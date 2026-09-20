@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import {
   AdminDialog,
@@ -10,6 +11,7 @@ import {
   TableCell,
   TableHeader,
 } from "@/components/admin";
+import { listAdminOrders, updateAdminOrderStatus } from "@/lib/admin-service";
 export const Route = createFileRoute("/admin/orders")({ component: AdminOrders });
 type Order = {
   id: string;
@@ -65,10 +67,15 @@ const initialOrders: Order[] = [
 ];
 const statuses: Order["status"][] = ["Pending", "Processing", "Shipped", "Delivered"];
 function AdminOrders() {
-  const [orders, setOrders] = useState(initialOrders);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("All");
   const [selected, setSelected] = useState<Order | null>(null);
+  const list = useServerFn(listAdminOrders);
+  const update = useServerFn(updateAdminOrderStatus);
+  useEffect(() => {
+    list().then(setOrders);
+  }, [list]);
   const filtered = useMemo(
     () =>
       orders.filter(
@@ -80,8 +87,14 @@ function AdminOrders() {
       ),
     [orders, query, status],
   );
-  const updateStatus = (next: Order["status"]) => {
+  const updateStatus = async (next: Order["status"]) => {
     if (!selected) return;
+    const result = await update({
+      data: {
+        id: selected.id,
+        status: next.toUpperCase() as "PENDING" | "PROCESSING" | "SHIPPED" | "DELIVERED",
+      },
+    });
     setOrders((current) =>
       current.map((order) => (order.id === selected.id ? { ...order, status: next } : order)),
     );
@@ -112,7 +125,7 @@ function AdminOrders() {
       </div>
       <div className="mt-4 flex justify-between text-xs text-[#776a61]">
         <span>{filtered.length} orders</span>
-        <span>Order mutations are preview-only until the order service is connected.</span>
+        <span>Connected to PostgreSQL order service.</span>
       </div>
       <div className="mt-4">
         <AdminTable>

@@ -1,46 +1,38 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import {
   AdminDialog,
   AdminField,
   AdminShell,
-  AdminStatus,
   AdminTable,
   TableCell,
   TableHeader,
 } from "@/components/admin";
+import { createAdminCategory, listAdminCategories } from "@/lib/admin-service";
 export const Route = createFileRoute("/admin/categories")({ component: AdminCategories });
-type Category = { name: string; slug: string; products: number; status: "Active" | "Draft" };
+type Category = { id: string; name: string; slug: string; products: number; status: "Active" };
 function AdminCategories() {
-  const [categories, setCategories] = useState<Category[]>([
-    { name: "Perfumes", slug: "perfume", products: 12, status: "Active" },
-    { name: "Makeup", slug: "makeup", products: 6, status: "Active" },
-    { name: "Grooming", slug: "grooming", products: 4, status: "Active" },
-    { name: "Bundles", slug: "bundle", products: 4, status: "Active" },
-    { name: "Accessories", slug: "accessories", products: 2, status: "Active" },
-  ]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const add = () => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    setCategories((current) => [
-      ...current,
-      {
-        name: trimmed,
-        slug: trimmed.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-        products: 0,
-        status: "Draft",
-      },
-    ]);
+  const list = useServerFn(listAdminCategories);
+  const create = useServerFn(createAdminCategory);
+  useEffect(() => {
+    list().then(setCategories);
+  }, [list]);
+  const add = async () => {
+    if (!name.trim()) return;
+    const category = await create({ data: { name } });
+    setCategories((current) => [...current, category]);
     setName("");
     setOpen(false);
   };
   return (
     <AdminShell
       title="Categories"
-      description="Manage the taxonomy that powers navigation, filtering, and catalogue organization."
+      description="Manage the database taxonomy used by navigation, filtering, and catalogue organization."
     >
       <div className="flex justify-end border-y border-[#d9cec5] py-4">
         <Button
@@ -57,21 +49,13 @@ function AdminCategories() {
             <th className="px-4 py-3">Slug</th>
             <th className="px-4 py-3">Products</th>
             <th className="px-4 py-3">Status</th>
-            <th className="px-4 py-3" />
           </TableHeader>
           {categories.map((category) => (
-            <tr key={category.slug} className="border-b border-[#e7ddd5] last:border-0">
+            <tr key={category.id} className="border-b border-[#e7ddd5] last:border-0">
               <TableCell className="font-medium">{category.name}</TableCell>
-              <TableCell className="text-[#776a61]">/{category.slug}</TableCell>
+              <TableCell>/{category.slug}</TableCell>
               <TableCell>{category.products}</TableCell>
-              <TableCell>
-                <AdminStatus tone={category.status === "Active" ? "positive" : "warning"}>
-                  {category.status}
-                </AdminStatus>
-              </TableCell>
-              <TableCell className="text-right">
-                <button className="text-[#8f5d48] underline">Edit</button>
-              </TableCell>
+              <TableCell>{category.status}</TableCell>
             </tr>
           ))}
         </AdminTable>
@@ -79,7 +63,7 @@ function AdminCategories() {
       {open && (
         <AdminDialog
           title="Add category"
-          description="New categories begin as drafts until assigned products are published."
+          description="Create a persistent category record."
           onClose={() => setOpen(false)}
         >
           <AdminField label="Category name">
@@ -87,7 +71,7 @@ function AdminCategories() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="h-10 w-full border border-[#d9cec5] bg-white/60 px-3 text-sm"
-              placeholder="e.g. Hair care"
+              placeholder="Hair care"
             />
           </AdminField>
           <div className="mt-6 flex justify-end gap-3">
@@ -99,7 +83,7 @@ function AdminCategories() {
               Cancel
             </Button>
             <Button onClick={add} className="rounded-none text-[10px] uppercase">
-              Create draft
+              Create category
             </Button>
           </div>
         </AdminDialog>

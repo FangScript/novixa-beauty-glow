@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import {
   AdminShell,
   AdminStatus,
@@ -9,9 +9,10 @@ import {
   TableCell,
   TableHeader,
 } from "@/components/admin";
+import { listAdminReviews, moderateAdminReview } from "@/lib/admin-service";
 export const Route = createFileRoute("/admin/reviews")({ component: AdminReviews });
 type Review = {
-  id: number;
+  id: string;
   product: string;
   customer: string;
   rating: number;
@@ -20,54 +21,48 @@ type Review = {
   status: "Approved" | "Pending" | "Rejected";
 };
 function AdminReviews() {
-  const [reviews, setReviews] = useState<Review[]>([
-    {
-      id: 1,
-      product: "Velvet Rose Eau de Parfum",
-      customer: "Ayesha K.",
-      rating: 5,
-      review: "Absolutely love the products!",
-      verified: true,
-      status: "Approved",
-    },
-    {
-      id: 2,
-      product: "Complete Glam Bundle",
-      customer: "Mira S.",
-      rating: 5,
-      review: "Everything I need in one edit.",
-      verified: true,
-      status: "Approved",
-    },
-    {
-      id: 3,
-      product: "Cloud Veil Foundation",
-      customer: "Nadia R.",
-      rating: 4,
-      review: "Beautiful finish and easy to blend.",
-      verified: false,
-      status: "Pending",
-    },
-  ]);
-  const moderate = (id: number, status: Review["status"]) =>
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const list = useServerFn(listAdminReviews);
+  const moderate = useServerFn(moderateAdminReview);
+  useEffect(() => {
+    list().then(setReviews);
+  }, [list]);
+  const update = async (id: string, status: "APPROVED" | "REJECTED") => {
+    const result = await moderate({ data: { id, status } });
     setReviews((current) =>
-      current.map((review) => (review.id === id ? { ...review, status } : review)),
+      current.map((review) =>
+        review.id === id
+          ? { ...review, status: result.status === "APPROVED" ? "Approved" : "Rejected" }
+          : review,
+      ),
     );
+  };
   const pending = reviews.filter((review) => review.status === "Pending").length;
+  const average = reviews.length
+    ? (reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length).toFixed(1)
+    : "—";
   return (
     <AdminShell
       title="Reviews"
-      description="Moderate customer feedback and protect the integrity of verified-purchase signals."
+      description="Moderate persistent customer feedback and verified-purchase signals."
     >
       <div className="grid gap-4 sm:grid-cols-3">
-        <MetricCard label="Average rating" value="4.8" detail="Across approved reviews" />
+        <MetricCard label="Average rating" value={average} detail="Database reviews" />
         <MetricCard
           label="Pending review"
           value={String(pending)}
           detail="Needs moderation"
           tone="dark"
         />
-        <MetricCard label="Verified reviews" value="86%" detail="Of approved reviews" />
+        <MetricCard
+          label="Verified reviews"
+          value={
+            reviews.length
+              ? `${Math.round((reviews.filter((r) => r.verified).length / reviews.length) * 100)}%`
+              : "—"
+          }
+          detail="Of loaded reviews"
+        />
       </div>
       <div className="mt-8">
         <AdminTable>
@@ -110,13 +105,13 @@ function AdminReviews() {
                 {review.status === "Pending" && (
                   <span className="flex gap-2">
                     <button
-                      onClick={() => moderate(review.id, "Approved")}
+                      onClick={() => update(review.id, "APPROVED")}
                       className="text-[#567149] underline"
                     >
                       Approve
                     </button>
                     <button
-                      onClick={() => moderate(review.id, "Rejected")}
+                      onClick={() => update(review.id, "REJECTED")}
                       className="text-[#a35742] underline"
                     >
                       Reject

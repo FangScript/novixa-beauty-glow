@@ -1,47 +1,26 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { AdminShell, AdminTable, AdminToolbar, TableCell, TableHeader } from "@/components/admin";
+import { useEffect, useState } from "react";
+import { AdminShell, AdminStatus, AdminTable, TableCell, TableHeader } from "@/components/admin";
+import { listAdminBundles } from "@/lib/admin-service";
 export const Route = createFileRoute("/admin/bundles")({ component: AdminBundles });
-const bundles = [
-  {
-    name: "Complete Glam Bundle",
-    products: 4,
-    price: "Rs. 7,999",
-    value: "Rs. 9,297",
-    savings: "14%",
-    status: "Active",
-  },
-  {
-    name: "Signature Scent Duo",
-    products: 2,
-    price: "Rs. 8,499",
-    value: "Rs. 9,999",
-    savings: "15%",
-    status: "Active",
-  },
-  {
-    name: "The Soft Glam Edit",
-    products: 4,
-    price: "Rs. 6,499",
-    value: "Rs. 7,399",
-    savings: "12%",
-    status: "Active",
-  },
-  {
-    name: "Rituals for Two",
-    products: 3,
-    price: "Rs. 7,299",
-    value: "Rs. 8,499",
-    savings: "14%",
-    status: "Draft",
-  },
-];
+type Bundle = {
+  id: string;
+  name: string;
+  products: number;
+  price: number;
+  originalValue: number;
+  status: string;
+};
 function AdminBundles() {
+  const [bundles, setBundles] = useState<Bundle[]>([]);
+  useEffect(() => {
+    listAdminBundles().then(setBundles);
+  }, []);
   return (
     <AdminShell
       title="Bundles"
-      description="Create curated offers, select included products, and manage bundle savings."
+      description="Review persistent curated offers and bundle savings from the commerce database."
     >
-      <AdminToolbar placeholder="Search bundles" />
       <div className="mt-6">
         <AdminTable>
           <TableHeader>
@@ -53,14 +32,22 @@ function AdminBundles() {
             <th className="px-4 py-3">Status</th>
           </TableHeader>
           {bundles.map((bundle) => (
-            <tr key={bundle.name} className="border-b border-[#e7ddd5] last:border-0">
+            <tr key={bundle.id} className="border-b border-[#e7ddd5] last:border-0">
               <TableCell className="font-medium">{bundle.name}</TableCell>
               <TableCell>{bundle.products}</TableCell>
-              <TableCell>{bundle.price}</TableCell>
-              <TableCell className="text-[#776a61]">{bundle.value}</TableCell>
-              <TableCell className="text-[#567149]">{bundle.savings}</TableCell>
+              <TableCell>Rs. {bundle.price.toLocaleString("en-IN")}</TableCell>
+              <TableCell className="text-[#776a61]">
+                Rs. {bundle.originalValue.toLocaleString("en-IN")}
+              </TableCell>
+              <TableCell className="text-[#567149]">
+                {bundle.originalValue
+                  ? `${Math.round((1 - bundle.price / bundle.originalValue) * 100)}%`
+                  : "—"}
+              </TableCell>
               <TableCell>
-                <span className="bg-[#e5dfd7] px-2 py-1 text-[9px] uppercase">{bundle.status}</span>
+                <AdminStatus tone={bundle.status === "ACTIVE" ? "positive" : "warning"}>
+                  {bundle.status}
+                </AdminStatus>
               </TableCell>
             </tr>
           ))}
