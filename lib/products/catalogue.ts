@@ -55,21 +55,19 @@ export type Gender = z.infer<typeof genderSchema>;
 export type ProductCategory = z.infer<typeof productCategorySchema>;
 export type Product = z.infer<typeof productSchema>;
 
-const toImg = (img: any): string => (typeof img === "string" ? img : img?.src || "/images/product-perfume.jpg");
-
 const perfume = (
   base: Omit<Product, "category" | "images"> & { gender: Gender; images?: string[] },
 ): Product => ({
   ...base,
   category: "perfume",
-  images: (base.images ?? [toImg(perfumeProduct)]) as string[],
+  images: base.images ?? [perfumeProduct],
   tags: base.tags,
 });
 const makeup = (base: any): Product => ({
   ...base,
   category: "makeup",
   gender: "women",
-  images: (base.images ?? [toImg(makeupCategory)]) as string[],
+  images: base.images ?? [makeupCategory],
   tags: base.tags,
 });
 const grooming = (
@@ -77,14 +75,14 @@ const grooming = (
 ): Product => ({
   ...base,
   category: "grooming",
-  images: (base.images ?? [toImg(accessoriesCategory)]) as string[],
+  images: base.images ?? [accessoriesCategory],
   tags: base.tags,
 });
 const bundle = (base: any): Product => ({
   ...base,
   category: "bundle",
   gender: "unisex",
-  images: (base.images ?? [toImg(bundleProduct)]) as string[],
+  images: base.images ?? [bundleProduct],
   tags: base.tags,
 });
 
