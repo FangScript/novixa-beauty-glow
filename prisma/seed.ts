@@ -1,8 +1,13 @@
 import { PrismaClient, ProductCategory, Gender, ProductStatus } from "@prisma/client";
+import { randomBytes, scryptSync } from "node:crypto";
 import { products } from "../src/lib/commerce/catalogue";
 
 const db = new PrismaClient();
 const categoryNames = ["perfume", "makeup", "grooming", "bundle", "accessories"] as const;
+const hashPassword = (password: string) => {
+  const salt = randomBytes(16).toString("hex");
+  return `scrypt:${salt}:${scryptSync(password, salt, 64).toString("hex")}`;
+};
 
 async function main() {
   const categories = new Map<string, string>();
@@ -85,6 +90,21 @@ async function main() {
         sortOrder,
       })),
     });
+  }
+  const adminEmail = process.env["ADMIN_EMAIL"]?.toLowerCase();
+  const adminPassword = process.env["ADMIN_PASSWORD"];
+  if (adminEmail && adminPassword) {
+    await db.user.upsert({
+      where: { email: adminEmail },
+      update: { name: "NOVIXA Administrator", role: "ADMIN" },
+      create: {
+        email: adminEmail,
+        name: "NOVIXA Administrator",
+        role: "ADMIN",
+        passwordHash: hashPassword(adminPassword),
+      },
+    });
+    console.log(`Ensured administrator account for ${adminEmail}.`);
   }
   console.log(`Seeded ${products.length} products across ${categories.size} categories.`);
 }

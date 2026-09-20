@@ -1,4 +1,4 @@
-import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, redirect, useRouterState } from "@tanstack/react-router";
 import { ArrowRight, TrendingUp } from "lucide-react";
 import {
   AdminShell,
@@ -8,7 +8,16 @@ import {
   AdminTable,
   adminProducts,
 } from "@/components/admin";
-export const Route = createFileRoute("/admin")({ component: AdminOverview });
+import { getCurrentAdmin } from "@/lib/auth";
+export const Route = createFileRoute("/admin")({
+  beforeLoad: async ({ location }) => {
+    if (location.pathname === "/admin/login" || location.pathname === "/admin/unauthorized") return;
+    const admin = await getCurrentAdmin();
+    if (!admin) throw redirect({ to: "/admin/login" });
+    return { admin };
+  },
+  component: AdminOverview,
+});
 function AdminOverview() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   if (pathname !== "/admin" && pathname !== "/admin/") return <Outlet />;

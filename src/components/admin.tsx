@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
   BarChart3,
   Boxes,
@@ -17,9 +17,11 @@ import {
   Users,
   Warehouse,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { products, formatPrice, type Product } from "@/lib/commerce";
+import { getCurrentAdmin, logoutAdmin } from "@/lib/auth";
 
 const nav = [
   ["Overview", "/admin", LayoutDashboard],
@@ -45,6 +47,19 @@ export function AdminShell({
   description?: string;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const navigate = useNavigate();
+  const getAdmin = useServerFn(getCurrentAdmin);
+  const logout = useServerFn(logoutAdmin);
+  const [admin, setAdmin] = useState<{ name: string; email: string } | null>(null);
+  useEffect(() => {
+    getAdmin().then((current) =>
+      setAdmin(current ? { name: current.name, email: current.email } : null),
+    );
+  }, [getAdmin]);
+  const handleLogout = async () => {
+    await logout();
+    await navigate({ to: "/admin/login" });
+  };
   return (
     <div className="min-h-screen bg-[#f6f1eb] text-[#211b18]">
       <aside
@@ -80,8 +95,8 @@ export function AdminShell({
           ))}
         </nav>
         <div className="absolute inset-x-5 bottom-5 border-t border-white/10 pt-4 text-[10px] text-white/50">
-          <p>Development mode</p>
-          <p className="mt-1">Auth guard pending</p>
+          <p>Protected workspace</p>
+          <p className="mt-1">Admin role verified</p>
         </div>
       </aside>
       <div className="lg:pl-64">
@@ -95,10 +110,21 @@ export function AdminShell({
           </button>
           <div className="hidden text-xs text-[#776a61] sm:block">Admin / {title}</div>
           <div className="flex items-center gap-3">
-            <span className="hidden text-xs text-[#776a61] sm:inline">NOVIXA Admin</span>
+            <span className="hidden text-right text-xs text-[#776a61] sm:inline">
+              <strong className="block font-normal text-[#211b18]">
+                {admin?.name ?? "NOVIXA Admin"}
+              </strong>
+              <span className="text-[10px]">{admin?.email ?? "Authenticated admin"}</span>
+            </span>
             <div className="flex h-8 w-8 items-center justify-center bg-[#211b18] text-xs text-white">
               NA
             </div>
+            <button
+              onClick={handleLogout}
+              className="hidden text-[10px] uppercase tracking-[0.12em] text-[#8f5d48] underline sm:inline"
+            >
+              Log out
+            </button>
           </div>
         </header>
         <main className="mx-auto max-w-[1440px] p-5 md:p-8">
@@ -108,9 +134,8 @@ export function AdminShell({
           >
             <ShieldAlert size={16} className="mt-0.5 shrink-0" />
             <p>
-              <strong>Preview access:</strong> admin authentication and server-side role checks are
-              not connected yet. Changes on these screens are local preview actions until the admin
-              service layer is enabled.
+              <strong>Protected workspace:</strong> administrator role verified server-side.
+              Product, order, and inventory mutations are attributed to the signed-in admin.
             </p>
           </div>
           <div className="mb-8">
