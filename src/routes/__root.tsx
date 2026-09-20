@@ -11,6 +11,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { CommerceProvider } from "../lib/commerce";
 
 function NotFoundComponent() {
   return (
@@ -78,10 +79,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "NOVIXA — Beauty, Fragrance & You" },
-      { name: "description", content: "Premium perfumes, curated makeup bundles and must-have beauty accessories." },
+      {
+        name: "description",
+        content: "Premium perfumes, curated makeup bundles and must-have beauty accessories.",
+      },
       { name: "author", content: "NOVIXA" },
       { property: "og:title", content: "NOVIXA — Beauty, Fragrance & You" },
-      { property: "og:description", content: "Discover premium fragrance, makeup and beauty essentials from NOVIXA." },
+      {
+        property: "og:description",
+        content: "Discover premium fragrance, makeup and beauty essentials from NOVIXA.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },
@@ -93,7 +100,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Italiana&display=swap" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Italiana&display=swap",
+      },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
     ],
   }),
@@ -122,8 +132,10 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      <CommerceProvider>
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <Outlet />
+      </CommerceProvider>
     </QueryClientProvider>
   );
 }
