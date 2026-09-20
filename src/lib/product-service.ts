@@ -1,7 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createServerFn } from "@tanstack/react-start";
 import { productSchema, products as seedProducts, type Product } from "@/lib/commerce/catalogue";
-import { getAuthenticatedAdmin } from "@/lib/auth";
+async function requireProductAdmin() {
+  const { getAuthenticatedAdmin } = await import("@/lib/auth.server");
+  if (!(await getAuthenticatedAdmin())) throw new Response("Unauthorized", { status: 401 });
+}
 
 let previewProducts: Product[] = seedProducts.map((product) => ({ ...product }));
 const hasDatabase = () => typeof process !== "undefined" && Boolean(process.env["DATABASE_URL"]);
@@ -43,7 +46,7 @@ const fromPrisma = (product: any): Product =>
   });
 
 export const listProducts = createServerFn({ method: "GET" }).handler(async () => {
-  if (!(await getAuthenticatedAdmin())) throw new Response("Unauthorized", { status: 401 });
+  await requireProductAdmin();
   if (!hasDatabase()) return { source: "preview" as const, products: previewProducts };
   const { PrismaClient } = await import("@prisma/client");
   const db = new PrismaClient();
@@ -63,7 +66,7 @@ const productInput = productSchema;
 export const saveProduct = createServerFn({ method: "POST" })
   .validator((data: unknown) => productInput.parse(data))
   .handler(async ({ data }) => {
-    if (!(await getAuthenticatedAdmin())) throw new Response("Unauthorized", { status: 401 });
+    await requireProductAdmin();
     if (!hasDatabase()) {
       previewProducts = previewProducts.some((product) => product.id === data.id)
         ? previewProducts.map((product) => (product.id === data.id ? data : product))
@@ -144,7 +147,7 @@ export const saveProduct = createServerFn({ method: "POST" })
 export const archiveProduct = createServerFn({ method: "POST" })
   .validator((data: { id: string }) => data)
   .handler(async ({ data }) => {
-    if (!(await getAuthenticatedAdmin())) throw new Response("Unauthorized", { status: 401 });
+    await requireProductAdmin();
     if (!hasDatabase()) {
       previewProducts = previewProducts.filter((product) => product.id !== data.id);
       return { source: "preview" as const, success: true };

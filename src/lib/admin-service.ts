@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { getAuthenticatedAdmin } from "@/lib/auth";
 const titleCase = (value: string) =>
   value
     .toLowerCase()
@@ -11,6 +10,7 @@ async function openDb() {
   return new PrismaClient();
 }
 async function adminOrThrow() {
+  const { getAuthenticatedAdmin } = await import("@/lib/auth.server");
   const admin = await getAuthenticatedAdmin();
   if (!admin) throw new Response("Unauthorized", { status: 401 });
   return admin;
