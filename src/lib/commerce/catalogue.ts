@@ -612,7 +612,13 @@ products.forEach((product) => {
 });
 
 export const formatPrice = (amount: number) => `Rs. ${amount.toLocaleString("en-IN")}`;
-export const getProduct = (slug: string) => products.find((product) => product.slug === slug);
+export const getProduct = (idOrSlug: string) =>
+  products.find(
+    (product) =>
+      product.id === idOrSlug ||
+      product.slug === idOrSlug ||
+      product.sku === idOrSlug,
+  );
 export const searchProducts = (query: string) => {
   const q = query.trim().toLowerCase();
   return q

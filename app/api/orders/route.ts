@@ -5,25 +5,48 @@ import { OrderStatus, PaymentStatus } from "@prisma/client";
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const email = searchParams.get("email");
+  const userId = searchParams.get("userId");
 
   try {
     if (process.env.DATABASE_URL) {
+      // Build the where clause based on available params
+      let whereClause: any = {};
+
+      if (userId) {
+        // Find user by matching the userId (stored as cuid) or by email
+        const matchedUser = await prisma.user.findFirst({
+          where: {
+            OR: [
+              { id: userId },
+              ...(userId.includes("@") ? [{ email: userId }] : []),
+            ],
+          },
+          select: { id: true },
+        });
+
+        if (matchedUser) {
+          whereClause = { userId: matchedUser.id };
+        } else {
+          whereClause = { id: { equals: "__none__" } };
+        }
+      } else if (email) {
+        whereClause = {
+          OR: [
+            {
+              shippingAddressSnapshot: {
+                path: ["email"],
+                string_contains: email,
+              },
+            },
+            {
+              user: { email: { equals: email, mode: "insensitive" } },
+            },
+          ],
+        };
+      }
+
       const orders = await prisma.order.findMany({
-        where: email
-          ? {
-              OR: [
-                {
-                  shippingAddressSnapshot: {
-                    path: ["email"],
-                    string_contains: email,
-                  },
-                },
-                {
-                  user: { email: { equals: email, mode: "insensitive" } },
-                },
-              ],
-            }
-          : undefined,
+        where: whereClause,
         include: {
           items: true,
           user: { select: { id: true, name: true, email: true } },
@@ -151,6 +174,28 @@ export async function POST(request: Request) {
       country: address.country ?? "IN",
     };
 
+    // Resolve the Prisma user ID from the provided userId (Supabase UID or email)
+    let resolvedPrismaUserId: string | null = null;
+    if (body.userId) {
+      const prismaUser = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { id: body.userId },
+            { email: customer.email.trim() },
+          ],
+        },
+        select: { id: true },
+      }).catch(() => null);
+      resolvedPrismaUserId = prismaUser?.id ?? null;
+    } else {
+      // Try to link by email even without explicit userId
+      const prismaUser = await prisma.user.findUnique({
+        where: { email: customer.email.trim() },
+        select: { id: true },
+      }).catch(() => null);
+      resolvedPrismaUserId = prismaUser?.id ?? null;
+    }
+
     // Execute atomic order placement & stock decrement transaction
     const createdOrder = await prisma.$transaction(async (tx) => {
       // 1. Decrement stock
@@ -172,6 +217,7 @@ export async function POST(request: Request) {
           tax,
           total,
           shippingAddressSnapshot: fullShippingSnapshot,
+          ...(resolvedPrismaUserId ? { user: { connect: { id: resolvedPrismaUserId } } } : {}),
           items: {
             create: lineItemsToCreate,
           },

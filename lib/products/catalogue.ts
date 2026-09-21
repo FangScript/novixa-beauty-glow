@@ -609,8 +609,33 @@ products.forEach((product) => {
   slugs.add(product.slug);
 });
 
+const liveProductsRegistry = new Map<string, Product>();
+
+export const registerLiveProducts = (liveProducts: Product[]) => {
+  if (!Array.isArray(liveProducts)) return;
+  liveProducts.forEach((p) => {
+    if (!p) return;
+    if (p.id) liveProductsRegistry.set(p.id, p);
+    if (p.slug) liveProductsRegistry.set(p.slug, p);
+    if (p.sku) liveProductsRegistry.set(p.sku, p);
+  });
+};
+
 export const formatPrice = (amount: number) => `Rs. ${amount.toLocaleString("en-IN")}`;
-export const getProduct = (slug: string) => products.find((product) => product.slug === slug);
+
+export const getProduct = (idOrSlug: string): Product | undefined => {
+  if (!idOrSlug) return undefined;
+  if (liveProductsRegistry.has(idOrSlug)) {
+    return liveProductsRegistry.get(idOrSlug);
+  }
+  return products.find(
+    (product) =>
+      product.id === idOrSlug ||
+      product.slug === idOrSlug ||
+      product.sku === idOrSlug,
+  );
+};
+
 export const searchProducts = (query: string) => {
   const q = query.trim().toLowerCase();
   return q

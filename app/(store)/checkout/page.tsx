@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Loader2, CheckCircle2, PackageCheck } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
 import { Button } from "@/components/ui/button";
 import { cartProducts, formatPrice, useCommerce } from "@/lib/commerce/context";
+import { useCustomerAuth } from "@/lib/auth/customer-context";
 
 export default function CheckoutPage() {
   const { cart, subtotal, clearCart } = useCommerce();
+  const { user } = useCustomerAuth();
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -23,6 +25,17 @@ export default function CheckoutPage() {
     state: "",
     pinCode: "",
   });
+
+  // Pre-fill from authenticated user
+  useEffect(() => {
+    if (user) {
+      setFormData((prev) => ({
+        ...prev,
+        name: prev.name || user.name || "",
+        email: prev.email || user.email || "",
+      }));
+    }
+  }, [user]);
 
   if (!cart.length && !submitted) {
     return (
@@ -124,6 +137,7 @@ export default function CheckoutPage() {
             productId: i.productId,
             quantity: i.quantity,
           })),
+          userId: user?.id ?? null,
           customer: {
             name: formData.name.trim(),
             email: formData.email.trim(),

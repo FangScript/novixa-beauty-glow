@@ -16,11 +16,18 @@ export default function AccountOrdersPage() {
   const [searchEmail, setSearchEmail] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchOrders = async (targetEmail: string) => {
+  const fetchOrders = async (targetEmail: string, targetUserId?: string) => {
     setIsLoading(true);
     try {
-      if (targetEmail) {
-        const res = await fetch(`/api/orders?email=${encodeURIComponent(targetEmail)}`);
+      // Prefer userId lookup (more reliable) then fall back to email
+      const param = targetUserId
+        ? `userId=${encodeURIComponent(targetUserId)}`
+        : targetEmail
+          ? `email=${encodeURIComponent(targetEmail)}`
+          : null;
+
+      if (param) {
+        const res = await fetch(`/api/orders?${param}`);
         const data = await res.json();
         if (data.orders && Array.isArray(data.orders) && data.orders.length > 0) {
           setOrders(data.orders);
@@ -29,7 +36,7 @@ export default function AccountOrdersPage() {
         }
       }
 
-      // Fallback to local session orders if API filter returns empty
+      // Fallback to local session orders if API returns empty
       if (typeof window !== "undefined") {
         const local = JSON.parse(localStorage.getItem("novixa_recent_orders") || "[]");
         setOrders(local);
@@ -50,7 +57,7 @@ export default function AccountOrdersPage() {
         : "");
     setEmail(resolvedEmail);
     setSearchEmail(resolvedEmail);
-    fetchOrders(resolvedEmail);
+    fetchOrders(resolvedEmail, user?.id);
   }, [user]);
 
   const handleSearch = (e: React.FormEvent) => {

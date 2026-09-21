@@ -242,22 +242,34 @@ export function AdminTable({ children }: { children: ReactNode }) {
   );
 }
 
-export function TableHeader({ children }: { children: ReactNode }) {
+export function TableHeader({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <tr className="border-b border-[#d9cec5] bg-[#ede4dc] text-[9px] uppercase tracking-[0.15em] text-[#776a61]">
+    <tr className={`border-b border-[#d9cec5] bg-[#ede4dc] text-[9px] uppercase tracking-[0.15em] text-[#776a61] ${className}`}>
       {children}
     </tr>
+  );
+}
+
+export function TableHead({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return (
+    <th className={`px-4 py-3 font-semibold ${className}`}>{children}</th>
   );
 }
 
 export function TableCell({
   children,
   className = "",
+  colSpan,
 }: {
   children: ReactNode;
   className?: string;
+  colSpan?: number;
 }) {
-  return <td className={`px-4 py-3 ${className}`}>{children}</td>;
+  return (
+    <td className={`px-4 py-3 ${className}`} colSpan={colSpan}>
+      {children}
+    </td>
+  );
 }
 
 export function ProductRow({ product }: { product: Product }) {

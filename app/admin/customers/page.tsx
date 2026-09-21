@@ -1,118 +1,119 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AdminShell, AdminTable, MetricCard, TableCell, TableHeader } from "@/components/admin";
+import { Loader2 } from "lucide-react";
 
 type Customer = {
   id: string;
   name: string;
   email: string;
+  phone?: string;
   orders: number;
   joined: string;
-  status: "Active";
 };
 
-const initialCustomers: Customer[] = [
-  {
-    id: "c1",
-    name: "Ayesha Khan",
-    email: "ayesha@example.com",
-    orders: 3,
-    joined: "12 Sep 2026",
-    status: "Active",
-  },
-  {
-    id: "c2",
-    name: "Mira Shah",
-    email: "mira@example.com",
-    orders: 2,
-    joined: "15 Sep 2026",
-    status: "Active",
-  },
-  {
-    id: "c3",
-    name: "Arjun Mehta",
-    email: "arjun@example.com",
-    orders: 1,
-    joined: "18 Sep 2026",
-    status: "Active",
-  },
-  {
-    id: "c4",
-    name: "Zara Ali",
-    email: "zara@example.com",
-    orders: 4,
-    joined: "05 Sep 2026",
-    status: "Active",
-  },
-];
-
 export default function AdminCustomersPage() {
-  const [customers] = useState<Customer[]>(initialCustomers);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    fetch("/api/admin/customers")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.customers) setCustomers(data.customers);
+      })
+      .catch((err) => console.warn("Failed to load customers:", err))
+      .finally(() => setIsLoading(false));
+  }, []);
 
   const filtered = useMemo(
     () =>
       customers.filter((c) =>
-        `${c.name} ${c.email}`.toLowerCase().includes(query.toLowerCase()),
+        `${c.name} ${c.email} ${c.phone ?? ""}`.toLowerCase().includes(query.toLowerCase()),
       ),
     [customers, query],
   );
 
+  const totalOrders = customers.reduce((sum, c) => sum + c.orders, 0);
+  const repeatCustomers = customers.filter((c) => c.orders > 1).length;
+
   return (
     <AdminShell
       title="Customers"
-      description="Review registered customers, account activity, and order history from PostgreSQL."
+      description="All registered customer accounts and their order activity."
     >
       <div className="grid gap-4 sm:grid-cols-3">
         <MetricCard
-          label="Total customers"
+          label="Total Customers"
           value={String(customers.length)}
-          detail="Database verified accounts"
+          detail="Registered accounts"
+          tone="dark"
         />
         <MetricCard
-          label="Active purchasers"
-          value={String(customers.filter((c) => c.orders > 0).length)}
-          detail="Accounts with completed orders"
+          label="Total Orders"
+          value={String(totalOrders)}
+          detail="Across all customers"
         />
         <MetricCard
-          label="Recent signup"
-          value={customers[0]?.joined ?? "—"}
-          detail="Latest member registration"
+          label="Repeat Customers"
+          value={String(repeatCustomers)}
+          detail="Placed 2+ orders"
         />
       </div>
 
-      <div className="mt-8 border-y border-[#d9cec5] py-4">
+      <div className="mt-6 flex items-center gap-3">
         <input
+          type="text"
+          placeholder="Search by name, email or phone…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search customer by name or email"
-          className="h-10 w-full max-w-md border border-[#d9cec5] bg-white/60 px-3 text-sm outline-none focus:border-[#8f5d48]"
+          className="h-9 w-full max-w-xs border border-[#d9cec5] bg-white/60 px-3 text-xs outline-none focus:border-[#c9a982]"
         />
+        {isLoading && <Loader2 size={15} className="animate-spin text-[#c9a982]" />}
       </div>
 
       <div className="mt-4">
         <AdminTable>
           <TableHeader>
-            <th className="px-4 py-3">Customer Name</th>
-            <th className="px-4 py-3">Email Address</th>
-            <th className="px-4 py-3">Completed Orders</th>
-            <th className="px-4 py-3">Joined Date</th>
-            <th className="px-4 py-3">Account Status</th>
+            <th className="px-4 py-3">Name</th>
+            <th className="px-4 py-3">Email</th>
+            <th className="px-4 py-3">Phone</th>
+            <th className="px-4 py-3">Orders</th>
+            <th className="px-4 py-3">Joined</th>
           </TableHeader>
-          {filtered.map((customer) => (
-            <tr key={customer.id} className="border-b border-[#e7ddd5] last:border-0 hover:bg-black/[0.02]">
-              <TableCell className="font-medium text-[#211b18]">{customer.name}</TableCell>
-              <TableCell className="text-[#8f8279]">{customer.email}</TableCell>
-              <TableCell className="font-semibold">{customer.orders} orders</TableCell>
-              <TableCell className="text-[#776a61]">{customer.joined}</TableCell>
-              <TableCell>
-                <span className="bg-[#dfe8d9] text-[#4b6742] px-2 py-0.5 text-[9px] uppercase font-medium">
-                  {customer.status}
+          {filtered.length === 0 && !isLoading ? (
+            <tr>
+              <TableCell colSpan={5}>
+                <span className="text-muted-foreground">
+                  {customers.length === 0
+                    ? "No customers have registered yet."
+                    : "No customers match your search."}
                 </span>
               </TableCell>
             </tr>
-          ))}
+          ) : (
+            filtered.map((c) => (
+              <tr key={c.id} className="border-b border-[#e8e0d8] hover:bg-white/60 transition-colors">
+                <TableCell>
+                  <span className="font-medium text-foreground">{c.name}</span>
+                </TableCell>
+                <TableCell>{c.email}</TableCell>
+                <TableCell>{c.phone || "—"}</TableCell>
+                <TableCell>
+                  <span
+                    className={`px-2 py-0.5 text-[10px] font-semibold ${
+                      c.orders > 1 ? "bg-[#f4ede6] text-[#8f5d48]" : "bg-[#f5f5f5] text-[#999]"
+                    }`}
+                  >
+                    {c.orders} order{c.orders !== 1 ? "s" : ""}
+                  </span>
+                </TableCell>
+                <TableCell>{c.joined}</TableCell>
+              </tr>
+            ))
+          )}
         </AdminTable>
       </div>
     </AdminShell>

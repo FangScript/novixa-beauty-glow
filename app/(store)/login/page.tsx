@@ -2,8 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
-import { Eye, EyeOff, Loader2, UserRound, Lock, Mail, Sparkles } from "lucide-react";
+import { Eye, EyeOff, Loader2, UserRound, Lock, Mail, Sparkles, CheckCircle2, ArrowLeft } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
 import { Button } from "@/components/ui/button";
 import { useCustomerAuth } from "@/lib/auth/customer-context";
@@ -17,17 +16,20 @@ const GOOGLE_ERROR_MESSAGES: Record<string, string> = {
   no_email: "Your Google account did not provide an email address.",
   db_error: "Account creation failed. Please try again.",
   oauth_failed: "Google sign-in failed. Please try again.",
+  auth_exchange_failed: "Sign-in exchange failed. Please try again.",
 };
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextPath = searchParams.get("next") || "/account";
-  const { user, isLoading: authLoading, login, register } = useCustomerAuth();
+  const { user, isLoading: authLoading, login, register, signInWithGoogle, resetPassword } = useCustomerAuth();
 
-  const [tab, setTab] = useState<"signin" | "register">("signin");
+  const [tab, setTab] = useState<"signin" | "register" | "forgot">("signin");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
@@ -40,6 +42,7 @@ function LoginForm() {
   }, [searchParams]);
 
   const [signInForm, setSignInForm] = useState({ email: "", password: "" });
+  const [forgotEmail, setForgotEmail] = useState("");
   const [registerForm, setRegisterForm] = useState({
     name: "",
     email: "",
@@ -57,6 +60,7 @@ function LoginForm() {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccessMsg(null);
     setIsSubmitting(true);
     const result = await login(signInForm.email, signInForm.password);
     if (!result.ok) {
@@ -70,6 +74,7 @@ function LoginForm() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccessMsg(null);
     if (registerForm.password !== registerForm.confirm) {
       setError("Passwords do not match.");
       return;
@@ -83,8 +88,36 @@ function LoginForm() {
     if (!result.ok) {
       setError(result.error || "Registration failed.");
       setIsSubmitting(false);
+    } else if (result.error) {
+      // Info note from supabase (e.g. check email)
+      setSuccessMsg(result.error);
+      setIsSubmitting(false);
     } else {
       router.push(nextPath);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setError(null);
+    setIsGoogleLoading(true);
+    const result = await signInWithGoogle(nextPath);
+    if (!result.ok) {
+      setError(result.error || "Google sign-in could not be initiated.");
+      setIsGoogleLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccessMsg(null);
+    setIsSubmitting(true);
+    const result = await resetPassword(forgotEmail);
+    setIsSubmitting(false);
+    if (!result.ok) {
+      setError(result.error || "Failed to send reset email.");
+    } else {
+      setSuccessMsg("Check your inbox! We've sent a password reset link to your email.");
     }
   };
 
@@ -97,35 +130,65 @@ function LoginForm() {
   }
 
   return (
-    <PageShell eyebrow="Member Portal" title={tab === "signin" ? "Welcome Back" : "Create Account"}>
+    <PageShell
+      eyebrow="Member Portal"
+      title={
+        tab === "signin"
+          ? "Welcome Back"
+          : tab === "register"
+            ? "Create Account"
+            : "Reset Password"
+      }
+    >
       <div className="mt-8 grid gap-8 lg:grid-cols-[480px_1fr]">
         {/* Form panel */}
         <div>
           {/* Tab switcher */}
-          <div className="flex border-b border-border">
+          {tab !== "forgot" ? (
+            <div className="flex border-b border-border">
+              <button
+                id="tab-signin"
+                onClick={() => {
+                  setTab("signin");
+                  setError(null);
+                  setSuccessMsg(null);
+                }}
+                className={`pb-3 pr-6 text-xs uppercase tracking-[0.14em] transition-colors ${
+                  tab === "signin"
+                    ? "border-b-2 border-rosewood text-rosewood font-semibold -mb-px"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Sign In
+              </button>
+              <button
+                id="tab-register"
+                onClick={() => {
+                  setTab("register");
+                  setError(null);
+                  setSuccessMsg(null);
+                }}
+                className={`pb-3 pl-6 text-xs uppercase tracking-[0.14em] transition-colors ${
+                  tab === "register"
+                    ? "border-b-2 border-rosewood text-rosewood font-semibold -mb-px"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Create Account
+              </button>
+            </div>
+          ) : (
             <button
-              id="tab-signin"
-              onClick={() => { setTab("signin"); setError(null); }}
-              className={`pb-3 pr-6 text-xs uppercase tracking-[0.14em] transition-colors ${
-                tab === "signin"
-                  ? "border-b-2 border-rosewood text-rosewood font-semibold -mb-px"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              onClick={() => {
+                setTab("signin");
+                setError(null);
+                setSuccessMsg(null);
+              }}
+              className="inline-flex items-center gap-2 pb-3 text-xs uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground"
             >
-              Sign In
+              <ArrowLeft size={14} /> Back to Sign In
             </button>
-            <button
-              id="tab-register"
-              onClick={() => { setTab("register"); setError(null); }}
-              className={`pb-3 pl-6 text-xs uppercase tracking-[0.14em] transition-colors ${
-                tab === "register"
-                  ? "border-b-2 border-rosewood text-rosewood font-semibold -mb-px"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Create Account
-            </button>
-          </div>
+          )}
 
           {/* Error banner */}
           {error && (
@@ -134,40 +197,72 @@ function LoginForm() {
             </div>
           )}
 
-          {/* Google OAuth button */}
-          <div className="mt-5">
-            <a
-              id="google-signin-btn"
-              href={`/api/auth/customer/google?next=${encodeURIComponent(nextPath)}`}
-              className="flex w-full items-center justify-center gap-3 border border-border bg-white px-4 py-2.5 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-gray-50 hover:border-gray-300"
-            >
-              {/* Google "G" logo */}
-              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-              </svg>
-              Continue with Google
-            </a>
-          </div>
+          {/* Success banner */}
+          {successMsg && (
+            <div className="mt-5 flex items-center gap-2 border border-emerald-300 bg-emerald-50 px-4 py-3 text-xs text-emerald-800">
+              <CheckCircle2 size={16} className="shrink-0 text-emerald-600" />
+              <span>{successMsg}</span>
+            </div>
+          )}
 
-          {/* Divider */}
-          <div className="relative my-5">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-border" />
-            </div>
-            <div className="relative flex justify-center">
-              <span className="bg-background px-3 text-[10px] uppercase tracking-wider text-muted-foreground">
-                or continue with email
-              </span>
-            </div>
-          </div>
+          {tab !== "forgot" && (
+            <>
+              {/* Google OAuth button */}
+              <div className="mt-5">
+                <button
+                  type="button"
+                  id="google-signin-btn"
+                  onClick={handleGoogleSignIn}
+                  disabled={isGoogleLoading}
+                  className="flex w-full items-center justify-center gap-3 border border-border bg-white px-4 py-2.5 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50"
+                >
+                  {isGoogleLoading ? (
+                    <Loader2 size={16} className="animate-spin text-rosewood" />
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                      <path
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                        fill="#4285F4"
+                      />
+                      <path
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                        fill="#34A853"
+                      />
+                      <path
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
+                        fill="#FBBC05"
+                      />
+                      <path
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                        fill="#EA4335"
+                      />
+                    </svg>
+                  )}
+                  Continue with Google
+                </button>
+              </div>
+
+              {/* Divider */}
+              <div className="relative my-5">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="bg-background px-3 text-[10px] uppercase tracking-wider text-muted-foreground">
+                    or continue with email
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
 
           {tab === "signin" ? (
             <form onSubmit={handleSignIn} className="mt-6 space-y-4">
               <div className="relative">
-                <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Mail
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                />
                 <input
                   id="signin-email"
                   required
@@ -179,7 +274,10 @@ function LoginForm() {
                 />
               </div>
               <div className="relative">
-                <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Lock
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                />
                 <input
                   id="signin-password"
                   required
@@ -198,6 +296,22 @@ function LoginForm() {
                   {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTab("forgot");
+                    setError(null);
+                    setSuccessMsg(null);
+                    setForgotEmail(signInForm.email);
+                  }}
+                  className="text-xs text-muted-foreground hover:text-rosewood transition-colors"
+                >
+                  Forgot your password?
+                </button>
+              </div>
+
               <Button
                 id="signin-submit"
                 type="submit"
@@ -216,17 +330,24 @@ function LoginForm() {
                 No account?{" "}
                 <button
                   type="button"
-                  onClick={() => { setTab("register"); setError(null); }}
+                  onClick={() => {
+                    setTab("register");
+                    setError(null);
+                    setSuccessMsg(null);
+                  }}
                   className="text-rosewood underline underline-offset-2 hover:text-foreground"
                 >
                   Create one for free
                 </button>
               </p>
             </form>
-          ) : (
+          ) : tab === "register" ? (
             <form onSubmit={handleRegister} className="mt-6 space-y-4">
               <div className="relative">
-                <UserRound size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <UserRound
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                />
                 <input
                   id="register-name"
                   required
@@ -238,7 +359,10 @@ function LoginForm() {
                 />
               </div>
               <div className="relative">
-                <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Mail
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                />
                 <input
                   id="register-email"
                   required
@@ -250,7 +374,10 @@ function LoginForm() {
                 />
               </div>
               <div className="relative">
-                <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Lock
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                />
                 <input
                   id="register-password"
                   required
@@ -270,7 +397,10 @@ function LoginForm() {
                 </button>
               </div>
               <div className="relative">
-                <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Lock
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                />
                 <input
                   id="register-confirm"
                   required
@@ -307,12 +437,51 @@ function LoginForm() {
                 Already a member?{" "}
                 <button
                   type="button"
-                  onClick={() => { setTab("signin"); setError(null); }}
+                  onClick={() => {
+                    setTab("signin");
+                    setError(null);
+                    setSuccessMsg(null);
+                  }}
                   className="text-rosewood underline underline-offset-2 hover:text-foreground"
                 >
                   Sign in instead
                 </button>
               </p>
+            </form>
+          ) : (
+            <form onSubmit={handleForgotPassword} className="mt-6 space-y-4">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Enter your registered email address and we will send you a secure link to reset your
+                password.
+              </p>
+              <div className="relative">
+                <Mail
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                />
+                <input
+                  id="forgot-email"
+                  required
+                  type="email"
+                  placeholder="Email address"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  className="h-11 w-full border border-border bg-white/50 pl-9 pr-3 text-sm outline-none focus:border-rosewood transition-colors"
+                />
+              </div>
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full rounded-none bg-ink py-6 text-[10px] font-semibold uppercase tracking-[0.14em] text-white hover:bg-black"
+              >
+                {isSubmitting ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 size={13} className="animate-spin" /> Sending link...
+                  </span>
+                ) : (
+                  "Send Reset Link"
+                )}
+              </Button>
             </form>
           )}
         </div>
@@ -337,7 +506,7 @@ function LoginForm() {
               {
                 icon: <Lock size={18} className="text-rosewood" />,
                 title: "Secure & Private",
-                desc: "Your account is protected with industry-standard password hashing.",
+                desc: "Protected by industry-leading Supabase authentication and encryption.",
               },
             ].map(({ icon, title, desc }) => (
               <div key={title} className="flex gap-4">
@@ -365,11 +534,13 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <Loader2 size={24} className="animate-spin text-rosewood" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="flex min-h-[50vh] items-center justify-center">
+          <Loader2 size={24} className="animate-spin text-rosewood" />
+        </div>
+      }
+    >
       <LoginForm />
     </Suspense>
   );

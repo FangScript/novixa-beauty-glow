@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/db/client";
-import { products as fallbackProducts, type Product } from "@/lib/products/catalogue";
+import {
+  products as fallbackProducts,
+  registerLiveProducts,
+  type Product,
+} from "@/lib/products/catalogue";
 
 export async function getLiveProducts(): Promise<Product[]> {
   try {
@@ -11,7 +15,7 @@ export async function getLiveProducts(): Promise<Product[]> {
       });
 
       if (dbProducts.length > 0) {
-        return dbProducts.map((p) => ({
+        const live = dbProducts.map((p) => ({
           id: p.id,
           name: p.name,
           slug: p.slug,
@@ -36,6 +40,8 @@ export async function getLiveProducts(): Promise<Product[]> {
           occasion: p.occasions,
           ingredients: p.ingredients,
         }));
+        registerLiveProducts(live);
+        return live;
       }
     }
   } catch (error) {
@@ -54,7 +60,7 @@ export async function getLiveProductBySlug(slug: string): Promise<Product | null
       });
 
       if (dbProduct) {
-        return {
+        const prod: Product = {
           id: dbProduct.id,
           name: dbProduct.name,
           slug: dbProduct.slug,
@@ -79,6 +85,8 @@ export async function getLiveProductBySlug(slug: string): Promise<Product | null
           occasion: dbProduct.occasions,
           ingredients: dbProduct.ingredients,
         };
+        registerLiveProducts([prod]);
+        return prod;
       }
     }
   } catch (error) {
