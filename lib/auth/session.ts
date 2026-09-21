@@ -252,3 +252,70 @@ export async function logoutCustomer() {
   return { ok: true as const };
 }
 
+// ─── Google OAuth ────────────────────────────────────────────────────────────
+
+export async function loginWithGoogle(
+  googleId: string,
+  email: string,
+  name: string,
+) {
+  if (!databaseConfigured()) {
+    return { ok: false as const, error: "Database is not configured." };
+  }
+
+  // 1. Try to find by googleId first
+  let user = await prisma.user.findUnique({ where: { googleId } });
+
+  // 2. Try to find by email (link existing password account)
+  if (!user) {
+    const byEmail = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+    if (byEmail) {
+      // Link googleId to existing account
+      user = await prisma.user.update({
+        where: { id: byEmail.id },
+        data: {
+          googleId,
+          emailVerifiedAt: byEmail.emailVerifiedAt ?? new Date(),
+          lastLoginAt: new Date(),
+        },
+      });
+    }
+  }
+
+  // 3. Create new customer account
+  if (!user) {
+    user = await prisma.user.create({
+      data: {
+        email: email.toLowerCase().trim(),
+        name: name.trim(),
+        googleId,
+        role: "CUSTOMER",
+        emailVerifiedAt: new Date(), // Google emails are pre-verified
+        lastLoginAt: new Date(),
+      },
+    });
+  } else {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+  }
+
+  // 4. Create session
+  const rawSession = randomBytes(32).toString("base64url");
+  const sessionId = hashSession(rawSession);
+  const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000);
+
+  await prisma.session.create({ data: { id: sessionId, userId: user.id, expiresAt } });
+
+  const cookieStore = await cookies();
+  cookieStore.set(CUSTOMER_SESSION_COOKIE, rawSession, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: SESSION_TTL_SECONDS,
+    path: "/",
+  });
+
+  return { ok: true as const, user: { id: user.id, email: user.email, name: user.name } };
+}
