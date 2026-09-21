@@ -1,14 +1,15 @@
 import { PageShell } from "@/components/layout/PageShell";
 import { ProductCard } from "@/components/products/ProductCard";
-import { products } from "@/lib/products/catalogue";
+import { getLiveProducts } from "@/lib/products/get-products";
 
 export const metadata = {
   title: "Curated Bundle Offers",
   description: "Complete beauty rituals, signature pairing sets, and luxury value bundles.",
 };
 
-export default function BundlesPage() {
-  const bundleProducts = products.filter(
+export default async function BundlesPage() {
+  const allProducts = await getLiveProducts();
+  const bundleProducts = allProducts.filter(
     (p) => p.category === "bundle" || p.tags.includes("kit"),
   );
 

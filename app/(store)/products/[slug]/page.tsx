@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { Heart, Star, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,19 @@ export default function ProductDetailPage({
 }) {
   const resolvedParams = use(params);
   const slug = resolvedParams.slug;
-  const product = getProduct(slug);
+  const initialProduct = getProduct(slug);
+  const [product, setProduct] = useState(initialProduct);
+
+  useEffect(() => {
+    fetch(`/api/products/${slug}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.product) {
+          setProduct(data.product);
+        }
+      })
+      .catch((err) => console.warn("Failed to load live product details:", err));
+  }, [slug]);
 
   const { addToCart, toggleWishlist, isWishlisted } = useCommerce();
   const [quantity, setQuantity] = useState(1);

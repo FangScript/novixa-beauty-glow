@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   AdminDialog,
@@ -8,10 +8,10 @@ import {
   AdminShell,
   AdminStatus,
   AdminTable,
-  ProductRow,
   TableCell,
   TableHeader,
 } from "@/components/admin";
+import { ProductImageUpload } from "@/components/admin/ProductImageUpload";
 import {
   products as seedProducts,
   productSchema,
@@ -31,6 +31,7 @@ type ProductForm = {
   stock: string;
   badge: string;
   tags: string;
+  images: string[];
 };
 
 const blankForm: ProductForm = {
@@ -44,6 +45,7 @@ const blankForm: ProductForm = {
   stock: "0",
   badge: "",
   tags: "",
+  images: [],
 };
 
 const inputClass =
@@ -61,6 +63,7 @@ function toForm(product: Product): ProductForm {
     stock: String(product.stock),
     badge: product.badge ?? "",
     tags: product.tags.join(", "),
+    images: product.images || [],
   };
 }
 
@@ -73,6 +76,18 @@ export default function AdminProductsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState<ProductForm>(blankForm);
   const [error, setError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/products")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.products && Array.isArray(data.products) && data.products.length > 0) {
+          setRecords(data.products);
+        }
+      })
+      .catch((err) => console.warn("Could not load products from API:", err));
+  }, []);
 
   const filtered = useMemo(
     () =>
@@ -103,6 +118,9 @@ export default function AdminProductsPage() {
   };
 
   const save = async () => {
+    setError("");
+    const finalImages = form.images.length > 0 ? form.images : ["/images/product-perfume.jpg"];
+
     const parsed = productSchema.safeParse({
       id: selected?.id ?? `p-${Date.now()}`,
       name: form.name.trim(),
@@ -118,7 +136,7 @@ export default function AdminProductsPage() {
       category: form.category,
       brand: selected?.brand ?? "NOVIXA",
       sku: form.sku.trim().toUpperCase(),
-      images: selected?.images ?? ["/images/product-perfume.jpg"],
+      images: finalImages,
       stock: Number(form.stock),
       rating: selected?.rating ?? 5.0,
       reviewCount: selected?.reviewCount ?? 0,
@@ -135,14 +153,37 @@ export default function AdminProductsPage() {
     }
 
     const savedProduct = parsed.data;
-    setRecords((current) =>
-      current.some((p) => p.id === savedProduct.id)
-        ? current.map((p) => (p.id === savedProduct.id ? savedProduct : p))
-        : [savedProduct, ...current],
-    );
+    setIsSaving(true);
 
-    setSelected(null);
-    setCreateOpen(false);
+    try {
+      const isEditing = Boolean(selected?.id);
+      const res = await fetch("/api/products", {
+        method: isEditing ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...savedProduct,
+          id: selected?.id,
+        }),
+      });
+
+      const resData = await res.json();
+      if (!res.ok) {
+        throw new Error(resData.error || "Failed to save product in database.");
+      }
+
+      setRecords((current) =>
+        current.some((p) => p.id === savedProduct.id)
+          ? current.map((p) => (p.id === savedProduct.id ? savedProduct : p))
+          : [savedProduct, ...current],
+      );
+
+      setSelected(null);
+      setCreateOpen(false);
+    } catch (err: any) {
+      setError(err.message || "Failed to persist product.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const archive = (id: string) => {
@@ -151,15 +192,15 @@ export default function AdminProductsPage() {
 
   return (
     <AdminShell
-      title="Products"
-      description="Manage catalogue content, pricing, product attributes, publishing state, and stock readiness."
+      title="Product Catalogue"
+      description="Manage formulations, pricing, stock levels, and photography assets."
     >
-      <div className="flex flex-col gap-3 border-y border-[#d9cec5] py-4 md:flex-row md:items-center">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_160px_160px_auto]">
         <input
+          placeholder="Search products by title, SKU, or tags..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search name, SKU, category, or tag"
-          className="h-10 flex-1 border border-[#d9cec5] bg-white/60 px-3 text-sm outline-none focus:border-[#8f5d48]"
+          className={inputClass}
         />
         <select
           value={category}
@@ -210,7 +251,14 @@ export default function AdminProductsPage() {
             <tr key={product.id} className="border-b border-[#e7ddd5] last:border-0 hover:bg-black/[0.02]">
               <TableCell>
                 <div className="flex items-center gap-3">
-                  <img src={product.images[0]} alt="" className="h-10 w-10 object-cover bg-blush/20" />
+                  <img
+                    src={product.images[0] || "/images/product-perfume.jpg"}
+                    alt=""
+                    className="h-10 w-10 object-cover bg-blush/20 border border-[#e7ddd5]"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = "/placeholder.svg";
+                    }}
+                  />
                   <div>
                     <p className="font-medium text-[#211b18]">{product.name}</p>
                     <p className="text-[10px] text-[#8f8279]">{product.sku}</p>
@@ -248,31 +296,43 @@ export default function AdminProductsPage() {
       {(createOpen || selected) && (
         <AdminDialog
           title={selected ? `Edit ${selected.name}` : "Create New Product"}
-          description="Update details, stock counts, and classifications."
+          description="Update details, stock counts, photography, and classifications."
           onClose={() => {
             setSelected(null);
             setCreateOpen(false);
           }}
         >
-          <div className="space-y-4">
+          <div className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
             {error && (
               <p className="border border-[#b86d5a] bg-[#5a3028] p-3 text-xs text-white">
                 {error}
               </p>
             )}
+
             <AdminField label="Product Name">
               <input
                 className={inputClass}
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="e.g. Amber Oud Noir Eau de Parfum"
               />
             </AdminField>
+
+            {/* Product Image Upload Section */}
+            <div className="border border-[#e7ddd5] bg-white/40 p-4">
+              <ProductImageUpload
+                images={form.images}
+                onChange={(imgs) => setForm({ ...form, images: imgs })}
+              />
+            </div>
+
             <div className="grid gap-3 sm:grid-cols-2">
               <AdminField label="SKU">
                 <input
                   className={inputClass}
                   value={form.sku}
                   onChange={(e) => setForm({ ...form, sku: e.target.value })}
+                  placeholder="e.g. NVX-AMB-01"
                 />
               </AdminField>
               <AdminField label="Stock Quantity">
@@ -284,6 +344,7 @@ export default function AdminProductsPage() {
                 />
               </AdminField>
             </div>
+
             <div className="grid gap-3 sm:grid-cols-2">
               <AdminField label="Price (INR)">
                 <input
@@ -293,15 +354,17 @@ export default function AdminProductsPage() {
                   onChange={(e) => setForm({ ...form, price: e.target.value })}
                 />
               </AdminField>
-              <AdminField label="Sale Price (INR)">
+              <AdminField label="Sale Price (INR - Optional)">
                 <input
                   type="number"
                   className={inputClass}
                   value={form.salePrice}
                   onChange={(e) => setForm({ ...form, salePrice: e.target.value })}
+                  placeholder="Leave empty if not on sale"
                 />
               </AdminField>
             </div>
+
             <div className="grid gap-3 sm:grid-cols-2">
               <AdminField label="Category">
                 <select
@@ -328,6 +391,25 @@ export default function AdminProductsPage() {
                 </select>
               </AdminField>
             </div>
+
+            <AdminField label="Badge (e.g. BEST SELLER, NEW ARRIVAL)">
+              <input
+                className={inputClass}
+                value={form.badge}
+                onChange={(e) => setForm({ ...form, badge: e.target.value })}
+                placeholder="Optional tag"
+              />
+            </AdminField>
+
+            <AdminField label="Search Tags (comma separated)">
+              <input
+                className={inputClass}
+                value={form.tags}
+                onChange={(e) => setForm({ ...form, tags: e.target.value })}
+                placeholder="luxury, signature, evening, floral"
+              />
+            </AdminField>
+
             <AdminField label="Description">
               <textarea
                 rows={3}
@@ -336,9 +418,11 @@ export default function AdminProductsPage() {
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
               />
             </AdminField>
+
             <div className="flex justify-end gap-3 pt-4 border-t border-[#d9cec5]">
               <Button
                 variant="outline"
+                disabled={isSaving}
                 onClick={() => {
                   setSelected(null);
                   setCreateOpen(false);
@@ -346,8 +430,12 @@ export default function AdminProductsPage() {
               >
                 Cancel
               </Button>
-              <Button onClick={save} className="bg-[#211b18] text-white hover:bg-black">
-                Save Product
+              <Button
+                disabled={isSaving}
+                onClick={save}
+                className="bg-[#211b18] text-white hover:bg-black min-w-[120px]"
+              >
+                {isSaving ? "Saving..." : "Save Product"}
               </Button>
             </div>
           </div>

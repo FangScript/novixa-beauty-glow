@@ -1,14 +1,15 @@
 import { PageShell } from "@/components/layout/PageShell";
 import { ProductCard } from "@/components/products/ProductCard";
-import { products } from "@/lib/products/catalogue";
+import { getLiveProducts } from "@/lib/products/get-products";
 
 export const metadata = {
   title: "Men's Fragrance & Grooming Edit",
   description: "Confident fragrances and refined grooming essentials for him.",
 };
 
-export default function MenPage() {
-  const menProducts = products.filter((p) => p.gender === "men");
+export default async function MenPage() {
+  const allProducts = await getLiveProducts();
+  const menProducts = allProducts.filter((p) => p.gender === "men");
 
   return (
     <PageShell

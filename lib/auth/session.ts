@@ -133,3 +133,122 @@ export async function logoutAdmin() {
   cookieStore.delete(SESSION_COOKIE);
   return { ok: true as const };
 }
+
+// ─── Customer Authentication ────────────────────────────────────────────────
+
+export const CUSTOMER_SESSION_COOKIE = "novixa_customer_session";
+
+export async function registerCustomer(name: string, email: string, password: string) {
+  if (!databaseConfigured()) {
+    return { ok: false as const, error: "Database is not configured." };
+  }
+
+  const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+  if (existing) {
+    return { ok: false as const, error: "An account with this email already exists." };
+  }
+
+  const passwordHash = hashPassword(password);
+  const user = await prisma.user.create({
+    data: {
+      name: name.trim(),
+      email: email.toLowerCase().trim(),
+      passwordHash,
+      role: "CUSTOMER",
+    },
+  });
+
+  const rawSession = randomBytes(32).toString("base64url");
+  const sessionId = hashSession(rawSession);
+  const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000);
+
+  await prisma.session.create({ data: { id: sessionId, userId: user.id, expiresAt } });
+
+  const cookieStore = await cookies();
+  cookieStore.set(CUSTOMER_SESSION_COOKIE, rawSession, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: SESSION_TTL_SECONDS,
+    path: "/",
+  });
+
+  return { ok: true as const, user: { id: user.id, email: user.email, name: user.name } };
+}
+
+export async function loginCustomer(email: string, password: string) {
+  if (!databaseConfigured()) {
+    return { ok: false as const, error: "Database is not configured." };
+  }
+
+  const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+
+  if (!user || user.role !== "CUSTOMER" || !verifyPassword(password, user.passwordHash)) {
+    return { ok: false as const, error: "Invalid email or password." };
+  }
+
+  const rawSession = randomBytes(32).toString("base64url");
+  const sessionId = hashSession(rawSession);
+  const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000);
+
+  await prisma.session.create({ data: { id: sessionId, userId: user.id, expiresAt } });
+  await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+
+  const cookieStore = await cookies();
+  cookieStore.set(CUSTOMER_SESSION_COOKIE, rawSession, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: SESSION_TTL_SECONDS,
+    path: "/",
+  });
+
+  return { ok: true as const, user: { id: user.id, email: user.email, name: user.name } };
+}
+
+export async function getAuthenticatedCustomer() {
+  if (!databaseConfigured()) return null;
+  const cookieStore = await cookies();
+  const rawSession = cookieStore.get(CUSTOMER_SESSION_COOKIE)?.value;
+  if (!rawSession) return null;
+
+  try {
+    const session = await prisma.session.findUnique({
+      where: { id: hashSession(rawSession) },
+      include: { user: true },
+    });
+
+    if (!session || session.expiresAt <= new Date() || session.user.role !== "CUSTOMER") {
+      if (session) {
+        await prisma.session.delete({ where: { id: session.id } }).catch(() => undefined);
+      }
+      return null;
+    }
+
+    return {
+      id: session.user.id,
+      email: session.user.email,
+      name: session.user.name,
+      role: session.user.role,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function logoutCustomer() {
+  const cookieStore = await cookies();
+  const rawSession = cookieStore.get(CUSTOMER_SESSION_COOKIE)?.value;
+
+  if (databaseConfigured() && rawSession) {
+    try {
+      await prisma.session.delete({ where: { id: hashSession(rawSession) } }).catch(() => undefined);
+    } catch {
+      // Ignored
+    }
+  }
+
+  cookieStore.delete(CUSTOMER_SESSION_COOKIE);
+  return { ok: true as const };
+}
+
