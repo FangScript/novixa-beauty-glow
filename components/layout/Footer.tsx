@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Sparkles } from "lucide-react";
 
 export function Footer() {
   return (
@@ -8,6 +9,9 @@ export function Footer() {
           <p className="font-display text-3xl">NOVIXA</p>
           <p className="mt-3 text-xs leading-relaxed text-primary-foreground/60">
             More than beauty. It's a lifestyle. Crafted with luxury notes and premium botanicals.
+          </p>
+          <p className="mt-4 text-[10px] uppercase tracking-widest text-champagne/80 font-mono">
+            Atelier Mayfair, London · Edinburgh
           </p>
         </div>
         <div>
@@ -19,13 +23,19 @@ export function Footer() {
               Shop all
             </Link>
             <Link href="/men" className="hover:text-white transition-colors">
-              Men
+              Men's Edit
             </Link>
             <Link href="/women" className="hover:text-white transition-colors">
-              Women
+              Women's Edit
             </Link>
             <Link href="/bundles" className="hover:text-white transition-colors">
-              Bundles
+              Curated Bundles
+            </Link>
+            <Link
+              href="/scent-finder"
+              className="hover:text-champagne transition-colors flex items-center gap-1.5 text-champagne font-medium"
+            >
+              <Sparkles size={11} className="text-champagne" /> Scent Finder Quiz
             </Link>
             <Link href="/admin/login" className="hover:text-white transition-colors pt-2 text-[10px] text-primary-foreground/40">
               Admin Portal
@@ -36,10 +46,23 @@ export function Footer() {
           <p className="font-sans text-xs font-semibold uppercase tracking-[0.14em] text-champagne">
             Customer Care
           </p>
-          <p className="mt-4 text-xs leading-6 text-primary-foreground/60">
-            Complimentary shipping on orders above Rs. 5,000. For custom orders, fragrance consultations, or inquiries:
+          <div className="mt-4 flex flex-col gap-2.5 text-xs text-primary-foreground/60">
+            <Link href="/shipping" className="hover:text-white transition-colors">
+              Shipping & Delivery Policy
+            </Link>
+            <Link href="/returns" className="hover:text-white transition-colors">
+              14-Day Returns & Exchanges
+            </Link>
+            <Link href="/contact" className="hover:text-white transition-colors">
+              Concierge & Consultations
+            </Link>
+            <Link href="/account/orders" className="hover:text-white transition-colors">
+              Track Order Status
+            </Link>
+          </div>
+          <p className="mt-4 text-[11px] text-primary-foreground/60">
+            Concierge: <a href="mailto:concierge@novixa.co.uk" className="text-champagne hover:underline">concierge@novixa.co.uk</a>
           </p>
-          <p className="mt-2 text-xs font-medium text-primary-foreground/80">hello@novixa.co</p>
         </div>
       </div>
       <div className="page-shell mt-12 border-t border-primary-foreground/10 pt-6 text-[10px] uppercase tracking-wider text-primary-foreground/45 flex flex-col sm:flex-row justify-between items-center gap-3">

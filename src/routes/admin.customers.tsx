@@ -51,7 +51,7 @@ function AdminCustomers() {
         <MetricCard
           label="Newest account"
           value={
-            customers[0]?.joined ? new Date(customers[0].joined).toLocaleDateString("en-IN") : "—"
+            customers[0]?.joined ? new Date(customers[0].joined).toLocaleDateString("en-GB") : "—"
           }
           detail="Most recent signup"
         />
@@ -85,7 +85,7 @@ function AdminCustomers() {
                     <p className="mt-1 text-[10px] text-[#8f8279]">{customer.email}</p>
                   </TableCell>
                   <TableCell>{customer.orders}</TableCell>
-                  <TableCell>{new Date(customer.joined).toLocaleDateString("en-IN")}</TableCell>
+                  <TableCell>{new Date(customer.joined).toLocaleDateString("en-GB")}</TableCell>
                   <TableCell>{customer.status}</TableCell>
                 </tr>
               ))

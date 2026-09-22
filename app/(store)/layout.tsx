@@ -1,5 +1,5 @@
-import { CommerceProvider } from "@/lib/commerce/context";
 import { CustomerAuthProvider } from "@/lib/auth/customer-context";
+import { CommerceProviderBridge } from "@/components/layout/CommerceProviderBridge";
 import { Navbar } from "@/components/navigation/Navbar";
 import { Footer } from "@/components/layout/Footer";
 
@@ -10,13 +10,13 @@ export default function StoreLayout({
 }) {
   return (
     <CustomerAuthProvider>
-      <CommerceProvider>
+      <CommerceProviderBridge>
         <div className="flex min-h-screen flex-col justify-between">
           <Navbar />
           <div className="flex-1">{children}</div>
           <Footer />
         </div>
-      </CommerceProvider>
+      </CommerceProviderBridge>
     </CustomerAuthProvider>
   );
 }

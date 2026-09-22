@@ -65,14 +65,14 @@ export default function AdminOrdersPage() {
             email: addr.email || o.user?.email || "No email",
             phone: addr.phone || "",
             address: [addr.line1, addr.city, addr.state, addr.postalCode].filter(Boolean).join(", "),
-            date: new Date(o.createdAt).toLocaleDateString("en-IN", {
+            date: new Date(o.createdAt).toLocaleDateString("en-GB", {
               day: "numeric",
               month: "short",
               year: "numeric",
               hour: "2-digit",
               minute: "2-digit",
             }),
-            total: `Rs. ${o.total.toLocaleString("en-IN")}`,
+            total: `£${o.total.toLocaleString("en-GB")}`,
             status: statusFormatted,
             payment: o.paymentStatus === "PAID" ? "Paid" : "Pay on Delivery (Unpaid)",
             trackingNumber: o.trackingNumber || "",
@@ -313,7 +313,7 @@ export default function AdminOrdersPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-medium">Rs. {item.price.toLocaleString("en-IN")}</p>
+                      <p className="font-medium">£{item.price}</p>
                       <p className="text-[10px] text-muted-foreground">Qty: {item.quantity}</p>
                     </div>
                   </div>
@@ -344,7 +344,7 @@ export default function AdminOrdersPage() {
                 <input
                   value={trackingInput}
                   onChange={(e) => setTrackingInput(e.target.value)}
-                  placeholder="e.g. BLUEDART-123456789"
+                  placeholder="e.g. ROYALMAIL-GB123456789"
                   className="h-10 flex-1 border border-[#d9cec5] bg-white/60 px-3 text-xs outline-none focus:border-[#8f5d48]"
                 />
                 <Button

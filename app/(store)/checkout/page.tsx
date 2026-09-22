@@ -2,11 +2,18 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Loader2, CheckCircle2, PackageCheck } from "lucide-react";
+import { Loader2, CheckCircle2, PackageCheck, Tag, X } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
 import { Button } from "@/components/ui/button";
 import { cartProducts, formatPrice, useCommerce } from "@/lib/commerce/context";
 import { useCustomerAuth } from "@/lib/auth/customer-context";
+
+type AppliedCoupon = {
+  id?: string;
+  code: string;
+  discount: number;
+  message: string;
+};
 
 export default function CheckoutPage() {
   const { cart, subtotal, clearCart } = useCommerce();
@@ -15,6 +22,12 @@ export default function CheckoutPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [confirmedOrder, setConfirmedOrder] = useState<any>(null);
+
+  // Coupon state
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -37,6 +50,49 @@ export default function CheckoutPage() {
     }
   }, [user]);
 
+  const applyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setIsValidatingCoupon(true);
+    setCouponError(null);
+
+    try {
+      const res = await fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: couponCode.trim(),
+          subtotal,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.valid) {
+        throw new Error(data.error || "Invalid coupon code.");
+      }
+
+      setAppliedCoupon({
+        id: data.coupon?.id,
+        code: data.coupon.code,
+        discount: data.discount,
+        message: data.message,
+      });
+      setCouponCode("");
+    } catch (err: any) {
+      setCouponError(err.message || "Failed to apply coupon.");
+    } finally {
+      setIsValidatingCoupon(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponError(null);
+  };
+
+  const discount = appliedCoupon?.discount ?? 0;
+  const shippingEstimate = subtotal >= 70 ? 0 : 4.95;
+  const orderTotal = Math.max(0, subtotal - discount) + shippingEstimate;
+
   if (!cart.length && !submitted) {
     return (
       <PageShell title="Checkout">
@@ -53,8 +109,9 @@ export default function CheckoutPage() {
   }
 
   if (submitted && confirmedOrder) {
-    const shipping = confirmedOrder.shipping ?? (subtotal >= 5000 ? 0 : 250);
-    const total = confirmedOrder.total ?? subtotal + shipping;
+    const orderDiscount = confirmedOrder.discount ?? discount;
+    const shipping = confirmedOrder.shipping ?? (subtotal >= 70 ? 0 : 4.95);
+    const total = confirmedOrder.total ?? Math.max(0, subtotal - orderDiscount) + shipping;
 
     return (
       <PageShell eyebrow="Thank You" title="Order Confirmed">
@@ -97,6 +154,12 @@ export default function CheckoutPage() {
               <span>Subtotal</span>
               <span>{formatPrice(confirmedOrder.subtotal ?? subtotal)}</span>
             </div>
+            {orderDiscount > 0 && (
+              <div className="flex justify-between text-xs text-[#4b6742] font-medium">
+                <span>Promotional Discount</span>
+                <span>-{formatPrice(orderDiscount)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>Shipping Delivery</span>
               <span>{shipping === 0 ? "Complimentary" : formatPrice(shipping)}</span>
@@ -115,7 +178,9 @@ export default function CheckoutPage() {
               </Link>
             </Button>
             <Button asChild variant="outline" className="rounded-none text-[10px] tracking-wider py-5 px-6">
-              <Link href="/shop">CONTINUE SHOPPING</Link>
+              <Link href="/shop">
+                CONTINUE SHOPPING
+              </Link>
             </Button>
           </div>
         </div>
@@ -138,6 +203,7 @@ export default function CheckoutPage() {
             quantity: i.quantity,
           })),
           userId: user?.id ?? null,
+          couponCode: appliedCoupon?.code ?? null,
           customer: {
             name: formData.name.trim(),
             email: formData.email.trim(),
@@ -148,7 +214,7 @@ export default function CheckoutPage() {
             city: formData.city.trim(),
             state: formData.state.trim(),
             postalCode: formData.pinCode.trim(),
-            country: "IN",
+            country: "GB",
           },
         }),
       });
@@ -180,9 +246,6 @@ export default function CheckoutPage() {
       setIsSubmitting(false);
     }
   };
-
-  const shippingEstimate = subtotal >= 5000 ? 0 : 250;
-  const orderTotal = subtotal + shippingEstimate;
 
   return (
     <PageShell eyebrow="Almost Yours" title="Checkout">
@@ -247,18 +310,16 @@ export default function CheckoutPage() {
                   className="h-11 border border-border bg-white/40 px-3 text-sm outline-none focus:border-rosewood"
                 />
                 <input
-                  required
-                  placeholder="State"
+                  placeholder="County (e.g. Greater London)"
                   value={formData.state}
                   onChange={(e) => setFormData({ ...formData, state: e.target.value })}
                   className="h-11 border border-border bg-white/40 px-3 text-sm outline-none focus:border-rosewood"
                 />
                 <input
                   required
-                  placeholder="PIN Code"
-                  pattern="[0-9]{5,6}"
+                  placeholder="Postcode (e.g. W1K 7AA)"
                   value={formData.pinCode}
-                  onChange={(e) => setFormData({ ...formData, pinCode: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, pinCode: e.target.value.toUpperCase() })}
                   className="h-11 border border-border bg-white/40 px-3 text-sm outline-none focus:border-rosewood"
                 />
               </div>
@@ -301,19 +362,80 @@ export default function CheckoutPage() {
                 </span>
               </div>
             ))}
+
+            {/* Subtotal */}
             <div className="flex justify-between border-t border-border pt-3 text-xs text-muted-foreground">
               <span>Subtotal</span>
               <span>{formatPrice(subtotal)}</span>
             </div>
+
+            {/* Promotional Code Input & Applied State */}
+            <div className="border-t border-border pt-3">
+              {appliedCoupon ? (
+                <div className="flex items-center justify-between rounded bg-[#f4ede6] px-3 py-2 text-xs">
+                  <div className="flex items-center gap-1.5 font-medium text-[#8f5d48]">
+                    <Tag size={13} />
+                    <span className="font-mono font-semibold">{appliedCoupon.code}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={removeCoupon}
+                    className="inline-flex items-center gap-1 text-[11px] text-[#a04040] hover:underline"
+                  >
+                    <X size={12} />
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Promo code (e.g. GLOW15)"
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                      className="h-9 flex-1 border border-border bg-white px-2.5 text-xs font-mono uppercase outline-none focus:border-rosewood"
+                    />
+                    <Button
+                      type="button"
+                      onClick={applyCoupon}
+                      disabled={isValidatingCoupon || !couponCode.trim()}
+                      className="h-9 rounded-none bg-ink text-white hover:bg-black px-3 text-[10px] uppercase tracking-wider"
+                    >
+                      {isValidatingCoupon ? <Loader2 size={12} className="animate-spin" /> : "Apply"}
+                    </Button>
+                  </div>
+                  {couponError && (
+                    <p className="text-[11px] text-[#8f2d18]">{couponError}</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Discount Display */}
+            {discount > 0 && (
+              <div className="flex justify-between text-xs text-[#4b6742] font-medium">
+                <span>Discount ({appliedCoupon?.code})</span>
+                <span>-{formatPrice(discount)}</span>
+              </div>
+            )}
+
+            {/* Shipping */}
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>Shipping Delivery</span>
               <span>{shippingEstimate === 0 ? "Free" : formatPrice(shippingEstimate)}</span>
             </div>
+
+            {/* Order Total */}
             <div className="flex justify-between border-t border-border pt-4 font-semibold text-base text-foreground">
               <span>Total</span>
               <span>{formatPrice(orderTotal)}</span>
             </div>
+            <p className="text-[10px] text-muted-foreground pt-1 text-right">
+              Includes 20% UK VAT. Complimentary delivery over £70.
+            </p>
           </div>
+
           <Button
             type="submit"
             disabled={isSubmitting}

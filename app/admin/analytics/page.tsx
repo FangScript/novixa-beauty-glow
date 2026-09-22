@@ -30,7 +30,12 @@ export default function AdminAnalyticsPage() {
     fetchAnalytics();
   }, []);
 
-  const fmt = (n: number) => `Rs. ${n.toLocaleString("en-IN")}`;
+  const fmt = (n: number) =>
+    new Intl.NumberFormat("en-GB", {
+      style: "currency",
+      currency: "GBP",
+      minimumFractionDigits: 2,
+    }).format(n);
 
   return (
     <AdminShell

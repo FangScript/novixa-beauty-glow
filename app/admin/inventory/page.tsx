@@ -90,13 +90,7 @@ export default function AdminInventoryPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: selected.id,
-          name: selected.name,
-          sku: selected.sku,
-          category: selected.category,
-          gender: "unisex",
-          price: 0,
           stock: newStock,
-          description: "",
         }),
       });
 

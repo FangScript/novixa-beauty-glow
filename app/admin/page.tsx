@@ -7,13 +7,78 @@ import {
   TableHeader,
   AdminTable,
 } from "@/components/admin";
-import { products } from "@/lib/products/catalogue";
+import { products as seedProducts } from "@/lib/products/catalogue";
+import { prisma } from "@/lib/db/client";
 
 export const metadata = {
   title: "Admin Overview",
 };
 
-export default function AdminOverviewPage() {
+export default async function AdminOverviewPage() {
+  let grossSales = 18450;
+  let ordersCount = 184;
+  let pendingOrdersCount = 12;
+  let customersCount = 1248;
+  let lowStockCount = 7;
+  let recentProducts: Array<{
+    id: string;
+    name: string;
+    category: string;
+    gender: string;
+    price: number;
+    stock: number;
+  }> = seedProducts.slice(0, 5);
+
+  if (process.env.DATABASE_URL) {
+    try {
+      const [revAgg, oCount, pendingCount, uCount, lsCount, dbProducts] = await Promise.all([
+        prisma.order.aggregate({
+          _sum: { total: true },
+          where: { paymentStatus: { in: ["PAID", "AUTHORIZED"] } },
+        }),
+        prisma.order.count(),
+        prisma.order.count({ where: { status: "PENDING" } }),
+        prisma.user.count({ where: { role: "CUSTOMER" } }),
+        prisma.product.count({ where: { status: "ACTIVE", stock: { lte: 8 } } }),
+        prisma.product.findMany({
+          where: { status: { not: "ARCHIVED" } },
+          orderBy: { updatedAt: "desc" },
+          take: 5,
+        }),
+      ]);
+
+      if (oCount > 0 || uCount > 0 || dbProducts.length > 0) {
+        grossSales = revAgg._sum.total ?? 0;
+        ordersCount = oCount;
+        pendingOrdersCount = pendingCount;
+        customersCount = uCount;
+        lowStockCount = lsCount;
+
+        if (dbProducts.length > 0) {
+          recentProducts = dbProducts.map((p) => ({
+            id: p.id,
+            name: p.name,
+            category: p.category.toLowerCase(),
+            gender: p.gender.toLowerCase(),
+            price: p.price,
+            stock: p.stock,
+          }));
+        }
+      }
+    } catch (err) {
+      console.warn("Could not load real-time admin metrics from DB:", err);
+    }
+  }
+
+  const formatSales = (amount: number) => {
+    return new Intl.NumberFormat("en-GB", {
+      style: "currency",
+      currency: "GBP",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
   return (
     <AdminShell
       title="Overview"
@@ -22,13 +87,25 @@ export default function AdminOverviewPage() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label="Gross sales"
-          value="Rs. 2.84L"
-          detail="+18.4% from last month"
+          value={formatSales(grossSales)}
+          detail="Storewide recorded revenue"
           tone="dark"
         />
-        <MetricCard label="Orders" value="184" detail="12 awaiting fulfilment" />
-        <MetricCard label="Customers" value="1,248" detail="86 new this month" />
-        <MetricCard label="Low stock" value="7" detail="Needs attention today" />
+        <MetricCard
+          label="Orders"
+          value={ordersCount.toLocaleString("en-GB")}
+          detail={`${pendingOrdersCount} awaiting fulfilment`}
+        />
+        <MetricCard
+          label="Customers"
+          value={customersCount.toLocaleString("en-GB")}
+          detail="Active registered accounts"
+        />
+        <MetricCard
+          label="Low stock"
+          value={String(lowStockCount)}
+          detail="Items requiring replenishment"
+        />
       </div>
 
       <div className="mt-8 grid gap-6 xl:grid-cols-[1.4fr_1fr]">
@@ -111,12 +188,12 @@ export default function AdminOverviewPage() {
             <th className="px-4 py-3">Status</th>
             <th className="px-4 py-3 text-right">Stock</th>
           </TableHeader>
-          {products.slice(0, 5).map((product) => (
+          {recentProducts.map((product) => (
             <tr key={product.id} className="border-b border-[#e7ddd5] last:border-0 hover:bg-black/[0.02]">
               <TableCell className="font-medium">{product.name}</TableCell>
-              <TableCell>{product.category}</TableCell>
-              <TableCell>{product.gender}</TableCell>
-              <TableCell>Rs. {product.price.toLocaleString("en-IN")}</TableCell>
+              <TableCell className="capitalize">{product.category}</TableCell>
+              <TableCell className="capitalize">{product.gender}</TableCell>
+              <TableCell>£{product.price}</TableCell>
               <TableCell>
                 <span className="bg-[#dfe8d9] text-[#4b6742] px-2 py-0.5 text-[9px] uppercase">
                   Active

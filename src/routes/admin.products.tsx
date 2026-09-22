@@ -252,7 +252,7 @@ function AdminProducts() {
             <TableCell>{product.category}</TableCell>
             <TableCell>{product.gender}</TableCell>
             <TableCell>
-              Rs. {(product.salePrice ?? product.price).toLocaleString("en-IN")}
+              £{(product.salePrice ?? product.price).toLocaleString("en-GB")}
             </TableCell>
             <TableCell>{product.stock}</TableCell>
             <TableCell>

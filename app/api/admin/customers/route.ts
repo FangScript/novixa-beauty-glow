@@ -26,7 +26,7 @@ export async function GET() {
       email: c.email,
       phone: c.phone ?? "",
       orders: c._count.orders,
-      joined: c.createdAt.toLocaleDateString("en-IN", {
+      joined: c.createdAt.toLocaleDateString("en-GB", {
         day: "numeric",
         month: "short",
         year: "numeric",

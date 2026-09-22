@@ -223,39 +223,42 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Product ID is required for updates." }, { status: 400 });
     }
 
-    const safeSlug = (slug || name)
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "");
-
-    const normalizedCategory = toPrismaCategory(category);
-    const normalizedGender = toPrismaGender(gender || "unisex");
-
     if (process.env.DATABASE_URL) {
-      const catRecord = await prisma.category.upsert({
-        where: { slug: category.toLowerCase() },
-        update: { name: category },
-        create: { slug: category.toLowerCase(), name: category },
-      });
+      const updateData: any = {};
+      if (name !== undefined) updateData.name = name;
+      if (slug !== undefined || name !== undefined) {
+        updateData.slug = (slug || name)
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/(^-|-$)/g, "");
+      }
+      if (sku !== undefined) updateData.sku = sku.toUpperCase();
+      if (description !== undefined) updateData.description = description;
+      if (price !== undefined && price !== null && Number(price) > 0) {
+        updateData.price = Number(price);
+      }
+      if (salePrice !== undefined) {
+        updateData.salePrice = salePrice ? Number(salePrice) : null;
+      }
+      if (gender !== undefined) updateData.gender = toPrismaGender(gender);
+      if (brand !== undefined) updateData.brand = brand;
+      if (stock !== undefined) updateData.stock = Number(stock);
+      if (Array.isArray(tags)) updateData.tags = tags;
 
-      // Update product details
+      if (category !== undefined) {
+        updateData.category = toPrismaCategory(category);
+        const catRecord = await prisma.category.upsert({
+          where: { slug: category.toLowerCase() },
+          update: { name: category },
+          create: { slug: category.toLowerCase(), name: category },
+        });
+        updateData.categoryId = catRecord.id;
+      }
+
       await prisma.product.update({
         where: { id },
-        data: {
-          name,
-          slug: safeSlug,
-          sku: sku.toUpperCase(),
-          description,
-          price: Number(price),
-          salePrice: salePrice ? Number(salePrice) : null,
-          category: normalizedCategory,
-          categoryId: catRecord.id,
-          gender: normalizedGender,
-          brand: brand || "NOVIXA",
-          stock: Number(stock) || 0,
-          tags: Array.isArray(tags) ? tags : [],
-        },
+        data: updateData,
       });
 
       // Update images if provided
@@ -266,7 +269,7 @@ export async function PUT(request: Request) {
             data: images.map((url: string, index: number) => ({
               productId: id,
               url,
-              alt: `${name} photo ${index + 1}`,
+              alt: `${name || "Product"} photo ${index + 1}`,
               sortOrder: index,
             })),
           });
@@ -296,3 +299,30 @@ export async function PUT(request: Request) {
     );
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ error: "Product ID is required." }, { status: 400 });
+    }
+
+    if (process.env.DATABASE_URL) {
+      await prisma.product.update({
+        where: { id },
+        data: { status: "ARCHIVED" },
+      });
+    }
+
+    return NextResponse.json({ success: true, message: "Product archived." });
+  } catch (error: any) {
+    console.error("Delete product error:", error);
+    return NextResponse.json(
+      { error: error.message || "Failed to archive product." },
+      { status: 500 },
+    );
+  }
+}
+

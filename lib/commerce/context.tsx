@@ -5,7 +5,9 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
+  useCallback,
   type ReactNode,
 } from "react";
 import {
@@ -21,7 +23,21 @@ import {
 export { formatPrice, getProduct, products, searchProducts };
 export type { Gender, ProductCategory, Product };
 
-export type CartItem = { productId: string; quantity: number };
+export type CartItem = {
+  id?: string; // DB row ID (present when server-backed)
+  productId: string;
+  quantity: number;
+  product?: {
+    id: string;
+    name: string;
+    slug: string;
+    price: number;
+    salePrice: number | null;
+    stock: number;
+    sku: string;
+    image: string;
+  };
+};
 
 type CommerceContextType = {
   cart: CartItem[];
@@ -34,67 +50,275 @@ type CommerceContextType = {
   cartCount: number;
   subtotal: number;
   clearCart: () => void;
+  isCartLoading: boolean;
 };
 
 const CommerceContext = createContext<CommerceContextType | null>(null);
 
-function readStored<T>(key: string, fallback: T): T {
+// ── helpers ─────────────────────────────────────────────────────────────────
+
+function readLS<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
   try {
-    const value = JSON.parse(localStorage.getItem(key) ?? "null");
-    return value ?? fallback;
+    const v = JSON.parse(localStorage.getItem(key) ?? "null");
+    return v ?? fallback;
   } catch {
     return fallback;
   }
 }
 
-export function CommerceProvider({ children }: { children: ReactNode }) {
+function writeLS(key: string, value: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {}
+}
+
+/** Resolve a CartItem's price from the live product catalogue or DB snapshot. */
+function itemPrice(item: CartItem): number {
+  if (item.product) return item.product.salePrice ?? item.product.price;
+  const p = getProduct(item.productId);
+  return p?.salePrice ?? p?.price ?? 0;
+}
+
+// ── Provider ─────────────────────────────────────────────────────────────────
+
+export function CommerceProvider({
+  children,
+  userId,
+}: {
+  children: ReactNode;
+  /** The current Supabase user ID — passed down from a server component or auth context. */
+  userId?: string | null;
+}) {
   const [mounted, setMounted] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<string[]>([]);
+  const [isCartLoading, setIsCartLoading] = useState(false);
+  const dbAvailable = typeof process !== "undefined" && Boolean(process.env.NEXT_PUBLIC_DB_AVAILABLE !== "false");
+  // We use a ref to avoid re-fetching when userId identity changes between renders
+  const userIdRef = useRef(userId);
+  userIdRef.current = userId;
 
+  // ── Initial hydration ──────────────────────────────────────────────────────
   useEffect(() => {
-    setCart(readStored<CartItem[]>("novixa-cart", []));
-    setWishlist(readStored<string[]>("novixa-wishlist", []));
     setMounted(true);
-  }, []);
 
+    async function hydrate() {
+      // 1. Load cart
+      setIsCartLoading(true);
+      try {
+        const qs = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+        const res = await fetch(`/api/cart${qs}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.items) && data.items.length >= 0) {
+            if (data.source === "db") {
+              setCart(data.items);
+              writeLS("novixa-cart", data.items.map((i: CartItem) => ({ productId: i.productId, quantity: i.quantity })));
+              setIsCartLoading(false);
+              return;
+            }
+          }
+        }
+      } catch {
+        // fall through to localStorage
+      }
+      // Fallback: localStorage
+      setCart(readLS<CartItem[]>("novixa-cart", []));
+      setIsCartLoading(false);
+    }
+
+    async function hydrateWishlist() {
+      if (!userId) {
+        setWishlist(readLS<string[]>("novixa-wishlist", []));
+        return;
+      }
+      try {
+        const res = await fetch(`/api/wishlist?userId=${encodeURIComponent(userId)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.source === "db" && Array.isArray(data.items)) {
+            const ids = data.items.map((i: { productId: string }) => i.productId);
+            setWishlist(ids);
+            writeLS("novixa-wishlist", ids);
+            return;
+          }
+        }
+      } catch {}
+      setWishlist(readLS<string[]>("novixa-wishlist", []));
+    }
+
+    hydrate();
+    hydrateWishlist();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  // ── Persist cart to localStorage as a write-through ───────────────────────
   useEffect(() => {
     if (!mounted) return;
-    localStorage.setItem("novixa-cart", JSON.stringify(cart));
+    writeLS(
+      "novixa-cart",
+      cart.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+    );
   }, [cart, mounted]);
 
   useEffect(() => {
     if (!mounted) return;
-    localStorage.setItem("novixa-wishlist", JSON.stringify(wishlist));
+    writeLS("novixa-wishlist", wishlist);
   }, [wishlist, mounted]);
 
-  const addToCart = (id: string, quantity = 1) => {
-    const stock = getProduct(id)?.stock ?? 0;
-    if (!stock || quantity <= 0) return;
-    setCart((items) => {
-      const existing = items.find((item) => item.productId === id);
-      return existing
-        ? items.map((item) =>
-            item.productId === id
-              ? { ...item, quantity: Math.min(item.quantity + quantity, stock) }
-              : item,
-          )
-        : [...items, { productId: id, quantity: Math.min(quantity, stock) }];
-    });
-  };
+  // ── Cart mutations ─────────────────────────────────────────────────────────
 
-  const updateQuantity = (id: string, quantity: number) => {
-    setCart((items) =>
-      quantity <= 0
-        ? items.filter((item) => item.productId !== id)
-        : items.map((item) =>
-            item.productId === id
-              ? { ...item, quantity: Math.min(quantity, getProduct(id)?.stock ?? 0) }
-              : item,
-          ),
-    );
-  };
+  const addToCart = useCallback(
+    async (productId: string, quantity = 1) => {
+      const localProduct = getProduct(productId);
+      const stock = localProduct?.stock ?? Infinity;
+      if (quantity <= 0) return;
+
+      // Optimistic update
+      setCart((prev) => {
+        const existing = prev.find((i) => i.productId === productId);
+        if (existing) {
+          return prev.map((i) =>
+            i.productId === productId
+              ? { ...i, quantity: Math.min(i.quantity + quantity, stock) }
+              : i,
+          );
+        }
+        return [...prev, { productId, quantity: Math.min(quantity, stock) }];
+      });
+
+      // Server sync (fire-and-forget with rollback on error)
+      if (userIdRef.current !== undefined) {
+        try {
+          const res = await fetch("/api/cart", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ productId, quantity, userId: userIdRef.current }),
+          });
+          const data = await res.json();
+          if (res.ok && data.ok && Array.isArray(data.items)) {
+            setCart(data.items);
+          } else if (!res.ok) {
+            // Rollback
+            setCart((prev) => {
+              const existing = prev.find((i) => i.productId === productId);
+              if (!existing) return prev.filter((i) => i.productId !== productId);
+              return prev.map((i) =>
+                i.productId === productId ? { ...i, quantity: i.quantity - quantity } : i,
+              );
+            });
+          }
+        } catch {
+          // keep optimistic state on network error
+        }
+      }
+    },
+    [],
+  );
+
+  const updateQuantity = useCallback(
+    async (productId: string, quantity: number) => {
+      const prev = [...cart];
+
+      if (quantity <= 0) {
+        setCart((c) => c.filter((i) => i.productId !== productId));
+        const item = prev.find((i) => i.productId === productId);
+        if (item?.id) {
+          fetch(`/api/cart?itemId=${item.id}`, { method: "DELETE" }).catch(() => {});
+        }
+        return;
+      }
+
+      setCart((c) =>
+        c.map((i) => (i.productId === productId ? { ...i, quantity } : i)),
+      );
+
+      const item = prev.find((i) => i.productId === productId);
+      if (item?.id) {
+        try {
+          await fetch("/api/cart", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ itemId: item.id, quantity }),
+          });
+        } catch {}
+      }
+    },
+    [cart],
+  );
+
+  const removeFromCart = useCallback(
+    async (productId: string) => {
+      const item = cart.find((i) => i.productId === productId);
+      setCart((c) => c.filter((i) => i.productId !== productId));
+      if (item?.id) {
+        fetch(`/api/cart?itemId=${item.id}`, { method: "DELETE" }).catch(() => {});
+      }
+    },
+    [cart],
+  );
+
+  const clearCart = useCallback(async () => {
+    setCart([]);
+    if (userIdRef.current !== undefined) {
+      const qs = userId ? `?userId=${encodeURIComponent(userId)}&clear=true` : "?clear=true";
+      fetch(`/api/cart${qs}`, { method: "DELETE" }).catch(() => {});
+    }
+  }, [userId]);
+
+  // ── Wishlist mutations ─────────────────────────────────────────────────────
+
+  const toggleWishlist = useCallback(
+    async (productId: string) => {
+      const isIn = wishlist.includes(productId);
+
+      // Optimistic
+      setWishlist((w) =>
+        isIn ? w.filter((id) => id !== productId) : [...w, productId],
+      );
+
+      if (!userIdRef.current) return; // guest — localStorage only
+
+      try {
+        if (isIn) {
+          await fetch(
+            `/api/wishlist?productId=${encodeURIComponent(productId)}&userId=${encodeURIComponent(userIdRef.current)}`,
+            { method: "DELETE" },
+          );
+        } else {
+          await fetch("/api/wishlist", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ productId, userId: userIdRef.current }),
+          });
+        }
+      } catch {
+        // rollback
+        setWishlist((w) =>
+          isIn ? [...w, productId] : w.filter((id) => id !== productId),
+        );
+      }
+    },
+    [wishlist],
+  );
+
+  const isWishlisted = useCallback(
+    (productId: string) => wishlist.includes(productId),
+    [wishlist],
+  );
+
+  // ── Derived values ─────────────────────────────────────────────────────────
+
+  const cartCount = useMemo(
+    () => cart.reduce((sum, i) => sum + i.quantity, 0),
+    [cart],
+  );
+
+  const subtotal = useMemo(
+    () => cart.reduce((sum, i) => sum + itemPrice(i) * i.quantity, 0),
+    [cart],
+  );
 
   const value = useMemo(
     () => ({
@@ -102,32 +326,52 @@ export function CommerceProvider({ children }: { children: ReactNode }) {
       wishlist,
       addToCart,
       updateQuantity,
-      removeFromCart: (id: string) => updateQuantity(id, 0),
-      toggleWishlist: (id: string) =>
-        setWishlist((items) =>
-          items.includes(id) ? items.filter((item) => item !== id) : [...items, id],
-        ),
-      isWishlisted: (id: string) => wishlist.includes(id),
-      cartCount: cart.reduce((sum, item) => sum + item.quantity, 0),
-      subtotal: cart.reduce((sum, item) => {
-        const product = getProduct(item.productId);
-        return sum + (product?.salePrice ?? product?.price ?? 0) * item.quantity;
-      }, 0),
-      clearCart: () => setCart([]),
+      removeFromCart,
+      toggleWishlist,
+      isWishlisted,
+      cartCount,
+      subtotal,
+      clearCart,
+      isCartLoading,
     }),
-    [cart, wishlist],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cart, wishlist, cartCount, subtotal, isCartLoading],
   );
 
   return <CommerceContext.Provider value={value}>{children}</CommerceContext.Provider>;
 }
 
 export const useCommerce = () => {
-  const context = useContext(CommerceContext);
-  if (!context) throw new Error("useCommerce must be used within CommerceProvider");
-  return context;
+  const ctx = useContext(CommerceContext);
+  if (!ctx) throw new Error("useCommerce must be used within CommerceProvider");
+  return ctx;
 };
 
+/** Helper: resolve full product objects for cart items (uses DB snapshot when available). */
 export const cartProducts = (cart: CartItem[]) =>
   cart
-    .map((item) => ({ item, product: getProduct(item.productId) }))
-    .filter((entry): entry is { item: CartItem; product: Product } => Boolean(entry.product));
+    .map((item) => {
+      // If server gave us a product snapshot, use it
+      if (item.product) {
+        return {
+          item,
+          product: {
+            id: item.product.id,
+            name: item.product.name,
+            slug: item.product.slug,
+            price: item.product.price,
+            salePrice: item.product.salePrice ?? undefined,
+            stock: item.product.stock,
+            sku: item.product.sku,
+            images: [item.product.image],
+            // minimal shape to avoid import chasing
+          } as unknown as Product,
+        };
+      }
+      // Fallback to in-memory catalogue
+      const product = getProduct(item.productId);
+      return product ? { item, product } : null;
+    })
+    .filter(
+      (entry): entry is { item: CartItem; product: Product } => entry !== null,
+    );

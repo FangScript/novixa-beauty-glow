@@ -157,9 +157,34 @@ export async function POST(request: Request) {
       });
     }
 
-    const shipping = subtotal >= 5000 ? 0 : 250;
+    let discount = 0;
+    let validCouponId: string | null = null;
+    const requestedCouponCode = (body.couponCode || "").trim().toUpperCase();
+
+    if (requestedCouponCode) {
+      const foundCoupon = await prisma.coupon.findUnique({
+        where: { code: requestedCouponCode },
+      }).catch(() => null);
+
+      if (
+        foundCoupon &&
+        foundCoupon.active &&
+        (!foundCoupon.expiresAt || new Date(foundCoupon.expiresAt).getTime() > Date.now()) &&
+        (!foundCoupon.usageLimit || foundCoupon.usageCount < foundCoupon.usageLimit) &&
+        subtotal >= foundCoupon.minimumOrder
+      ) {
+        validCouponId = foundCoupon.id;
+        if (foundCoupon.type === "PERCENTAGE") {
+          discount = Math.round((subtotal * foundCoupon.value) / 100);
+        } else {
+          discount = Math.min(subtotal, foundCoupon.value);
+        }
+      }
+    }
+
+    const shipping = subtotal >= 70 ? 0 : 4.95;
     const tax = 0;
-    const total = subtotal + shipping + tax;
+    const total = Math.max(0, subtotal - discount) + shipping + tax;
     const orderNumber = `NVX-2026-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const fullShippingSnapshot = {
@@ -171,7 +196,7 @@ export async function POST(request: Request) {
       city: address.city,
       state: address.state,
       postalCode: address.postalCode,
-      country: address.country ?? "IN",
+      country: address.country ?? "GB",
     };
 
     // Resolve the Prisma user ID from the provided userId (Supabase UID or email)
@@ -206,18 +231,28 @@ export async function POST(request: Request) {
         });
       }
 
-      // 2. Create Order
+      // 2. Increment coupon usage if applied
+      if (validCouponId) {
+        await tx.coupon.update({
+          where: { id: validCouponId },
+          data: { usageCount: { increment: 1 } },
+        }).catch(() => null);
+      }
+
+      // 3. Create Order
       const newOrder = await tx.order.create({
         data: {
           orderNumber,
           status: OrderStatus.PENDING,
           paymentStatus: PaymentStatus.UNPAID,
           subtotal,
+          discount,
           shipping,
           tax,
           total,
           shippingAddressSnapshot: fullShippingSnapshot,
           ...(resolvedPrismaUserId ? { user: { connect: { id: resolvedPrismaUserId } } } : {}),
+          ...(validCouponId ? { coupon: { connect: { id: validCouponId } } } : {}),
           items: {
             create: lineItemsToCreate,
           },

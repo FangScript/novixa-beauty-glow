@@ -23,7 +23,7 @@ function AdminAnalytics() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label="Revenue"
-          value={data ? `Rs. ${data.revenue.toLocaleString("en-IN")}` : "—"}
+          value={data ? `£${data.revenue.toLocaleString("en-GB")}` : "—"}
           detail="Paid orders"
           tone="dark"
         />

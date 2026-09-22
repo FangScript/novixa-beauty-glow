@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AdminDialog,
@@ -14,27 +15,79 @@ import {
 type Category = { id: string; name: string; slug: string; products: number; status: "Active" };
 
 const initialCategories: Category[] = [
-  { id: "cat-1", name: "Perfumes", slug: "perfume", products: 12, status: "Active" },
-  { id: "cat-2", name: "Makeup", slug: "makeup", products: 6, status: "Active" },
-  { id: "cat-3", name: "Grooming", slug: "grooming", products: 4, status: "Active" },
-  { id: "cat-4", name: "Bundles", slug: "bundle", products: 4, status: "Active" },
-  { id: "cat-5", name: "Accessories", slug: "accessories", products: 2, status: "Active" },
+  { id: "perfume", name: "Perfumes", slug: "perfume", products: 12, status: "Active" },
+  { id: "makeup", name: "Makeup", slug: "makeup", products: 6, status: "Active" },
+  { id: "grooming", name: "Grooming", slug: "grooming", products: 4, status: "Active" },
+  { id: "bundle", name: "Bundles", slug: "bundle", products: 4, status: "Active" },
+  { id: "accessories", name: "Accessories", slug: "accessories", products: 2, status: "Active" },
 ];
 
 export default function AdminCategoriesPage() {
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
-  const add = () => {
+  useEffect(() => {
+    fetch("/api/categories")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.categories && Array.isArray(data.categories) && data.categories.length > 0) {
+          setCategories(
+            data.categories.map((c: any) => ({
+              id: c.id,
+              name: c.name,
+              slug: c.slug,
+              products: c.count ?? 0,
+              status: "Active" as const,
+            })),
+          );
+        }
+      })
+      .catch((err) => console.warn("Could not load categories from API:", err));
+  }, []);
+
+  const add = async () => {
     if (!name.trim()) return;
-    const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    setCategories((current) => [
-      ...current,
-      { id: `cat-${Date.now()}`, name: name.trim(), slug, products: 0, status: "Active" },
-    ]);
-    setName("");
-    setOpen(false);
+    setIsSaving(true);
+    const trimmedName = name.trim();
+    const slug = trimmedName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
+    try {
+      const res = await fetch("/api/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmedName, slug }),
+      });
+      const data = await res.json();
+      const newCat: Category = {
+        id: data.category?.id ?? `cat-${Date.now()}`,
+        name: data.category?.name ?? trimmedName,
+        slug: data.category?.slug ?? slug,
+        products: 0,
+        status: "Active",
+      };
+      setCategories((current) => [...current, newCat]);
+    } catch (err) {
+      console.warn("Could not save category via API:", err);
+      setCategories((current) => [
+        ...current,
+        { id: `cat-${Date.now()}`, name: trimmedName, slug, products: 0, status: "Active" },
+      ]);
+    } finally {
+      setIsSaving(false);
+      setName("");
+      setOpen(false);
+    }
+  };
+
+  const remove = async (id: string) => {
+    try {
+      await fetch(`/api/categories?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    } catch (err) {
+      console.warn("Could not delete category via API:", err);
+    }
+    setCategories((current) => current.filter((c) => c.id !== id));
   };
 
   return (
@@ -59,6 +112,7 @@ export default function AdminCategoriesPage() {
             <th className="px-4 py-3">URL Slug</th>
             <th className="px-4 py-3">Linked Products</th>
             <th className="px-4 py-3">Status</th>
+            <th className="px-4 py-3 text-right">Actions</th>
           </TableHeader>
           {categories.map((category) => (
             <tr key={category.id} className="border-b border-[#e7ddd5] last:border-0 hover:bg-black/[0.02]">
@@ -69,6 +123,17 @@ export default function AdminCategoriesPage() {
                 <span className="bg-[#dfe8d9] text-[#4b6742] px-2 py-0.5 text-[9px] uppercase font-medium">
                   {category.status}
                 </span>
+              </TableCell>
+              <TableCell className="text-right">
+                <button
+                  type="button"
+                  onClick={() => remove(category.id)}
+                  className="inline-flex items-center gap-1 text-[11px] text-[#a04040] hover:underline"
+                  title="Delete category"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
+                </button>
               </TableCell>
             </tr>
           ))}
@@ -88,14 +153,15 @@ export default function AdminCategoriesPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Skin Care Essentials"
+                autoFocus
               />
             </AdminField>
             <div className="flex justify-end gap-3 pt-3 border-t border-[#d9cec5]">
-              <Button variant="outline" onClick={() => setOpen(false)}>
+              <Button variant="outline" onClick={() => setOpen(false)} disabled={isSaving}>
                 Cancel
               </Button>
-              <Button onClick={add} className="bg-[#211b18] text-white hover:bg-black">
-                Save Category
+              <Button onClick={add} disabled={isSaving || !name.trim()} className="bg-[#211b18] text-white hover:bg-black">
+                {isSaving ? "Saving..." : "Save Category"}
               </Button>
             </div>
           </div>

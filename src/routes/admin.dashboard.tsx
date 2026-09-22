@@ -11,7 +11,7 @@ function AdminDashboard() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label="Gross sales"
-          value="Rs. 2.84L"
+          value="£28,450"
           detail="Development preview"
           tone="dark"
         />

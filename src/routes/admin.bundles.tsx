@@ -35,9 +35,9 @@ function AdminBundles() {
             <tr key={bundle.id} className="border-b border-[#e7ddd5] last:border-0">
               <TableCell className="font-medium">{bundle.name}</TableCell>
               <TableCell>{bundle.products}</TableCell>
-              <TableCell>Rs. {bundle.price.toLocaleString("en-IN")}</TableCell>
+              <TableCell>£{bundle.price.toLocaleString("en-GB")}</TableCell>
               <TableCell className="text-[#776a61]">
-                Rs. {bundle.originalValue.toLocaleString("en-IN")}
+                £{bundle.originalValue.toLocaleString("en-GB")}
               </TableCell>
               <TableCell className="text-[#567149]">
                 {bundle.originalValue

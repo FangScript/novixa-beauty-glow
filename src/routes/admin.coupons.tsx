@@ -82,7 +82,7 @@ function AdminCoupons() {
               <TableCell>
                 {coupon.expiry === "Not set"
                   ? coupon.expiry
-                  : new Date(coupon.expiry).toLocaleDateString("en-IN")}
+                  : new Date(coupon.expiry).toLocaleDateString("en-GB")}
               </TableCell>
               <TableCell>
                 <button onClick={() => switchState(coupon)}>

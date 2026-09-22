@@ -11,17 +11,20 @@ import {
   X,
   LogOut,
   Package,
+  Sparkles,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useCommerce } from "@/lib/commerce/context";
 import { useCustomerAuth } from "@/lib/auth/customer-context";
+import { CartDrawer } from "@/components/cart/CartDrawer";
 
 export function Navbar() {
   const { cartCount } = useCommerce();
   const { user, logout } = useCustomerAuth();
   const [open, setOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const [query, setQuery] = useState("");
   const router = useRouter();
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -65,7 +68,7 @@ export function Navbar() {
   return (
     <>
       <div className="bg-ink py-2 text-center text-[9px] font-medium uppercase tracking-[0.14em] text-primary-foreground">
-        Complimentary shipping on orders above Rs. 5,000
+        Complimentary UK Royal Mail delivery on orders above £70
       </div>
       <header className="sticky top-0 z-50 border-b border-primary-foreground/10 bg-ink/95 text-primary-foreground backdrop-blur-md">
         <div className="page-shell flex h-18 items-center justify-between gap-4">
@@ -78,6 +81,12 @@ export function Navbar() {
             <Link href="/men" className="transition-colors hover:text-champagne">Men</Link>
             <Link href="/women" className="transition-colors hover:text-champagne">Women</Link>
             <Link href="/bundles" className="transition-colors hover:text-champagne">Bundles</Link>
+            <Link
+              href="/scent-finder"
+              className="transition-colors hover:text-champagne text-champagne/90 flex items-center gap-1 font-semibold"
+            >
+              <Sparkles size={11} className="text-champagne" /> Scent Finder
+            </Link>
           </nav>
           <div className="flex items-center gap-1">
             <form
@@ -150,21 +159,20 @@ export function Navbar() {
                 <Heart size={18} />
               </Button>
             </Link>
-            <Link href="/cart">
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={`Shopping bag with ${cartCount} items`}
-                className="relative text-primary-foreground hover:bg-white/10"
-              >
-                <ShoppingBag size={18} />
-                {cartCount > 0 && (
-                  <span className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-blush px-1 text-[9px] font-semibold text-foreground">
-                    {cartCount}
-                  </span>
-                )}
-              </Button>
-            </Link>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Shopping bag with ${cartCount} items`}
+              className="relative text-primary-foreground hover:bg-white/10"
+              onClick={() => setCartDrawerOpen(true)}
+            >
+              <ShoppingBag size={18} />
+              {cartCount > 0 && (
+                <span className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-blush px-1 text-[9px] font-semibold text-foreground">
+                  {cartCount}
+                </span>
+              )}
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -182,6 +190,13 @@ export function Navbar() {
             <Link href="/men" onClick={() => setOpen(false)} className="py-2.5 uppercase tracking-wider text-xs hover:text-champagne">Men</Link>
             <Link href="/women" onClick={() => setOpen(false)} className="py-2.5 uppercase tracking-wider text-xs hover:text-champagne">Women</Link>
             <Link href="/bundles" onClick={() => setOpen(false)} className="py-2.5 uppercase tracking-wider text-xs hover:text-champagne">Bundles</Link>
+            <Link
+              href="/scent-finder"
+              onClick={() => setOpen(false)}
+              className="py-2.5 uppercase tracking-wider text-xs text-champagne hover:text-white flex items-center gap-1.5 font-semibold"
+            >
+              <Sparkles size={12} className="text-champagne" /> Scent Finder Quiz
+            </Link>
             {user ? (
               <>
                 <Link href="/account" onClick={() => setOpen(false)} className="py-2.5 uppercase tracking-wider text-xs hover:text-champagne">
@@ -202,6 +217,8 @@ export function Navbar() {
           </nav>
         )}
       </header>
+
+      <CartDrawer open={cartDrawerOpen} onClose={() => setCartDrawerOpen(false)} />
     </>
   );
 }

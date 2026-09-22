@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Star } from "lucide-react";
 import {
   AdminShell,
@@ -54,10 +54,32 @@ const initialReviews: Review[] = [
 export default function AdminReviewsPage() {
   const [reviews, setReviews] = useState<Review[]>(initialReviews);
 
-  const update = (id: string, status: "Approved" | "Rejected") => {
+  useEffect(() => {
+    fetch("/api/reviews?admin=true")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.reviews && Array.isArray(data.reviews) && data.reviews.length > 0) {
+          setReviews(data.reviews);
+        }
+      })
+      .catch((err) => console.warn("Could not load reviews from API:", err));
+  }, []);
+
+  const update = async (id: string, status: "Approved" | "Rejected") => {
+    // Optimistic UI update
     setReviews((current) =>
       current.map((r) => (r.id === id ? { ...r, status } : r)),
     );
+
+    try {
+      await fetch("/api/reviews", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status }),
+      });
+    } catch (err) {
+      console.warn("Could not persist review status update:", err);
+    }
   };
 
   const pending = reviews.filter((r) => r.status === "Pending").length;

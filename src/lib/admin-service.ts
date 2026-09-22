@@ -30,7 +30,7 @@ export const listAdminOrders = createServerFn({ method: "GET" }).handler(async (
       customer: order.user?.name ?? "Guest customer",
       email: order.user?.email ?? "Guest checkout",
       date: order.createdAt.toISOString(),
-      total: `Rs. ${order.total.toLocaleString("en-IN")}`,
+      total: `£${order.total.toLocaleString("en-GB")}`,
       status: titleCase(order.status) as "Pending" | "Processing" | "Shipped" | "Delivered",
       payment: order.paymentStatus === "PAID" ? ("Paid" as const) : ("Requires action" as const),
       items: order.items.map((item) => item.productName),

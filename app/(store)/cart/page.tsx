@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 export default function CartPage() {
   const { cart, updateQuantity, removeFromCart, subtotal } = useCommerce();
   const items = cartProducts(cart);
-  const shipping = subtotal >= 5000 || subtotal === 0 ? 0 : 250;
+  const shipping = subtotal >= 70 || subtotal === 0 ? 0 : 4.95;
 
   return (
     <PageShell eyebrow="Your Edit" title="Shopping Bag">
@@ -89,7 +89,7 @@ export default function CartPage() {
               <Link href="/checkout">PROCEED TO CHECKOUT</Link>
             </Button>
             <p className="mt-3.5 text-center text-[10px] text-muted-foreground">
-              Complimentary shipping on orders above Rs. 5,000.
+              Complimentary UK delivery on orders above £70.
             </p>
           </aside>
         </div>

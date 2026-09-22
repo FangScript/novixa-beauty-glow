@@ -186,7 +186,12 @@ export default function AdminProductsPage() {
     }
   };
 
-  const archive = (id: string) => {
+  const archive = async (id: string) => {
+    try {
+      await fetch(`/api/products?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    } catch (err) {
+      console.warn("Could not archive product via API:", err);
+    }
     setRecords((current) => current.filter((p) => p.id !== id));
   };
 
@@ -267,7 +272,7 @@ export default function AdminProductsPage() {
               </TableCell>
               <TableCell>{product.category}</TableCell>
               <TableCell>{product.gender}</TableCell>
-              <TableCell>Rs. {product.price.toLocaleString("en-IN")}</TableCell>
+              <TableCell>£{product.price}</TableCell>
               <TableCell>{product.stock}</TableCell>
               <TableCell>
                 <AdminStatus tone={product.stock <= 5 ? "warning" : "positive"}>
@@ -346,7 +351,7 @@ export default function AdminProductsPage() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <AdminField label="Price (INR)">
+              <AdminField label="Price (£ GBP)">
                 <input
                   type="number"
                   className={inputClass}
@@ -354,7 +359,7 @@ export default function AdminProductsPage() {
                   onChange={(e) => setForm({ ...form, price: e.target.value })}
                 />
               </AdminField>
-              <AdminField label="Sale Price (INR - Optional)">
+              <AdminField label="Sale Price (£ GBP - Optional)">
                 <input
                   type="number"
                   className={inputClass}

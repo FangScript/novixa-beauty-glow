@@ -55,21 +55,19 @@ export type Gender = z.infer<typeof genderSchema>;
 export type ProductCategory = z.infer<typeof productCategorySchema>;
 export type Product = z.infer<typeof productSchema>;
 
-const toImg = (img: any): string => (typeof img === "string" ? img : img?.src || "/images/product-perfume.jpg");
-
 const perfume = (
   base: Omit<Product, "category" | "images"> & { gender: Gender; images?: string[] },
 ): Product => ({
   ...base,
   category: "perfume",
-  images: (base.images ?? [toImg(perfumeProduct)]) as string[],
+  images: base.images ?? [perfumeProduct],
   tags: base.tags,
 });
 const makeup = (base: any): Product => ({
   ...base,
   category: "makeup",
   gender: "women",
-  images: (base.images ?? [toImg(makeupCategory)]) as string[],
+  images: base.images ?? [makeupCategory],
   tags: base.tags,
 });
 const grooming = (
@@ -77,14 +75,14 @@ const grooming = (
 ): Product => ({
   ...base,
   category: "grooming",
-  images: (base.images ?? [toImg(accessoriesCategory)]) as string[],
+  images: base.images ?? [accessoriesCategory],
   tags: base.tags,
 });
 const bundle = (base: any): Product => ({
   ...base,
   category: "bundle",
   gender: "unisex",
-  images: (base.images ?? [toImg(bundleProduct)]) as string[],
+  images: base.images ?? [bundleProduct],
   tags: base.tags,
 });
 
@@ -93,8 +91,8 @@ export const products: Product[] = [
     id: "p1",
     name: "Velvet Rose Eau de Parfum",
     slug: "velvet-rose-eau-de-parfum",
-    description: "A luminous floral fragrance wrapped in velvety rose, warm amber, and soft woods.",
-    price: 4999,
+    description: "A luminous British floral fragrance wrapped in velvety rose, warm amber, and soft woods.",
+    price: 85,
     gender: "women",
     brand: "NOVIXA",
     sku: "NVP-001",
@@ -116,7 +114,7 @@ export const products: Product[] = [
     name: "Noir Élan Eau de Parfum",
     slug: "noir-elan-eau-de-parfum",
     description: "An elegant modern woody scent with bright citrus and a magnetic smoky finish.",
-    price: 5499,
+    price: 95,
     gender: "men",
     brand: "NOVIXA",
     sku: "NVP-002",
@@ -137,7 +135,7 @@ export const products: Product[] = [
     name: "Solaris Homme",
     slug: "solaris-homme",
     description: "Fresh aquatic notes meet warm amber for a confident everyday signature.",
-    price: 4299,
+    price: 75,
     gender: "men",
     brand: "NOVIXA",
     sku: "NVP-003",
@@ -157,8 +155,8 @@ export const products: Product[] = [
     name: "Bloom Silk",
     slug: "bloom-silk",
     description: "A soft, radiant floral veil designed for effortless daily wear.",
-    price: 3899,
-    salePrice: 3499,
+    price: 68,
+    salePrice: 58,
     gender: "women",
     brand: "NOVIXA",
     sku: "NVP-004",
@@ -179,7 +177,7 @@ export const products: Product[] = [
     name: "Cedar Veil",
     slug: "cedar-veil",
     description: "Dry cedar and smooth suede create a quietly confident signature scent.",
-    price: 4799,
+    price: 82,
     gender: "men",
     brand: "NOVIXA",
     sku: "NVP-005",
@@ -199,7 +197,7 @@ export const products: Product[] = [
     name: "Santal After Dark",
     slug: "santal-after-dark",
     description: "Creamy sandalwood, spice, and warm musk for slow evenings.",
-    price: 5999,
+    price: 105,
     gender: "men",
     brand: "NOVIXA",
     sku: "NVP-006",
@@ -219,7 +217,7 @@ export const products: Product[] = [
     name: "Azure Current",
     slug: "azure-current",
     description: "A crisp marine fragrance brightened with citrus and grounded in driftwood.",
-    price: 3999,
+    price: 70,
     gender: "men",
     brand: "NOVIXA",
     sku: "NVP-011",
@@ -239,7 +237,7 @@ export const products: Product[] = [
     name: "Obsidian Reserve",
     slug: "obsidian-reserve",
     description: "A deep, polished blend of black pepper, leather, and smoky woods.",
-    price: 6299,
+    price: 115,
     gender: "men",
     brand: "NOVIXA",
     sku: "NVP-012",
@@ -260,7 +258,7 @@ export const products: Product[] = [
     name: "Petal Smoke",
     slug: "petal-smoke",
     description: "A modern rose with a smoky, mineral edge and an unforgettable drydown.",
-    price: 5299,
+    price: 92,
     gender: "women",
     brand: "NOVIXA",
     sku: "NVP-007",
@@ -281,7 +279,7 @@ export const products: Product[] = [
     name: "Luna Neroli",
     slug: "luna-neroli",
     description: "Sunlit neroli and white flowers softened by clean musk.",
-    price: 4199,
+    price: 72,
     gender: "women",
     brand: "NOVIXA",
     sku: "NVP-008",
@@ -301,7 +299,7 @@ export const products: Product[] = [
     name: "Cashmere Bloom",
     slug: "cashmere-bloom",
     description: "A plush floral musk with a soft cashmere finish.",
-    price: 4599,
+    price: 78,
     gender: "women",
     brand: "NOVIXA",
     sku: "NVP-009",
@@ -321,7 +319,7 @@ export const products: Product[] = [
     name: "Golden Hour",
     slug: "golden-hour",
     description: "A warm glowing blend of saffron, jasmine, and amber woods.",
-    price: 5799,
+    price: 98,
     gender: "women",
     brand: "NOVIXA",
     sku: "NVP-010",
@@ -342,7 +340,7 @@ export const products: Product[] = [
     name: "Matte Muse Lip Colour",
     slug: "matte-muse-lip-colour",
     description: "Comfortable high-pigment colour with a soft matte finish.",
-    price: 1599,
+    price: 26,
     brand: "NOVIXA",
     sku: "NVM-001",
     stock: 26,
@@ -358,7 +356,7 @@ export const products: Product[] = [
     name: "Cloud Veil Foundation",
     slug: "cloud-veil-foundation",
     description: "Breathable medium-buildable coverage with a soft-focus natural finish.",
-    price: 2299,
+    price: 38,
     brand: "NOVIXA",
     sku: "NVM-002",
     stock: 20,
@@ -375,7 +373,7 @@ export const products: Product[] = [
     name: "Roseglass Blush",
     slug: "roseglass-blush",
     description: "A sheer cream blush that melts into skin for a fresh flush.",
-    price: 1399,
+    price: 24,
     brand: "NOVIXA",
     sku: "NVM-003",
     stock: 30,
@@ -392,7 +390,7 @@ export const products: Product[] = [
     name: "Inkline Liquid Liner",
     slug: "inkline-liquid-liner",
     description: "A precise, long-wear liquid liner with a deep satin black finish.",
-    price: 999,
+    price: 18,
     brand: "NOVIXA",
     sku: "NVM-004",
     stock: 42,
@@ -408,7 +406,7 @@ export const products: Product[] = [
     name: "Soft Focus Setting Powder",
     slug: "soft-focus-setting-powder",
     description: "A finely milled powder that sets makeup without flattening the glow.",
-    price: 1899,
+    price: 32,
     brand: "NOVIXA",
     sku: "NVM-005",
     stock: 16,
@@ -425,7 +423,7 @@ export const products: Product[] = [
     name: "Lustre Lip Oil",
     slug: "lustre-lip-oil",
     description: "A cushiony conditioning lip oil with a veil of rose colour.",
-    price: 1299,
+    price: 22,
     brand: "NOVIXA",
     sku: "NVM-006",
     stock: 35,
@@ -441,7 +439,7 @@ export const products: Product[] = [
     name: "Gentleman Grooming Kit",
     slug: "gentleman-grooming-kit",
     description: "A considered daily ritual with cleanser, moisturiser, and beard oil.",
-    price: 3299,
+    price: 55,
     gender: "men",
     brand: "NOVIXA",
     sku: "NVG-001",
@@ -458,7 +456,7 @@ export const products: Product[] = [
     name: "Silk Skin Ritual Kit",
     slug: "silk-skin-ritual-kit",
     description: "A calming three-step ritual for hydrated, luminous skin.",
-    price: 3799,
+    price: 65,
     gender: "women",
     brand: "NOVIXA",
     sku: "NVG-002",
@@ -475,7 +473,7 @@ export const products: Product[] = [
     name: "Atlas Daily Grooming Kit",
     slug: "atlas-daily-grooming-kit",
     description: "A practical three-step grooming ritual for a clean, refreshed start.",
-    price: 2999,
+    price: 48,
     gender: "men",
     brand: "NOVIXA",
     sku: "NVG-003",
@@ -492,7 +490,7 @@ export const products: Product[] = [
     name: "Rosewater Recovery Kit",
     slug: "rosewater-recovery-kit",
     description: "A gentle recovery ritual for skin that needs calm, comfort, and hydration.",
-    price: 3499,
+    price: 58,
     gender: "women",
     brand: "NOVIXA",
     sku: "NVG-004",
@@ -508,7 +506,7 @@ export const products: Product[] = [
     name: "Complete Glam Bundle",
     slug: "complete-glam-bundle",
     description: "A curated complexion-to-lip edit with everything you need for a polished look.",
-    price: 7999,
+    price: 135,
     gender: "women",
     brand: "NOVIXA",
     sku: "NVB-001",
@@ -524,7 +522,7 @@ export const products: Product[] = [
     name: "Signature Scent Duo",
     slug: "signature-scent-duo",
     description: "Two complementary NOVIXA fragrances for day and after dark.",
-    price: 8499,
+    price: 145,
     gender: "unisex",
     brand: "NOVIXA",
     sku: "NVB-002",
@@ -540,7 +538,7 @@ export const products: Product[] = [
     name: "The Soft Glam Edit",
     slug: "soft-glam-edit",
     description: "A complete soft-glam colour edit with base, blush, lips, and tools.",
-    price: 6499,
+    price: 115,
     gender: "women",
     brand: "NOVIXA",
     sku: "NVB-003",
@@ -556,7 +554,7 @@ export const products: Product[] = [
     name: "Rituals for Two",
     slug: "rituals-for-two",
     description: "A paired fragrance and grooming collection designed for shared rituals.",
-    price: 7299,
+    price: 125,
     gender: "unisex",
     brand: "NOVIXA",
     sku: "NVB-004",
@@ -572,7 +570,7 @@ export const products: Product[] = [
     name: "Pro Makeup Brush Set",
     slug: "pro-makeup-brush-set",
     description: "Twelve soft-touch professional brushes for seamless blending and detail work.",
-    price: 2499,
+    price: 42,
     gender: "unisex",
     category: "accessories",
     brand: "NOVIXA",
@@ -588,7 +586,7 @@ export const products: Product[] = [
     name: "Blending Sponges — Set of 3",
     slug: "blending-sponges-set",
     description: "Velvety, latex-free sponges that make every base look airbrushed.",
-    price: 1299,
+    price: 18,
     gender: "unisex",
     category: "accessories",
     brand: "NOVIXA",
@@ -598,6 +596,23 @@ export const products: Product[] = [
     rating: 4.7,
     reviewCount: 38,
     tags: ["sponges", "tools", "makeup"],
+  },
+  {
+    id: "p29",
+    name: "Atelier Travel Refill Atomizer",
+    slug: "atelier-travel-refill-atomizer",
+    description: "Precision-milled 5ml luxury pocket atomizer engineered for fine mist diffusion on the go.",
+    price: 22,
+    gender: "unisex",
+    category: "accessories",
+    brand: "NOVIXA",
+    sku: "NVA-003",
+    images: [accessoriesCategory],
+    stock: 50,
+    rating: 4.9,
+    reviewCount: 42,
+    badge: "ESSENTIAL",
+    tags: ["atomizer", "accessories", "travel", "perfume"],
   },
 ];
 
@@ -611,7 +626,15 @@ products.forEach((product) => {
   slugs.add(product.slug);
 });
 
-export const formatPrice = (amount: number) => `Rs. ${amount.toLocaleString("en-IN")}`;
+export const formatPrice = (amount: number) => {
+  return new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: "GBP",
+    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+};
+
 export const getProduct = (idOrSlug: string) =>
   products.find(
     (product) =>
@@ -619,6 +642,7 @@ export const getProduct = (idOrSlug: string) =>
       product.slug === idOrSlug ||
       product.sku === idOrSlug,
   );
+
 export const searchProducts = (query: string) => {
   const q = query.trim().toLowerCase();
   return q

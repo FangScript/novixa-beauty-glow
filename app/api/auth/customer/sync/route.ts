@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/db/client";
+import { prisma } from "@/lib/db/client";
 
 export async function POST(request: Request) {
   try {
@@ -17,6 +17,7 @@ export async function POST(request: Request) {
       where: { email: cleanEmail },
       update: {
         lastLoginAt: new Date(),
+        ...(name && { name: cleanName }),
       },
       create: {
         id: id || undefined,
