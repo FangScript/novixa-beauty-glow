@@ -247,6 +247,8 @@ export default function AdminBundlesPage() {
               <AdminField label="Bundle Price (£)">
                 <input
                   type="number"
+                  step="0.01"
+                  min="0"
                   className="h-10 w-full border border-[#d9cec5] bg-white/60 px-3 text-sm outline-none focus:border-[#8f5d48]"
                   value={form.price}
                   onChange={(e) => setForm({ ...form, price: e.target.value })}
@@ -256,6 +258,8 @@ export default function AdminBundlesPage() {
               <AdminField label="Original Value (£)">
                 <input
                   type="number"
+                  step="0.01"
+                  min="0"
                   className="h-10 w-full border border-[#d9cec5] bg-white/60 px-3 text-sm outline-none focus:border-[#8f5d48]"
                   value={form.originalValue}
                   onChange={(e) => setForm({ ...form, originalValue: e.target.value })}

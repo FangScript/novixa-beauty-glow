@@ -359,7 +359,8 @@ function ProductForm({
         <AdminField label="Price">
           <input
             type="number"
-            min="1"
+            step="0.01"
+            min="0.01"
             value={form.price}
             onChange={(e) => update("price", e.target.value)}
             className={inputClass}
@@ -368,7 +369,8 @@ function ProductForm({
         <AdminField label="Sale price" hint="Optional">
           <input
             type="number"
-            min="1"
+            step="0.01"
+            min="0.01"
             value={form.salePrice}
             onChange={(e) => update("salePrice", e.target.value)}
             className={inputClass}

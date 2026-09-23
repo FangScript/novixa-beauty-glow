@@ -116,8 +116,8 @@ model Product {
   name            String
   slug            String          @unique
   description     String
-  price           Int
-  salePrice       Int?
+  price           Float
+  salePrice       Float?
   gender          Gender
   categoryId      String
   category        ProductCategory
@@ -171,8 +171,8 @@ model Bundle {
   name         String
   slug         String        @unique
   description  String
-  price        Int
-  originalValue Int
+  price         Float
+  originalValue Float
   status       ProductStatus @default(DRAFT)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
@@ -250,8 +250,8 @@ model Coupon {
   id             String       @id @default(cuid())
   code           String       @unique
   type           DiscountType
-  value          Int
-  minimumOrder   Int          @default(0)
+  value          Float
+  minimumOrder   Float        @default(0)
   usageLimit     Int?
   usageCount     Int          @default(0)
   startsAt       DateTime?
@@ -270,11 +270,11 @@ model Order {
   couponId              String?
   status                OrderStatus   @default(PENDING)
   paymentStatus         PaymentStatus @default(UNPAID)
-  subtotal              Int
-  discount              Int           @default(0)
-  shipping              Int           @default(0)
-  tax                   Int           @default(0)
-  total                 Int
+  subtotal              Float
+  discount              Float         @default(0)
+  shipping              Float         @default(0)
+  tax                   Float         @default(0)
+  total                 Float
   shippingAddressSnapshot Json
   trackingNumber        String?
   user                  User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -295,7 +295,7 @@ model OrderItem {
   productId      String?
   productName    String
   sku            String
-  unitPrice      Int
+  unitPrice      Float
   quantity       Int
   imageUrl       String?
   order          Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -308,7 +308,7 @@ model Payment {
   orderId           String        @unique
   provider          String
   providerPaymentId String?       @unique
-  amount            Int
+  amount            Float
   status            PaymentStatus @default(UNPAID)
   rawStatus         String?
   createdAt         DateTime      @default(now())

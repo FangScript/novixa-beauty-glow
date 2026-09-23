@@ -354,6 +354,8 @@ export default function AdminProductsPage() {
               <AdminField label="Price (£ GBP)">
                 <input
                   type="number"
+                  step="0.01"
+                  min="0.01"
                   className={inputClass}
                   value={form.price}
                   onChange={(e) => setForm({ ...form, price: e.target.value })}
@@ -362,6 +364,8 @@ export default function AdminProductsPage() {
               <AdminField label="Sale Price (£ GBP - Optional)">
                 <input
                   type="number"
+                  step="0.01"
+                  min="0.01"
                   className={inputClass}
                   value={form.salePrice}
                   onChange={(e) => setForm({ ...form, salePrice: e.target.value })}

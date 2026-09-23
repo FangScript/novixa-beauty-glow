@@ -321,6 +321,8 @@ export default function AdminCouponsPage() {
               <AdminField label="Value *">
                 <input
                   type="number"
+                  step="any"
+                  min="0.01"
                   className="h-10 w-full border border-[#d9cec5] bg-white/60 px-3 text-sm outline-none focus:border-[#8f5d48]"
                   value={form.value}
                   onChange={(e) => setForm({ ...form, value: e.target.value })}
@@ -333,6 +335,8 @@ export default function AdminCouponsPage() {
               <AdminField label="Min. Order Subtotal (£)">
                 <input
                   type="number"
+                  step="0.01"
+                  min="0"
                   className="h-10 w-full border border-[#d9cec5] bg-white/60 px-3 text-sm outline-none focus:border-[#8f5d48]"
                   value={form.minimumOrder}
                   onChange={(e) => setForm({ ...form, minimumOrder: e.target.value })}
