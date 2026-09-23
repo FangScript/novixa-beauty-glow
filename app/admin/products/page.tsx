@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   AdminDialog,
@@ -148,15 +149,17 @@ export default function AdminProductsPage() {
     });
 
     if (!parsed.success) {
-      setError(parsed.error.errors[0]?.message ?? "Invalid product configuration.");
+      const msg = parsed.error.errors[0]?.message ?? "Invalid product configuration.";
+      setError(msg);
+      toast.error(msg);
       return;
     }
 
     const savedProduct = parsed.data;
+    const isEditing = Boolean(selected?.id);
     setIsSaving(true);
 
     try {
-      const isEditing = Boolean(selected?.id);
       const res = await fetch("/api/products", {
         method: isEditing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
@@ -179,20 +182,36 @@ export default function AdminProductsPage() {
 
       setSelected(null);
       setCreateOpen(false);
+      toast.success(
+        isEditing
+          ? `Product "${savedProduct.name}" updated successfully.`
+          : `Product "${savedProduct.name}" created and saved successfully.`,
+      );
     } catch (err: any) {
-      setError(err.message || "Failed to persist product.");
+      const errMsg = err.message || "Failed to persist product.";
+      setError(errMsg);
+      toast.error(`Failed to save product: ${errMsg}`);
     } finally {
       setIsSaving(false);
     }
   };
 
   const archive = async (id: string) => {
+    const prod = records.find((p) => p.id === id);
+    const prodName = prod?.name || "Product";
     try {
-      await fetch(`/api/products?id=${encodeURIComponent(id)}`, { method: "DELETE" });
-    } catch (err) {
+      const res = await fetch(`/api/products?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to archive product.");
+      }
+      setRecords((current) => current.filter((p) => p.id !== id));
+      toast.success(`Product "${prodName}" archived successfully.`);
+    } catch (err: any) {
       console.warn("Could not archive product via API:", err);
+      setRecords((current) => current.filter((p) => p.id !== id));
+      toast.error(`Could not archive "${prodName}": ${err.message || "Unknown error"}`);
     }
-    setRecords((current) => current.filter((p) => p.id !== id));
   };
 
   return (

@@ -47,7 +47,7 @@ const blankForm: ProductForm = {
   tags: "",
 };
 const inputClass =
-  "h-10 w-full border border-[#d9cec5] bg-white/60 px-3 text-sm outline-none focus:border-[#8f5d48]";
+  "h-10 w-full border border-[#d9cec5] bg-white/60 px-3 text-xs outline-none focus:border-[#8f5d48]";
 
 function toForm(product: Product): ProductForm {
   return {
@@ -65,8 +65,7 @@ function toForm(product: Product): ProductForm {
 }
 function AdminProducts() {
   const [records, setRecords] = useState<Product[]>(products);
-  const [source, setSource] = useState<"preview" | "database">("preview");
-  const [saving, setSaving] = useState(false);
+  const [source, setSource] = useState<string>("fallback catalogue");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<"all" | ProductCategory>("all");
   const [stockFilter, setStockFilter] = useState<"all" | "low" | "healthy">("all");
@@ -74,18 +73,24 @@ function AdminProducts() {
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState<ProductForm>(blankForm);
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
   const listProductsFn = useServerFn(listProducts);
   const saveProductFn = useServerFn(saveProduct);
   const archiveProductFn = useServerFn(archiveProduct);
   useEffect(() => {
+    let mounted = true;
     listProductsFn()
-      .then((result) => {
-        setRecords(result.products);
-        setSource(result.source);
+      .then((data) => {
+        if (!mounted) return;
+        setRecords(data.products);
+        setSource(data.source);
       })
-      .catch(() =>
-        setError("Products could not be loaded from the service. Showing the preview catalogue."),
-      );
+      .catch((err) => {
+        console.error("Failed to load products:", err);
+      });
+    return () => {
+      mounted = false;
+    };
   }, [listProductsFn]);
   const filtered = useMemo(
     () =>
@@ -96,7 +101,8 @@ function AdminProducts() {
             .includes(query.toLowerCase());
         const matchesCategory = category === "all" || product.category === category;
         const matchesStock =
-          stockFilter === "all" || (stockFilter === "low" ? product.stock <= 8 : product.stock > 8);
+          stockFilter === "all" ||
+          (stockFilter === "low" ? product.stock <= 8 : product.stock > 8);
         return matchesQuery && matchesCategory && matchesStock;
       }),
     [records, query, category, stockFilter],
@@ -112,25 +118,29 @@ function AdminProducts() {
     setForm(toForm(product));
     setError("");
   };
+  const update = <K extends keyof ProductForm>(key: K, value: ProductForm[K]) => {
+    setForm((current) => ({ ...current, [key]: value }));
+  };
   const save = async () => {
+    setError("");
     const parsed = productSchema.safeParse({
-      id: selected?.id ?? `draft-${Date.now()}`,
+      id: selected?.id ?? `p-${Date.now()}`,
       name: form.name.trim(),
       slug: (selected?.slug ?? form.name)
         .toLowerCase()
         .trim()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/(^-|-$)/g, ""),
-      description: form.description.trim(),
+      description: form.description.trim() || "Luxury formulation crafted by NOVIXA.",
       price: Number(form.price),
       salePrice: form.salePrice ? Number(form.salePrice) : undefined,
       gender: form.gender,
       category: form.category,
       brand: selected?.brand ?? "NOVIXA",
       sku: form.sku.trim().toUpperCase(),
-      images: selected?.images ?? products[0]!.images,
+      images: selected?.images?.length ? selected.images : ["/images/product-perfume.jpg"],
       stock: Number(form.stock),
-      rating: selected?.rating ?? 0,
+      rating: selected?.rating ?? 5.0,
       reviewCount: selected?.reviewCount ?? 0,
       badge: form.badge.trim() || undefined,
       tags: form.tags
@@ -139,23 +149,33 @@ function AdminProducts() {
         .filter(Boolean),
     });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Check the product fields.");
+      const msg = parsed.error.errors[0]?.message ?? "Invalid product configuration.";
+      setError(msg);
+      toast.error(msg);
       return;
     }
+    const isEditing = Boolean(selected?.id);
     setSaving(true);
     try {
       const result = await saveProductFn({ data: parsed.data });
       setRecords((current) =>
-        selected
-          ? current.map((item) => (item.id === selected.id ? result.product : item))
+        current.some((item) => item.id === result.product.id)
+          ? current.map((item) => (item.id === selected?.id ? result.product : item))
           : [result.product, ...current],
       );
       setSource(result.source);
       setSelected(null);
       setCreateOpen(false);
       setError("");
+      toast.success(
+        isEditing
+          ? `Product "${parsed.data.name}" updated successfully.`
+          : `Product "${parsed.data.name}" created and saved successfully.`,
+      );
     } catch {
-      setError("The product could not be saved. Check the database connection and product fields.");
+      const err = "The product could not be saved. Check the database connection and product fields.";
+      setError(err);
+      toast.error(err);
     } finally {
       setSaving(false);
     }
@@ -167,8 +187,10 @@ function AdminProducts() {
       const result = await archiveProductFn({ data: { id: product.id } });
       setRecords((current) => current.filter((item) => item.id !== product.id));
       setSource(result.source);
+      toast.success(`Product "${product.name}" archived successfully.`);
     } catch {
       setError("The product could not be archived.");
+      toast.error(`The product "${product.name}" could not be archived.`);
     } finally {
       setSaving(false);
     }

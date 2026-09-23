@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Plus_Jakarta_Sans } from "next/font/google";
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 const fontDisplay = Cormorant_Garamond({
@@ -36,6 +37,7 @@ export default function RootLayout({
     <html lang="en" className={`${fontDisplay.variable} ${fontSans.variable}`}>
       <body className="antialiased bg-background text-foreground min-h-screen">
         {children}
+        <Toaster richColors position="top-right" closeButton />
       </body>
     </html>
   );

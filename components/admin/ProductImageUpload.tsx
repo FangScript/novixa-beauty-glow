@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { toast } from "sonner";
 import { UploadCloud, Trash2, Star, Plus, Link as LinkIcon, Loader2, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -44,8 +45,11 @@ export function ProductImageUpload({ images, onChange }: ProductImageUploadProps
       } else if (data.url) {
         onChange([data.url, ...images]);
       }
+      toast.success("Image uploaded successfully.");
     } catch (err: any) {
-      setUploadError(err.message || "An unexpected error occurred during upload.");
+      const msg = err.message || "An unexpected error occurred during upload.";
+      setUploadError(msg);
+      toast.error(msg);
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -68,12 +69,14 @@ export default function AdminCategoriesPage() {
         status: "Active",
       };
       setCategories((current) => [...current, newCat]);
-    } catch (err) {
+      toast.success(`Category "${trimmedName}" created successfully.`);
+    } catch (err: any) {
       console.warn("Could not save category via API:", err);
       setCategories((current) => [
         ...current,
         { id: `cat-${Date.now()}`, name: trimmedName, slug, products: 0, status: "Active" },
       ]);
+      toast.success(`Category "${trimmedName}" created.`);
     } finally {
       setIsSaving(false);
       setName("");
@@ -82,12 +85,17 @@ export default function AdminCategoriesPage() {
   };
 
   const remove = async (id: string) => {
+    const cat = categories.find((c) => c.id === id);
+    const catName = cat?.name || "Category";
     try {
       await fetch(`/api/categories?id=${encodeURIComponent(id)}`, { method: "DELETE" });
-    } catch (err) {
+      setCategories((current) => current.filter((c) => c.id !== id));
+      toast.success(`Category "${catName}" deleted.`);
+    } catch (err: any) {
       console.warn("Could not delete category via API:", err);
+      setCategories((current) => current.filter((c) => c.id !== id));
+      toast.error(`Could not delete category "${catName}".`);
     }
-    setCategories((current) => current.filter((c) => c.id !== id));
   };
 
   return (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Trash2, Plus, Power } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -104,7 +105,10 @@ export default function AdminCouponsPage() {
   }, []);
 
   const handleCreate = async () => {
-    if (!form.code.trim() || !form.value) return;
+    if (!form.code.trim() || !form.value) {
+      toast.error("Please provide both a coupon code and discount value.");
+      return;
+    }
 
     setIsSaving(true);
     const payload = {
@@ -139,6 +143,7 @@ export default function AdminCouponsPage() {
           },
           ...curr.filter((c) => c.code !== data.coupon.code),
         ]);
+        toast.success(`Coupon "${payload.code}" created and saved successfully.`);
       } else {
         setCoupons((curr) => [
           {
@@ -148,8 +153,9 @@ export default function AdminCouponsPage() {
           },
           ...curr,
         ]);
+        toast.success(`Coupon "${payload.code}" saved.`);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.warn("Failed to create coupon via API:", err);
       setCoupons((curr) => [
         {
@@ -159,6 +165,7 @@ export default function AdminCouponsPage() {
         },
         ...curr,
       ]);
+      toast.error(`Failed to save coupon: ${err.message || "Unknown error"}`);
     } finally {
       setIsSaving(false);
       setForm({
@@ -193,8 +200,10 @@ export default function AdminCouponsPage() {
           active: updatedActive,
         }),
       });
+      toast.success(`Coupon ${coupon.code} is now ${updatedActive ? "active" : "inactive"}.`);
     } catch (err) {
       console.warn("Failed to update coupon status:", err);
+      toast.error(`Could not update coupon ${coupon.code}.`);
     }
   };
 
@@ -205,8 +214,10 @@ export default function AdminCouponsPage() {
         `/api/coupons?${coupon.id ? `id=${coupon.id}` : `code=${encodeURIComponent(coupon.code)}`}`,
         { method: "DELETE" },
       );
+      toast.success(`Coupon "${coupon.code}" deleted.`);
     } catch (err) {
       console.warn("Failed to delete coupon:", err);
+      toast.error(`Could not delete coupon "${coupon.code}".`);
     }
   };
 

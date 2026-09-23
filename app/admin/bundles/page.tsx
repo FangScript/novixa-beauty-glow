@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -81,9 +82,13 @@ export default function AdminBundlesPage() {
   }, []);
 
   const handleCreate = async () => {
-    if (!form.name.trim() || !form.price || !form.originalValue) return;
+    if (!form.name.trim() || !form.price || !form.originalValue) {
+      toast.error("Please fill in bundle name, price, and original value.");
+      return;
+    }
 
     setIsSaving(true);
+    const bundleName = form.name.trim();
     const numPrice = Number(form.price);
     const numOrig = Number(form.originalValue);
 
@@ -92,7 +97,7 @@ export default function AdminBundlesPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: form.name.trim(),
+          name: bundleName,
           description: form.description.trim(),
           price: numPrice,
           originalValue: numOrig,
@@ -114,12 +119,13 @@ export default function AdminBundlesPage() {
           },
           ...curr,
         ]);
+        toast.success(`Bundle "${bundleName}" created and saved successfully.`);
       } else {
         // Fallback local update
         setBundles((curr) => [
           {
             id: `b-${Date.now()}`,
-            name: form.name.trim(),
+            name: bundleName,
             products: 0,
             price: numPrice,
             originalValue: numOrig,
@@ -128,21 +134,11 @@ export default function AdminBundlesPage() {
           },
           ...curr,
         ]);
+        toast.success(`Bundle "${bundleName}" saved locally.`);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.warn("Could not save bundle:", err);
-      setBundles((curr) => [
-        {
-          id: `b-${Date.now()}`,
-          name: form.name.trim(),
-          products: 0,
-          price: numPrice,
-          originalValue: numOrig,
-          status: "ACTIVE",
-          description: form.description.trim(),
-        },
-        ...curr,
-      ]);
+      toast.error(`Failed to save bundle: ${err.message || "Unknown error"}`);
     } finally {
       setIsSaving(false);
       setForm({ name: "", description: "", price: "", originalValue: "" });
@@ -151,12 +147,17 @@ export default function AdminBundlesPage() {
   };
 
   const archive = async (id: string) => {
+    const b = bundles.find((x) => x.id === id);
+    const name = b?.name || "Bundle";
     try {
       await fetch(`/api/bundles?id=${encodeURIComponent(id)}`, { method: "DELETE" });
-    } catch (err) {
+      setBundles((curr) => curr.filter((item) => item.id !== id));
+      toast.success(`"${name}" has been archived.`);
+    } catch (err: any) {
       console.warn("Could not archive bundle:", err);
+      setBundles((curr) => curr.filter((item) => item.id !== id));
+      toast.error(`Could not archive "${name}": ${err.message || "Unknown error"}`);
     }
-    setBundles((curr) => curr.filter((b) => b.id !== id));
   };
 
   return (

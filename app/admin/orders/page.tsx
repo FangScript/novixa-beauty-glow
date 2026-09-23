@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   AdminDialog,
@@ -129,9 +130,13 @@ export default function AdminOrdersPage() {
           current.map((order) => (order.id === selected.id ? { ...order, status: nextStatus } : order)),
         );
         setSelected({ ...selected, status: nextStatus });
+        toast.success(`Order ${selected.orderNumber} status updated to "${nextStatus}".`);
+      } else {
+        toast.error(`Failed to update order status.`);
       }
     } catch (err) {
       console.error("Failed to update status:", err);
+      toast.error("Failed to update order status.");
     } finally {
       setIsUpdating(false);
     }
@@ -158,9 +163,13 @@ export default function AdminOrdersPage() {
           ),
         );
         setSelected({ ...selected, trackingNumber: trackingInput.trim() });
+        toast.success(`Tracking number saved for Order ${selected.orderNumber}.`);
+      } else {
+        toast.error("Failed to save tracking number.");
       }
     } catch (err) {
       console.error("Failed to save tracking:", err);
+      toast.error("Failed to save tracking number.");
     } finally {
       setIsUpdating(false);
     }

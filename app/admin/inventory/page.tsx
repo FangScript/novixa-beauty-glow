@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   AdminDialog,
@@ -98,13 +99,19 @@ export default function AdminInventoryPage() {
         setRecords((current) =>
           current.map((p) => (p.id === selected.id ? { ...p, stock: newStock } : p)),
         );
+        const name = selected.name;
         setSelected(null);
+        toast.success(`Stock level for "${name}" updated to ${newStock} units.`);
       } else {
         const data = await res.json();
-        setSaveError(data.error || "Failed to update stock.");
+        const err = data.error || "Failed to update stock.";
+        setSaveError(err);
+        toast.error(err);
       }
     } catch {
-      setSaveError("Network error. Please try again.");
+      const err = "Network error. Please try again.";
+      setSaveError(err);
+      toast.error(err);
     } finally {
       setIsSaving(false);
     }
