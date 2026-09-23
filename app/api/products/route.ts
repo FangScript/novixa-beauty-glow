@@ -120,14 +120,16 @@ export async function POST(request: Request) {
       );
     }
 
-    const safeSlug = (slug || name)
+    let safeSlug = (slug || name)
       .toLowerCase()
       .trim()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)/g, "");
+    if (!safeSlug) safeSlug = `product-${Date.now().toString(36)}`;
 
     const normalizedCategory = toPrismaCategory(category);
     const normalizedGender = toPrismaGender(gender || "unisex");
+    const upperSku = sku.trim().toUpperCase();
 
     if (process.env.DATABASE_URL) {
       // Ensure category exists
@@ -137,34 +139,72 @@ export async function POST(request: Request) {
         create: { slug: category.toLowerCase(), name: category },
       });
 
-      const product = await prisma.product.create({
-        data: {
-          name,
-          slug: safeSlug,
-          sku: sku.toUpperCase(),
-          description: description || "Luxury formulation crafted by NOVIXA.",
-          price: Number(price),
-          salePrice: salePrice ? Number(salePrice) : null,
-          category: normalizedCategory,
-          categoryId: catRecord.id,
-          gender: normalizedGender,
-          brand: brand || "NOVIXA",
-          stock: Number(stock) || 0,
-          tags: Array.isArray(tags) ? tags : [],
-          status: "ACTIVE",
-          images: {
-            create: (Array.isArray(images) && images.length > 0
-              ? images
-              : ["/images/product-perfume.jpg"]
-            ).map((url: string, index: number) => ({
-              url,
-              alt: `${name} photo ${index + 1}`,
-              sortOrder: index,
-            })),
-          },
-        },
-        include: { images: true },
+      // Check if product already exists by SKU
+      const existingProduct = await prisma.product.findUnique({
+        where: { sku: upperSku },
       });
+
+      // Ensure slug uniqueness across products
+      const slugConflict = await prisma.product.findFirst({
+        where: {
+          slug: safeSlug,
+          NOT: existingProduct ? { id: existingProduct.id } : undefined,
+        },
+      });
+      if (slugConflict) {
+        safeSlug = `${safeSlug}-${Date.now().toString().slice(-4)}`;
+      }
+
+      let product;
+      if (existingProduct) {
+        product = await prisma.product.update({
+          where: { id: existingProduct.id },
+          data: {
+            name,
+            slug: safeSlug,
+            description: description || "Luxury formulation crafted by NOVIXA.",
+            price: Number(price),
+            salePrice: salePrice ? Number(salePrice) : null,
+            category: normalizedCategory,
+            categoryId: catRecord.id,
+            gender: normalizedGender,
+            brand: brand || "NOVIXA",
+            stock: Number(stock) || 0,
+            tags: Array.isArray(tags) ? tags : [],
+            status: "ACTIVE",
+          },
+          include: { images: true },
+        });
+      } else {
+        product = await prisma.product.create({
+          data: {
+            name,
+            slug: safeSlug,
+            sku: upperSku,
+            description: description || "Luxury formulation crafted by NOVIXA.",
+            price: Number(price),
+            salePrice: salePrice ? Number(salePrice) : null,
+            category: normalizedCategory,
+            categoryId: catRecord.id,
+            gender: normalizedGender,
+            brand: brand || "NOVIXA",
+            stock: Number(stock) || 0,
+            tags: Array.isArray(tags) ? tags : [],
+            status: "ACTIVE",
+            images: {
+              create: (Array.isArray(images) && images.length > 0
+                ? images
+                : ["/images/product-perfume.jpg"]
+              ).map((url: string, index: number) => ({
+                url,
+                alt: `${name} photo ${index + 1}`,
+                sortOrder: index,
+              })),
+            },
+          },
+          include: { images: true },
+        });
+      }
 
       return NextResponse.json({
         success: true,
@@ -181,7 +221,7 @@ export async function POST(request: Request) {
         id: `p-${Date.now()}`,
         name,
         slug: safeSlug,
-        sku,
+        sku: upperSku,
         description,
         price,
         salePrice,
@@ -219,19 +259,42 @@ export async function PUT(request: Request) {
       brand,
     } = body;
 
-    if (!id) {
-      return NextResponse.json({ error: "Product ID is required for updates." }, { status: 400 });
+    if (!id && !sku) {
+      return NextResponse.json({ error: "Product ID or SKU is required for updates." }, { status: 400 });
     }
 
     if (process.env.DATABASE_URL) {
+      // Find the product by ID or SKU
+      const existing = await prisma.product.findFirst({
+        where: {
+          OR: [
+            ...(id ? [{ id }] : []),
+            ...(sku ? [{ sku: sku.toUpperCase() }] : []),
+          ],
+        },
+      });
+
       const updateData: any = {};
       if (name !== undefined) updateData.name = name;
       if (slug !== undefined || name !== undefined) {
-        updateData.slug = (slug || name)
+        let safeSlug = (slug || name)
           .toLowerCase()
           .trim()
           .replace(/[^a-z0-9]+/g, "-")
           .replace(/(^-|-$)/g, "");
+        if (!safeSlug) safeSlug = `product-${Date.now().toString(36)}`;
+
+        // Verify slug uniqueness
+        const slugConflict = await prisma.product.findFirst({
+          where: {
+            slug: safeSlug,
+            NOT: existing ? { id: existing.id } : undefined,
+          },
+        });
+        if (slugConflict) {
+          safeSlug = `${safeSlug}-${Date.now().toString().slice(-4)}`;
+        }
+        updateData.slug = safeSlug;
       }
       if (sku !== undefined) updateData.sku = sku.toUpperCase();
       if (description !== undefined) updateData.description = description;
@@ -256,18 +319,50 @@ export async function PUT(request: Request) {
         updateData.categoryId = catRecord.id;
       }
 
-      await prisma.product.update({
-        where: { id },
-        data: updateData,
-      });
+      let updatedProduct;
+      const targetId = existing?.id || id;
+
+      if (existing) {
+        updatedProduct = await prisma.product.update({
+          where: { id: targetId },
+          data: updateData,
+          include: { images: { orderBy: { sortOrder: "asc" } } },
+        });
+      } else {
+        // Fallback upsert create if not in DB
+        const catRecord = await prisma.category.upsert({
+          where: { slug: (category || "perfume").toLowerCase() },
+          update: { name: category || "perfume" },
+          create: { slug: (category || "perfume").toLowerCase(), name: category || "perfume" },
+        });
+        updatedProduct = await prisma.product.create({
+          data: {
+            id: targetId.startsWith("p-") ? undefined : targetId,
+            name: name || "Product",
+            slug: updateData.slug || `prod-${Date.now()}`,
+            sku: (sku || `SKU-${Date.now()}`).toUpperCase(),
+            description: description || "Luxury formulation crafted by NOVIXA.",
+            price: Number(price) || 50,
+            salePrice: salePrice ? Number(salePrice) : null,
+            category: toPrismaCategory(category || "perfume"),
+            categoryId: catRecord.id,
+            gender: toPrismaGender(gender || "unisex"),
+            brand: brand || "NOVIXA",
+            stock: Number(stock) || 0,
+            tags: Array.isArray(tags) ? tags : [],
+            status: "ACTIVE",
+          },
+          include: { images: { orderBy: { sortOrder: "asc" } } },
+        });
+      }
 
       // Update images if provided
-      if (Array.isArray(images)) {
-        await prisma.productImage.deleteMany({ where: { productId: id } });
+      if (Array.isArray(images) && updatedProduct) {
+        await prisma.productImage.deleteMany({ where: { productId: updatedProduct.id } });
         if (images.length > 0) {
           await prisma.productImage.createMany({
             data: images.map((url: string, index: number) => ({
-              productId: id,
+              productId: updatedProduct.id,
               url,
               alt: `${name || "Product"} photo ${index + 1}`,
               sortOrder: index,
@@ -276,16 +371,16 @@ export async function PUT(request: Request) {
         }
       }
 
-      const updated = await prisma.product.findUnique({
-        where: { id },
+      const refreshed = await prisma.product.findUnique({
+        where: { id: updatedProduct.id },
         include: { images: { orderBy: { sortOrder: "asc" } } },
       });
 
       return NextResponse.json({
         success: true,
         product: {
-          ...updated,
-          images: updated?.images.map((img) => img.url) ?? [],
+          ...refreshed,
+          images: refreshed?.images.map((img) => img.url) ?? [],
         },
       });
     }

@@ -122,23 +122,57 @@ export default function AdminProductsPage() {
     setError("");
     const finalImages = form.images.length > 0 ? form.images : ["/images/product-perfume.jpg"];
 
+    if (!form.name.trim()) {
+      const msg = "Product name is required.";
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    const numPrice = Number(form.price);
+    if (!form.price || isNaN(numPrice) || numPrice <= 0) {
+      const msg = "Please enter a valid price greater than 0 (e.g. 1.99).";
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    const numSalePrice = form.salePrice ? Number(form.salePrice) : undefined;
+    if (numSalePrice !== undefined && (isNaN(numSalePrice) || numSalePrice <= 0 || numSalePrice >= numPrice)) {
+      const msg = "Sale price must be greater than 0 and lower than regular price.";
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    const safeSku = form.sku.trim()
+      ? form.sku.trim().toUpperCase()
+      : `NVX-${form.name.slice(0, 3).toUpperCase().replace(/[^A-Z]/g, "X")}-${Date.now().toString().slice(-4)}`;
+
+    let generatedSlug = (selected?.slug || form.name)
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "");
+    if (!generatedSlug) generatedSlug = `product-${Date.now().toString(36)}`;
+
+    const safeDesc = form.description.trim().length >= 10
+      ? form.description.trim()
+      : (form.description.trim() ? `${form.description.trim()} - Luxury formulation.` : "Luxury formulation crafted by NOVIXA.");
+
     const parsed = productSchema.safeParse({
       id: selected?.id ?? `p-${Date.now()}`,
       name: form.name.trim(),
-      slug: (selected?.slug ?? form.name)
-        .toLowerCase()
-        .trim()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)/g, ""),
-      description: form.description.trim() || "Luxury formulation crafted by NOVIXA.",
-      price: Number(form.price),
-      salePrice: form.salePrice ? Number(form.salePrice) : undefined,
+      slug: generatedSlug,
+      description: safeDesc,
+      price: numPrice,
+      salePrice: numSalePrice,
       gender: form.gender,
       category: form.category,
       brand: selected?.brand ?? "NOVIXA",
-      sku: form.sku.trim().toUpperCase(),
+      sku: safeSku,
       images: finalImages,
-      stock: Number(form.stock),
+      stock: Math.max(0, Math.floor(Number(form.stock) || 0)),
       rating: selected?.rating ?? 5.0,
       reviewCount: selected?.reviewCount ?? 0,
       badge: form.badge.trim() || undefined,
@@ -174,18 +208,32 @@ export default function AdminProductsPage() {
         throw new Error(resData.error || "Failed to save product in database.");
       }
 
-      setRecords((current) =>
-        current.some((p) => p.id === savedProduct.id)
-          ? current.map((p) => (p.id === savedProduct.id ? savedProduct : p))
-          : [savedProduct, ...current],
-      );
+      // Use the actual product object from server which has the database id
+      const productFromServer: Product = resData.product ? {
+        ...savedProduct,
+        id: resData.product.id || savedProduct.id,
+        sku: resData.product.sku || savedProduct.sku,
+        slug: resData.product.slug || savedProduct.slug,
+        price: Number(resData.product.price) || savedProduct.price,
+        salePrice: resData.product.salePrice ? Number(resData.product.salePrice) : undefined,
+        images: resData.product.images?.length ? resData.product.images : savedProduct.images,
+      } : savedProduct;
+
+      setRecords((current) => {
+        const targetId = selected?.id || productFromServer.id;
+        const exists = current.some((p) => p.id === targetId || p.sku === productFromServer.sku);
+        if (exists) {
+          return current.map((p) => (p.id === targetId || p.sku === productFromServer.sku ? productFromServer : p));
+        }
+        return [productFromServer, ...current];
+      });
 
       setSelected(null);
       setCreateOpen(false);
       toast.success(
         isEditing
-          ? `Product "${savedProduct.name}" updated successfully.`
-          : `Product "${savedProduct.name}" created and saved successfully.`,
+          ? `Product "${productFromServer.name}" updated successfully.`
+          : `Product "${productFromServer.name}" created and saved successfully.`,
       );
     } catch (err: any) {
       const errMsg = err.message || "Failed to persist product.";
