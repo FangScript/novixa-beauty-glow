@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
-import { products as fallbackProducts, searchProducts, type ProductCategory } from "@/lib/products/catalogue";
+import { getAuthenticatedAdmin } from "@/lib/auth/session";
+import {
+  products as fallbackProducts,
+  searchProducts,
+  type ProductCategory,
+} from "@/lib/products/catalogue";
 
 const toPrismaCategory = (cat: string) => {
   const c = cat.toUpperCase();
@@ -63,7 +68,8 @@ export async function GET(request: Request) {
           rating: Number(p.rating),
           reviewCount: p.reviewCount,
           tags: p.tags,
-          images: p.images.length > 0 ? p.images.map((img) => img.url) : ["/images/product-perfume.jpg"],
+          images:
+            p.images.length > 0 ? p.images.map((img) => img.url) : ["/images/product-perfume.jpg"],
         }));
 
         return NextResponse.json({
@@ -97,6 +103,11 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const admin = await getAuthenticatedAdmin();
+    if (!admin) {
+      return NextResponse.json({ error: "Unauthorized. Admin session required." }, { status: 401 });
+    }
+
     const body = await request.json();
     const {
       name,
@@ -242,6 +253,11 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    const admin = await getAuthenticatedAdmin();
+    if (!admin) {
+      return NextResponse.json({ error: "Unauthorized. Admin session required." }, { status: 401 });
+    }
+
     const body = await request.json();
     const {
       id,
@@ -260,17 +276,17 @@ export async function PUT(request: Request) {
     } = body;
 
     if (!id && !sku) {
-      return NextResponse.json({ error: "Product ID or SKU is required for updates." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Product ID or SKU is required for updates." },
+        { status: 400 },
+      );
     }
 
     if (process.env.DATABASE_URL) {
       // Find the product by ID or SKU
       const existing = await prisma.product.findFirst({
         where: {
-          OR: [
-            ...(id ? [{ id }] : []),
-            ...(sku ? [{ sku: sku.toUpperCase() }] : []),
-          ],
+          OR: [...(id ? [{ id }] : []), ...(sku ? [{ sku: sku.toUpperCase() }] : [])],
         },
       });
 
@@ -397,6 +413,11 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const admin = await getAuthenticatedAdmin();
+    if (!admin) {
+      return NextResponse.json({ error: "Unauthorized. Admin session required." }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 
@@ -420,4 +441,3 @@ export async function DELETE(request: Request) {
     );
   }
 }
-

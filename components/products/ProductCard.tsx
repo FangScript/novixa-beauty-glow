@@ -33,9 +33,7 @@ export function ProductCard({ product }: { product: Product }) {
         <p className="mt-1 text-sm font-medium">
           {product.salePrice ? (
             <>
-              <span className="text-rosewood font-semibold">
-                {formatPrice(product.salePrice)}
-              </span>{" "}
+              <span className="text-rosewood font-semibold">{formatPrice(product.salePrice)}</span>{" "}
               <del className="ml-1 text-xs font-normal text-muted-foreground">
                 {formatPrice(product.price)}
               </del>
@@ -51,9 +49,7 @@ export function ProductCard({ product }: { product: Product }) {
           {[1, 2, 3, 4, 5].map((star) => (
             <Star key={star} size={11} fill="currentColor" />
           ))}
-          <span className="ml-1 text-[10px] text-muted-foreground">
-            ({product.reviewCount})
-          </span>
+          <span className="ml-1 text-[10px] text-muted-foreground">({product.reviewCount})</span>
         </div>
       </div>
       <div className="mt-2 flex gap-2">

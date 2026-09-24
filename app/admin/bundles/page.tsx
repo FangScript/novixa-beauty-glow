@@ -187,10 +187,15 @@ export default function AdminBundlesPage() {
             <th className="px-4 py-3 text-right">Actions</th>
           </TableHeader>
           {bundles.map((bundle) => (
-            <tr key={bundle.id} className="border-b border-[#e7ddd5] last:border-0 hover:bg-black/[0.02]">
+            <tr
+              key={bundle.id}
+              className="border-b border-[#e7ddd5] last:border-0 hover:bg-black/[0.02]"
+            >
               <TableCell className="font-medium text-[#211b18]">{bundle.name}</TableCell>
               <TableCell className="text-[#776a61]">{bundle.products} items</TableCell>
-              <TableCell className="font-semibold">£{bundle.price.toLocaleString("en-GB")}</TableCell>
+              <TableCell className="font-semibold">
+                £{bundle.price.toLocaleString("en-GB")}
+              </TableCell>
               <TableCell className="text-[#776a61] line-through">
                 £{bundle.originalValue.toLocaleString("en-GB")}
               </TableCell>

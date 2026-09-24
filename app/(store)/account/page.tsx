@@ -80,7 +80,9 @@ export default function AccountPage() {
           {initials}
         </div>
         <div>
-          <p className="font-display text-xl text-foreground">Welcome back, {user.name.split(" ")[0]}</p>
+          <p className="font-display text-xl text-foreground">
+            Welcome back, {user.name.split(" ")[0]}
+          </p>
           <p className="text-xs text-muted-foreground mt-0.5">{user.email}</p>
         </div>
       </div>
@@ -89,7 +91,11 @@ export default function AccountPage() {
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
           { label: "Orders", href: "/account/orders", desc: "Track and review your purchases" },
-          { label: "Addresses", href: "/account/addresses", desc: "Manage saved delivery destinations" },
+          {
+            label: "Addresses",
+            href: "/account/addresses",
+            desc: "Manage saved delivery destinations",
+          },
           { label: "Profile", href: "/account/profile", desc: "Update your personal details" },
           { label: "Wishlist", href: "/wishlist", desc: "Your saved signature edit" },
         ].map(({ label, href, desc }) => (
@@ -109,7 +115,8 @@ export default function AccountPage() {
         <div>
           <h2 className="font-display text-2xl">Member Account</h2>
           <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
-            Your session is active and secure. Orders placed while signed in are linked to your account automatically.
+            Your session is active and secure. Orders placed while signed in are linked to your
+            account automatically.
           </p>
         </div>
         <Button

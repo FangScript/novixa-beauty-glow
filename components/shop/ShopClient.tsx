@@ -23,7 +23,8 @@ export function ShopClient({ initialProducts }: ShopClientProps) {
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
     const list = allProducts.filter((p) => {
-      const matchesQuery = !q || `${p.name} ${p.sku} ${p.category} ${p.tags?.join(" ")}`.toLowerCase().includes(q);
+      const matchesQuery =
+        !q || `${p.name} ${p.sku} ${p.category} ${p.tags?.join(" ")}`.toLowerCase().includes(q);
       const matchesCategory = category === "all" || p.category === category;
       return matchesQuery && matchesCategory;
     });

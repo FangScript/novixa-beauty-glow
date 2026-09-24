@@ -25,9 +25,9 @@ export async function processCheckoutAction(items: CheckoutItem[], customerEmail
     subtotal += unitPrice * item.quantity;
   }
 
-  const shipping = subtotal >= 5000 ? 0 : 250;
-  const total = subtotal + shipping;
-  const orderNumber = `NV-${Math.floor(1000 + Math.random() * 9000)}`;
+  const shipping = subtotal >= 70 ? 0 : 4.95;
+  const total = Math.round((subtotal + shipping) * 100) / 100;
+  const orderNumber = `NVX-2026-${Math.floor(1000 + Math.random() * 9000)}`;
 
   return {
     success: true,

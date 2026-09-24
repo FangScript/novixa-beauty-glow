@@ -138,7 +138,10 @@ export default function AdminProductsPage() {
     }
 
     const numSalePrice = form.salePrice ? Number(form.salePrice) : undefined;
-    if (numSalePrice !== undefined && (isNaN(numSalePrice) || numSalePrice <= 0 || numSalePrice >= numPrice)) {
+    if (
+      numSalePrice !== undefined &&
+      (isNaN(numSalePrice) || numSalePrice <= 0 || numSalePrice >= numPrice)
+    ) {
       const msg = "Sale price must be greater than 0 and lower than regular price.";
       setError(msg);
       toast.error(msg);
@@ -147,7 +150,10 @@ export default function AdminProductsPage() {
 
     const safeSku = form.sku.trim()
       ? form.sku.trim().toUpperCase()
-      : `NVX-${form.name.slice(0, 3).toUpperCase().replace(/[^A-Z]/g, "X")}-${Date.now().toString().slice(-4)}`;
+      : `NVX-${form.name
+          .slice(0, 3)
+          .toUpperCase()
+          .replace(/[^A-Z]/g, "X")}-${Date.now().toString().slice(-4)}`;
 
     let generatedSlug = (selected?.slug || form.name)
       .toLowerCase()
@@ -156,9 +162,12 @@ export default function AdminProductsPage() {
       .replace(/(^-|-$)/g, "");
     if (!generatedSlug) generatedSlug = `product-${Date.now().toString(36)}`;
 
-    const safeDesc = form.description.trim().length >= 10
-      ? form.description.trim()
-      : (form.description.trim() ? `${form.description.trim()} - Luxury formulation.` : "Luxury formulation crafted by NOVIXA.");
+    const safeDesc =
+      form.description.trim().length >= 10
+        ? form.description.trim()
+        : form.description.trim()
+          ? `${form.description.trim()} - Luxury formulation.`
+          : "Luxury formulation crafted by NOVIXA.";
 
     const parsed = productSchema.safeParse({
       id: selected?.id ?? `p-${Date.now()}`,
@@ -209,21 +218,25 @@ export default function AdminProductsPage() {
       }
 
       // Use the actual product object from server which has the database id
-      const productFromServer: Product = resData.product ? {
-        ...savedProduct,
-        id: resData.product.id || savedProduct.id,
-        sku: resData.product.sku || savedProduct.sku,
-        slug: resData.product.slug || savedProduct.slug,
-        price: Number(resData.product.price) || savedProduct.price,
-        salePrice: resData.product.salePrice ? Number(resData.product.salePrice) : undefined,
-        images: resData.product.images?.length ? resData.product.images : savedProduct.images,
-      } : savedProduct;
+      const productFromServer: Product = resData.product
+        ? {
+            ...savedProduct,
+            id: resData.product.id || savedProduct.id,
+            sku: resData.product.sku || savedProduct.sku,
+            slug: resData.product.slug || savedProduct.slug,
+            price: Number(resData.product.price) || savedProduct.price,
+            salePrice: resData.product.salePrice ? Number(resData.product.salePrice) : undefined,
+            images: resData.product.images?.length ? resData.product.images : savedProduct.images,
+          }
+        : savedProduct;
 
       setRecords((current) => {
         const targetId = selected?.id || productFromServer.id;
         const exists = current.some((p) => p.id === targetId || p.sku === productFromServer.sku);
         if (exists) {
-          return current.map((p) => (p.id === targetId || p.sku === productFromServer.sku ? productFromServer : p));
+          return current.map((p) =>
+            p.id === targetId || p.sku === productFromServer.sku ? productFromServer : p,
+          );
         }
         return [productFromServer, ...current];
       });
@@ -304,7 +317,9 @@ export default function AdminProductsPage() {
       </div>
 
       <div className="mt-4 flex justify-between text-xs text-[#776a61]">
-        <span>Showing {filtered.length} of {records.length} products</span>
+        <span>
+          Showing {filtered.length} of {records.length} products
+        </span>
         <span>Connected to PostgreSQL catalogue repository</span>
       </div>
 
@@ -320,7 +335,10 @@ export default function AdminProductsPage() {
             <th className="px-4 py-3 text-right">Actions</th>
           </TableHeader>
           {filtered.map((product) => (
-            <tr key={product.id} className="border-b border-[#e7ddd5] last:border-0 hover:bg-black/[0.02]">
+            <tr
+              key={product.id}
+              className="border-b border-[#e7ddd5] last:border-0 hover:bg-black/[0.02]"
+            >
               <TableCell>
                 <div className="flex items-center gap-3">
                   <img
@@ -376,9 +394,7 @@ export default function AdminProductsPage() {
         >
           <div className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
             {error && (
-              <p className="border border-[#b86d5a] bg-[#5a3028] p-3 text-xs text-white">
-                {error}
-              </p>
+              <p className="border border-[#b86d5a] bg-[#5a3028] p-3 text-xs text-white">{error}</p>
             )}
 
             <AdminField label="Product Name">
@@ -446,7 +462,9 @@ export default function AdminProductsPage() {
                 <select
                   className={inputClass}
                   value={form.category}
-                  onChange={(e) => setForm({ ...form, category: e.target.value as ProductCategory })}
+                  onChange={(e) =>
+                    setForm({ ...form, category: e.target.value as ProductCategory })
+                  }
                 >
                   <option value="perfume">Perfume</option>
                   <option value="makeup">Makeup</option>

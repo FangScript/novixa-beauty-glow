@@ -41,7 +41,7 @@ export const productSchema = z
     skinType: z.string().optional(),
     hairType: z.string().optional(),
     ingredients: z.array(z.string()).optional(),
-    stock: z.number().int().nonnegative(),
+    stock: z.number().nonnegative(),
     rating: z.number().min(0).max(5),
     reviewCount: z.number().int().nonnegative(),
     badge: z.string().optional(),
@@ -91,7 +91,8 @@ export const products: Product[] = [
     id: "p1",
     name: "Velvet Rose Eau de Parfum",
     slug: "velvet-rose-eau-de-parfum",
-    description: "A luminous British floral fragrance wrapped in velvety rose, warm amber, and soft woods.",
+    description:
+      "A luminous British floral fragrance wrapped in velvety rose, warm amber, and soft woods.",
     price: 85,
     gender: "women",
     brand: "NOVIXA",
@@ -601,7 +602,8 @@ export const products: Product[] = [
     id: "p29",
     name: "Atelier Travel Refill Atomizer",
     slug: "atelier-travel-refill-atomizer",
-    description: "Precision-milled 5ml luxury pocket atomizer engineered for fine mist diffusion on the go.",
+    description:
+      "Precision-milled 5ml luxury pocket atomizer engineered for fine mist diffusion on the go.",
     price: 22,
     gender: "unisex",
     category: "accessories",
@@ -653,10 +655,7 @@ export const getProduct = (idOrSlug: string): Product | undefined => {
     return liveProductsRegistry.get(idOrSlug);
   }
   return products.find(
-    (product) =>
-      product.id === idOrSlug ||
-      product.slug === idOrSlug ||
-      product.sku === idOrSlug,
+    (product) => product.id === idOrSlug || product.slug === idOrSlug || product.sku === idOrSlug,
   );
 };
 

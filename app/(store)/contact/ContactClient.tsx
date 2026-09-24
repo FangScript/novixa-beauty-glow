@@ -2,7 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Mail, Phone, MapPin, Clock, CheckCircle2, AlertCircle, Loader2, Sparkles } from "lucide-react";
+import {
+  Mail,
+  Phone,
+  MapPin,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  Sparkles,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCustomerAuth } from "@/lib/auth/customer-context";
 
@@ -72,7 +81,9 @@ export function ContactClient() {
 
       setStatus({
         type: "success",
-        message: data.message || "Your inquiry has been received. Our concierge will respond within 24 hours.",
+        message:
+          data.message ||
+          "Your inquiry has been received. Our concierge will respond within 24 hours.",
       });
 
       setMessage("");
@@ -95,7 +106,8 @@ export function ContactClient() {
           Send a Concierge Inquiry
         </h2>
         <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
-          Please share your inquiry details below. Our fragrance concierges review and respond to every patron message personally.
+          Please share your inquiry details below. Our fragrance concierges review and respond to
+          every patron message personally.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-5">
@@ -236,7 +248,8 @@ export function ContactClient() {
           </div>
           <h3 className="mt-2 font-display text-2xl text-foreground">Private Concierge Service</h3>
           <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-            Our atelier specialists are at your service for personal scent matching, corporate gifting curation, and bespoke formulations.
+            Our atelier specialists are at your service for personal scent matching, corporate
+            gifting curation, and bespoke formulations.
           </p>
 
           <div className="mt-6 space-y-4 text-xs">

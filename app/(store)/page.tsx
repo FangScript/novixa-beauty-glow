@@ -1,14 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Gem,
-  Sparkles,
-  ShieldCheck,
-  UsersRound,
-} from "lucide-react";
+import { ArrowLeft, ArrowRight, Gem, Sparkles, ShieldCheck, UsersRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProductCard } from "@/components/products/ProductCard";
 import { getLiveProducts } from "@/lib/products/get-products";
@@ -281,7 +274,8 @@ export default async function HomePage() {
               Not Sure Which Fragrance Fits Your Aura?
             </h2>
             <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              Take our 2-minute olfactive consultation. Answer 4 sensory questions to reveal your personalized signature fragrance and complementary evening pairing.
+              Take our 2-minute olfactive consultation. Answer 4 sensory questions to reveal your
+              personalized signature fragrance and complementary evening pairing.
             </p>
           </div>
           <Button

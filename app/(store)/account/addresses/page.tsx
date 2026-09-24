@@ -143,7 +143,7 @@ export default function AccountAddressesPage() {
   const field = (
     label: string,
     key: keyof typeof EMPTY_FORM,
-    opts?: { type?: string; required?: boolean; placeholder?: string; pattern?: string }
+    opts?: { type?: string; required?: boolean; placeholder?: string; pattern?: string },
   ) => (
     <label className="block text-xs font-semibold uppercase tracking-[0.1em] text-foreground">
       {label}
@@ -207,14 +207,20 @@ export default function AccountAddressesPage() {
               {field("Label (e.g. Home, Work)", "label", { placeholder: "Home" })}
               {field("Full Name", "fullName", { required: true, placeholder: "Recipient name" })}
             </div>
-            {field("Street Address", "line1", { required: true, placeholder: "Flat / House / Street" })}
+            {field("Street Address", "line1", {
+              required: true,
+              placeholder: "Flat / House / Street",
+            })}
             {field("Address Line 2", "line2", { placeholder: "Landmark, Colony (optional)" })}
             <div className="grid gap-4 sm:grid-cols-3">
               {field("City", "city", { required: true })}
               {field("State", "state", { required: true })}
               {field("PIN Code", "postalCode", { required: true, pattern: "[0-9]{5,6}" })}
             </div>
-            {field("Phone (for delivery)", "phone", { type: "tel", placeholder: "+91 XXXXX XXXXX" })}
+            {field("Phone (for delivery)", "phone", {
+              type: "tel",
+              placeholder: "+91 XXXXX XXXXX",
+            })}
 
             <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer select-none">
               <input
@@ -272,7 +278,10 @@ export default function AccountAddressesPage() {
           <p className="mt-2 text-xs text-muted-foreground max-w-xs mx-auto">
             Save delivery addresses for faster checkout on future orders.
           </p>
-          <Button onClick={openAdd} className="mt-5 rounded-none bg-ink text-white hover:bg-black text-[10px] tracking-[0.12em] gap-2">
+          <Button
+            onClick={openAdd}
+            className="mt-5 rounded-none bg-ink text-white hover:bg-black text-[10px] tracking-[0.12em] gap-2"
+          >
             <Plus size={13} /> ADD ADDRESS
           </Button>
         </div>
@@ -302,9 +311,7 @@ export default function AccountAddressesPage() {
                 <br />
                 {addr.city}, {addr.state} — {addr.postalCode}
               </p>
-              {addr.phone && (
-                <p className="mt-1 text-xs text-muted-foreground">{addr.phone}</p>
-              )}
+              {addr.phone && <p className="mt-1 text-xs text-muted-foreground">{addr.phone}</p>}
               <div className="mt-4 flex items-center gap-3">
                 <button
                   onClick={() => openEdit(addr)}

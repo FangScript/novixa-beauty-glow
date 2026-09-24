@@ -2,7 +2,17 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Eye, EyeOff, Loader2, UserRound, Lock, Mail, Sparkles, CheckCircle2, ArrowLeft } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  Loader2,
+  UserRound,
+  Lock,
+  Mail,
+  Sparkles,
+  CheckCircle2,
+  ArrowLeft,
+} from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
 import { Button } from "@/components/ui/button";
 import { useCustomerAuth } from "@/lib/auth/customer-context";
@@ -23,7 +33,14 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextPath = searchParams.get("next") || "/account";
-  const { user, isLoading: authLoading, login, register, signInWithGoogle, resetPassword } = useCustomerAuth();
+  const {
+    user,
+    isLoading: authLoading,
+    login,
+    register,
+    signInWithGoogle,
+    resetPassword,
+  } = useCustomerAuth();
 
   const [tab, setTab] = useState<"signin" | "register" | "forgot">("signin");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -133,11 +150,7 @@ function LoginForm() {
     <PageShell
       eyebrow="Member Portal"
       title={
-        tab === "signin"
-          ? "Welcome Back"
-          : tab === "register"
-            ? "Create Account"
-            : "Reset Password"
+        tab === "signin" ? "Welcome Back" : tab === "register" ? "Create Account" : "Reset Password"
       }
     >
       <div className="mt-8 grid gap-8 lg:grid-cols-[480px_1fr]">
@@ -523,7 +536,8 @@ function LoginForm() {
               Your fragrance journey, personalised.
             </p>
             <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-              NOVIXA members get exclusive early access to limited releases and curated scent profiles.
+              NOVIXA members get exclusive early access to limited releases and curated scent
+              profiles.
             </p>
           </div>
         </div>

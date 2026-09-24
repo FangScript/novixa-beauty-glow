@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
+import { getAuthenticatedAdmin } from "@/lib/auth/session";
 
 const defaultCategories = [
   { id: "perfume", name: "Perfumes", slug: "perfume", count: 12 },
@@ -45,6 +46,11 @@ export async function GET() {
 // ─── POST /api/categories ─────────────────────────────────────────────────────
 export async function POST(request: Request) {
   try {
+    const admin = await getAuthenticatedAdmin();
+    if (!admin) {
+      return NextResponse.json({ error: "Unauthorized. Admin session required." }, { status: 401 });
+    }
+
     const body = await request.json();
     const { name, description } = body;
 
@@ -98,6 +104,11 @@ export async function POST(request: Request) {
 // ─── DELETE /api/categories?id=xxx ────────────────────────────────────────────
 export async function DELETE(request: Request) {
   try {
+    const admin = await getAuthenticatedAdmin();
+    if (!admin) {
+      return NextResponse.json({ error: "Unauthorized. Admin session required." }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 

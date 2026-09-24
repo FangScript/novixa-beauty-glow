@@ -95,7 +95,10 @@ export default function AdminCustomersPage() {
             </tr>
           ) : (
             filtered.map((c) => (
-              <tr key={c.id} className="border-b border-[#e8e0d8] hover:bg-white/60 transition-colors">
+              <tr
+                key={c.id}
+                className="border-b border-[#e8e0d8] hover:bg-white/60 transition-colors"
+              >
                 <TableCell>
                   <span className="font-medium text-foreground">{c.name}</span>
                 </TableCell>

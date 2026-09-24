@@ -22,9 +22,7 @@ export function PageShell({
         {title}
       </h1>
       {copy && (
-        <p className="mt-4 max-w-xl text-sm leading-relaxed text-muted-foreground">
-          {copy}
-        </p>
+        <p className="mt-4 max-w-xl text-sm leading-relaxed text-muted-foreground">{copy}</p>
       )}
       <div className="mt-8">{children}</div>
     </main>

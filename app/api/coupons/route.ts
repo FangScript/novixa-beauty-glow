@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
+import { getAuthenticatedAdmin } from "@/lib/auth/session";
 
 const defaultCoupons = [
   {
@@ -7,7 +8,7 @@ const defaultCoupons = [
     code: "GLOW15",
     type: "PERCENTAGE",
     value: 15,
-    minimumOrder: 3000,
+    minimumOrder: 50,
     usageLimit: 200,
     usageCount: 48,
     active: true,
@@ -15,10 +16,10 @@ const defaultCoupons = [
   },
   {
     id: "c-2",
-    code: "LUXE1000",
+    code: "LUXE20",
     type: "FIXED",
-    value: 1000,
-    minimumOrder: 8000,
+    value: 20,
+    minimumOrder: 100,
     usageLimit: 100,
     usageCount: 22,
     active: true,
@@ -29,7 +30,7 @@ const defaultCoupons = [
     code: "WELCOME10",
     type: "PERCENTAGE",
     value: 10,
-    minimumOrder: 2000,
+    minimumOrder: 40,
     usageLimit: null,
     usageCount: 115,
     active: true,
@@ -51,20 +52,22 @@ export async function GET() {
 
       // If database has 0 coupons, seed defaults
       for (const def of defaultCoupons) {
-        await prisma.coupon.upsert({
-          where: { code: def.code },
-          update: {},
-          create: {
-            code: def.code,
-            type: def.type as any,
-            value: def.value,
-            minimumOrder: def.minimumOrder,
-            usageLimit: def.usageLimit,
-            usageCount: def.usageCount,
-            active: def.active,
-            expiresAt: def.expiresAt ? new Date(def.expiresAt) : null,
-          },
-        }).catch(() => null);
+        await prisma.coupon
+          .upsert({
+            where: { code: def.code },
+            update: {},
+            create: {
+              code: def.code,
+              type: def.type as any,
+              value: def.value,
+              minimumOrder: def.minimumOrder,
+              usageLimit: def.usageLimit,
+              usageCount: def.usageCount,
+              active: def.active,
+              expiresAt: def.expiresAt ? new Date(def.expiresAt) : null,
+            },
+          })
+          .catch(() => null);
       }
 
       const seeded = await prisma.coupon.findMany({ orderBy: { createdAt: "desc" } });
@@ -79,6 +82,14 @@ export async function GET() {
 
 // ─── POST /api/coupons ────────────────────────────────────────────────────────
 export async function POST(request: Request) {
+  const admin = await getAuthenticatedAdmin();
+  if (!admin) {
+    return NextResponse.json(
+      { error: "Unauthorized. Administrator authentication required." },
+      { status: 401 },
+    );
+  }
+
   try {
     const body = await request.json();
     const { code, type, value, minimumOrder, usageLimit, expiresAt, active } = body;
@@ -138,15 +149,20 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error("POST /api/coupons error:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to save coupon." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: error.message || "Failed to save coupon." }, { status: 500 });
   }
 }
 
 // ─── DELETE /api/coupons?id=xxx ───────────────────────────────────────────────
 export async function DELETE(request: Request) {
+  const admin = await getAuthenticatedAdmin();
+  if (!admin) {
+    return NextResponse.json(
+      { error: "Unauthorized. Administrator authentication required." },
+      { status: 401 },
+    );
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");

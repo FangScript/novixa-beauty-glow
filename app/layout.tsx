@@ -20,7 +20,8 @@ export const metadata: Metadata = {
     default: "NOVIXA | Premium Perfume, Makeup & Beauty",
     template: "%s | NOVIXA",
   },
-  description: "Shop NOVIXA luxury perfumes, curated makeup bundles, and premium beauty essentials.",
+  description:
+    "Shop NOVIXA luxury perfumes, curated makeup bundles, and premium beauty essentials.",
   openGraph: {
     title: "NOVIXA | Discover Your Signature Glow",
     description: "Premium fragrance, makeup and beauty essentials for your signature look.",
@@ -28,11 +29,7 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${fontDisplay.variable} ${fontSans.variable}`}>
       <body className="antialiased bg-background text-foreground min-h-screen">

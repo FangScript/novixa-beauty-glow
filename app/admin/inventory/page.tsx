@@ -185,7 +185,10 @@ export default function AdminInventoryPage() {
               <th className="px-4 py-3">Adjustment</th>
             </TableHeader>
             {filtered.map((item) => (
-              <tr key={item.id} className="border-b border-[#e7ddd5] last:border-0 hover:bg-black/[0.02]">
+              <tr
+                key={item.id}
+                className="border-b border-[#e7ddd5] last:border-0 hover:bg-black/[0.02]"
+              >
                 <TableCell className="font-medium text-[#211b18]">{item.name}</TableCell>
                 <TableCell className="text-[#8f8279]">{item.sku}</TableCell>
                 <TableCell>{item.category}</TableCell>
@@ -233,9 +236,7 @@ export default function AdminInventoryPage() {
                 className="h-10 w-full border border-[#d9cec5] bg-white/60 px-3 text-sm outline-none focus:border-[#8f5d48]"
               />
             </AdminField>
-            {saveError && (
-              <p className="text-xs text-[#8f2d18]">{saveError}</p>
-            )}
+            {saveError && <p className="text-xs text-[#8f2d18]">{saveError}</p>}
             <div className="flex justify-end gap-3 pt-3">
               <Button variant="outline" onClick={() => setSelected(null)} disabled={isSaving}>
                 Cancel

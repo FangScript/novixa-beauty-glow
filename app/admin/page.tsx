@@ -1,12 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, TrendingUp } from "lucide-react";
-import {
-  AdminShell,
-  MetricCard,
-  TableCell,
-  TableHeader,
-  AdminTable,
-} from "@/components/admin";
+import { AdminShell, MetricCard, TableCell, TableHeader, AdminTable } from "@/components/admin";
 import { products as seedProducts } from "@/lib/products/catalogue";
 import { prisma } from "@/lib/db/client";
 
@@ -175,7 +169,10 @@ export default async function AdminOverviewPage() {
             <p className="text-[9px] uppercase tracking-[0.18em] text-[#8f5d48]">Catalogue</p>
             <h2 className="mt-2 font-display text-3xl">Recent Products</h2>
           </div>
-          <Link href="/admin/products" className="text-xs text-[#8f5d48] underline hover:text-black">
+          <Link
+            href="/admin/products"
+            className="text-xs text-[#8f5d48] underline hover:text-black"
+          >
             View all
           </Link>
         </div>
@@ -189,7 +186,10 @@ export default async function AdminOverviewPage() {
             <th className="px-4 py-3 text-right">Stock</th>
           </TableHeader>
           {recentProducts.map((product) => (
-            <tr key={product.id} className="border-b border-[#e7ddd5] last:border-0 hover:bg-black/[0.02]">
+            <tr
+              key={product.id}
+              className="border-b border-[#e7ddd5] last:border-0 hover:bg-black/[0.02]"
+            >
               <TableCell className="font-medium">{product.name}</TableCell>
               <TableCell className="capitalize">{product.category}</TableCell>
               <TableCell className="capitalize">{product.gender}</TableCell>

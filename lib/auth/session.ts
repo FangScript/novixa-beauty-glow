@@ -242,7 +242,9 @@ export async function logoutCustomer() {
 
   if (databaseConfigured() && rawSession) {
     try {
-      await prisma.session.delete({ where: { id: hashSession(rawSession) } }).catch(() => undefined);
+      await prisma.session
+        .delete({ where: { id: hashSession(rawSession) } })
+        .catch(() => undefined);
     } catch {
       // Ignored
     }
@@ -254,11 +256,7 @@ export async function logoutCustomer() {
 
 // ─── Google OAuth ────────────────────────────────────────────────────────────
 
-export async function loginWithGoogle(
-  googleId: string,
-  email: string,
-  name: string,
-) {
+export async function loginWithGoogle(googleId: string, email: string, name: string) {
   if (!databaseConfigured()) {
     return { ok: false as const, error: "Database is not configured." };
   }

@@ -99,7 +99,8 @@ export default function AdminAnalyticsPage() {
             <div className="mt-8 border border-[#d9cec5] bg-white/40 px-6 py-8 text-center">
               <p className="font-display text-2xl text-foreground">Store Metrics Ready</p>
               <p className="mt-2 text-xs text-[#776a61] max-w-sm mx-auto">
-                Analytics will populate as customers place orders. Revenue reflects only paid/authorised transactions.
+                Analytics will populate as customers place orders. Revenue reflects only
+                paid/authorised transactions.
               </p>
             </div>
           )}

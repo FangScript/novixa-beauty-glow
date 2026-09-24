@@ -2,7 +2,15 @@
 
 import { useState, useRef } from "react";
 import { toast } from "sonner";
-import { UploadCloud, Trash2, Star, Plus, Link as LinkIcon, Loader2, Image as ImageIcon } from "lucide-react";
+import {
+  UploadCloud,
+  Trash2,
+  Star,
+  Plus,
+  Link as LinkIcon,
+  Loader2,
+  Image as ImageIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ProductImageUploadProps {

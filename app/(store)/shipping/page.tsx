@@ -38,10 +38,16 @@ export default function ShippingPage() {
   ];
 
   const timelines = [
-    { region: "Mainland England & Wales (London, Manchester, Birmingham, Leeds, Bristol)", time: "1 – 2 Working Days (Tracked 24)" },
+    {
+      region: "Mainland England & Wales (London, Manchester, Birmingham, Leeds, Bristol)",
+      time: "1 – 2 Working Days (Tracked 24)",
+    },
     { region: "Scotland (Edinburgh, Glasgow & Central Belt)", time: "1 – 2 Working Days" },
     { region: "Northern Ireland (Belfast & Regional Districts)", time: "2 – 3 Working Days" },
-    { region: "Scottish Highlands & Islands, Channel Islands, Isle of Man", time: "2 – 4 Working Days" },
+    {
+      region: "Scottish Highlands & Islands, Channel Islands, Isle of Man",
+      time: "2 – 4 Working Days",
+    },
   ];
 
   return (
@@ -63,7 +69,9 @@ export default function ShippingPage() {
                 <Icon size={20} />
               </div>
               <h3 className="mt-4 font-display text-xl text-foreground">{item.title}</h3>
-              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{item.description}</p>
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                {item.description}
+              </p>
             </div>
           );
         })}
@@ -98,11 +106,16 @@ export default function ShippingPage() {
         <div className="border border-border bg-white/40 p-6 md:p-8">
           <h3 className="font-display text-2xl text-foreground">Royal Mail & DPD Live Tracking</h3>
           <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-            Upon carrier collection, an automated dispatch notification containing your 13-character Royal Mail or DPD tracking code is sent via email and SMS.
+            Upon carrier collection, an automated dispatch notification containing your 13-character
+            Royal Mail or DPD tracking code is sent via email and SMS.
           </p>
           <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-            DPD shipments include a precise 1-hour delivery window notification on the morning of arrival. You may also follow your parcel live in your{" "}
-            <Link href="/account/orders" className="text-rosewood underline font-medium hover:text-black">
+            DPD shipments include a precise 1-hour delivery window notification on the morning of
+            arrival. You may also follow your parcel live in your{" "}
+            <Link
+              href="/account/orders"
+              className="text-rosewood underline font-medium hover:text-black"
+            >
               NOVIXA Order History
             </Link>{" "}
             with our visual order stepper.
@@ -112,10 +125,13 @@ export default function ShippingPage() {
         <div className="border border-border bg-white/40 p-6 md:p-8">
           <h3 className="font-display text-2xl text-foreground">VAT & Sustainable Despatch</h3>
           <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-            All prices on NOVIXA are fully inclusive of 20% United Kingdom VAT. There are no additional duties, cross-border customs fees, or unexpected carrier surcharges upon arrival.
+            All prices on NOVIXA are fully inclusive of 20% United Kingdom VAT. There are no
+            additional duties, cross-border customs fees, or unexpected carrier surcharges upon
+            arrival.
           </p>
           <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-            Our presentation boxes utilize 100% biodegradable soy inks and recycled card inserts, upholding the highest standards of British environmental responsibility.
+            Our presentation boxes utilize 100% biodegradable soy inks and recycled card inserts,
+            upholding the highest standards of British environmental responsibility.
           </p>
         </div>
       </div>
@@ -123,16 +139,25 @@ export default function ShippingPage() {
       {/* Action Footer */}
       <div className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-border pt-8">
         <div>
-          <p className="text-xs font-medium text-foreground">Need bespoke Saturday or morning courier delivery?</p>
-          <p className="text-xs text-muted-foreground">Contact our Mayfair concierge desk for private expedited logistics.</p>
+          <p className="text-xs font-medium text-foreground">
+            Need bespoke Saturday or morning courier delivery?
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Contact our Mayfair concierge desk for private expedited logistics.
+          </p>
         </div>
         <div className="flex gap-3">
-          <Button asChild className="rounded-none bg-ink text-white hover:bg-black text-[10px] tracking-wider py-5 px-6">
-            <Link href="/account/orders">
-              TRACK MY PARCEL
-            </Link>
+          <Button
+            asChild
+            className="rounded-none bg-ink text-white hover:bg-black text-[10px] tracking-wider py-5 px-6"
+          >
+            <Link href="/account/orders">TRACK MY PARCEL</Link>
           </Button>
-          <Button asChild variant="outline" className="rounded-none text-[10px] tracking-wider py-5 px-6">
+          <Button
+            asChild
+            variant="outline"
+            className="rounded-none text-[10px] tracking-wider py-5 px-6"
+          >
             <Link href="/contact" className="inline-flex items-center gap-1.5">
               CONCIERGE INQUIRY <ArrowRight size={13} />
             </Link>

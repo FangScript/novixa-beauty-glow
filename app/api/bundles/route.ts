@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
+import { getAuthenticatedAdmin } from "@/lib/auth/session";
 
 // ─── GET /api/bundles ─────────────────────────────────────────────────────────
 export async function GET() {
@@ -50,6 +51,14 @@ export async function GET() {
 
 // ─── POST /api/bundles ────────────────────────────────────────────────────────
 export async function POST(request: Request) {
+  const admin = await getAuthenticatedAdmin();
+  if (!admin) {
+    return NextResponse.json(
+      { ok: false, error: "Unauthorized. Admin session required." },
+      { status: 401 },
+    );
+  }
+
   if (!process.env.DATABASE_URL) {
     return NextResponse.json({ ok: false, error: "Database not configured." }, { status: 503 });
   }
@@ -100,6 +109,14 @@ export async function POST(request: Request) {
 
 // ─── PUT /api/bundles ─────────────────────────────────────────────────────────
 export async function PUT(request: Request) {
+  const admin = await getAuthenticatedAdmin();
+  if (!admin) {
+    return NextResponse.json(
+      { ok: false, error: "Unauthorized. Admin session required." },
+      { status: 401 },
+    );
+  }
+
   if (!process.env.DATABASE_URL) {
     return NextResponse.json({ ok: false, error: "Database not configured." }, { status: 503 });
   }
@@ -142,6 +159,14 @@ export async function PUT(request: Request) {
 
 // ─── DELETE /api/bundles?id=xxx (archive) ─────────────────────────────────────
 export async function DELETE(request: Request) {
+  const admin = await getAuthenticatedAdmin();
+  if (!admin) {
+    return NextResponse.json(
+      { ok: false, error: "Unauthorized. Admin session required." },
+      { status: 401 },
+    );
+  }
+
   if (!process.env.DATABASE_URL) {
     return NextResponse.json({ ok: true });
   }

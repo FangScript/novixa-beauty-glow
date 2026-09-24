@@ -1,5 +1,12 @@
 import Link from "next/link";
-import { RotateCcw, ShieldCheck, CheckCircle2, AlertTriangle, ArrowRight, QrCode } from "lucide-react";
+import {
+  RotateCcw,
+  ShieldCheck,
+  CheckCircle2,
+  AlertTriangle,
+  ArrowRight,
+  QrCode,
+} from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
 import { Button } from "@/components/ui/button";
 
@@ -50,16 +57,21 @@ export default function ReturnsPage() {
             <RotateCcw size={22} />
           </div>
           <div>
-            <h2 className="font-display text-2xl text-foreground">14-Day British Atelier Return Guarantee</h2>
+            <h2 className="font-display text-2xl text-foreground">
+              14-Day British Atelier Return Guarantee
+            </h2>
             <p className="mt-1 text-xs text-muted-foreground leading-relaxed max-w-xl">
-              Fully compliant with the UK Consumer Rights Act 2015. Unopened, sealed fragrances and beauty rituals in their original presentation boxes are eligible for complimentary return or exchange within 14 days of delivery.
+              Fully compliant with the UK Consumer Rights Act 2015. Unopened, sealed fragrances and
+              beauty rituals in their original presentation boxes are eligible for complimentary
+              return or exchange within 14 days of delivery.
             </p>
           </div>
         </div>
-        <Button asChild className="rounded-none bg-ink text-white hover:bg-black text-[10px] tracking-wider py-5 px-6 shrink-0 self-start md:self-auto">
-          <Link href="/contact?subject=Returns">
-            INITIATE RETURN
-          </Link>
+        <Button
+          asChild
+          className="rounded-none bg-ink text-white hover:bg-black text-[10px] tracking-wider py-5 px-6 shrink-0 self-start md:self-auto"
+        >
+          <Link href="/contact?subject=Returns">INITIATE RETURN</Link>
         </Button>
       </div>
 
@@ -84,7 +96,9 @@ export default function ReturnsPage() {
                 {item.step}
               </span>
               <h3 className="mt-4 font-display text-xl text-foreground pr-8">{item.title}</h3>
-              <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{item.description}</p>
+              <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+                {item.description}
+              </p>
             </div>
           ))}
         </div>
@@ -104,7 +118,9 @@ export default function ReturnsPage() {
             </li>
             <li className="flex items-start gap-2">
               <span className="text-emerald-700 font-bold">✓</span>
-              <span>Cosmetics, lip glazes, and skincare with unbroken tamper-proof security stickers.</span>
+              <span>
+                Cosmetics, lip glazes, and skincare with unbroken tamper-proof security stickers.
+              </span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-emerald-700 font-bold">✓</span>
@@ -112,7 +128,9 @@ export default function ReturnsPage() {
             </li>
             <li className="flex items-start gap-2">
               <span className="text-emerald-700 font-bold">✓</span>
-              <span>Incorrect formulation dispatch verified against order confirmation receipt.</span>
+              <span>
+                Incorrect formulation dispatch verified against order confirmation receipt.
+              </span>
             </li>
           </ul>
         </div>
@@ -125,7 +143,10 @@ export default function ReturnsPage() {
           <ul className="mt-4 space-y-2.5 text-xs text-muted-foreground">
             <li className="flex items-start gap-2">
               <span className="text-[#8f2d18] font-bold">✕</span>
-              <span>Items where cellophane, tamper seals, or bottle atomizer sprays have been unsealed or pumped.</span>
+              <span>
+                Items where cellophane, tamper seals, or bottle atomizer sprays have been unsealed
+                or pumped.
+              </span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-[#8f2d18] font-bold">✕</span>
@@ -133,7 +154,9 @@ export default function ReturnsPage() {
             </li>
             <li className="flex items-start gap-2">
               <span className="text-[#8f2d18] font-bold">✕</span>
-              <span>Requests submitted after 14 calendar days from documented Royal Mail delivery.</span>
+              <span>
+                Requests submitted after 14 calendar days from documented Royal Mail delivery.
+              </span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-[#8f2d18] font-bold">✕</span>
@@ -150,23 +173,34 @@ export default function ReturnsPage() {
           <h3 className="font-display text-2xl text-foreground">Damaged in Transit?</h3>
         </div>
         <p className="mt-2 text-xs leading-relaxed text-muted-foreground max-w-3xl">
-          In the rare circumstance that your parcel arrives compromised during Royal Mail transit, photograph the damaged outer carton and formulation bottle within 48 hours. Our Mayfair concierge will dispatch an expedited complimentary replacement parcel the same day.
+          In the rare circumstance that your parcel arrives compromised during Royal Mail transit,
+          photograph the damaged outer carton and formulation bottle within 48 hours. Our Mayfair
+          concierge will dispatch an expedited complimentary replacement parcel the same day.
         </p>
       </div>
 
       {/* Action Footer */}
       <div className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-border pt-8">
         <div>
-          <p className="text-xs font-medium text-foreground">Need advice on fragrance notes or exchanges?</p>
-          <p className="text-xs text-muted-foreground">Our olfactive concierge is available Monday to Friday, 9:00 AM to 5:30 PM GMT.</p>
+          <p className="text-xs font-medium text-foreground">
+            Need advice on fragrance notes or exchanges?
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Our olfactive concierge is available Monday to Friday, 9:00 AM to 5:30 PM GMT.
+          </p>
         </div>
         <div className="flex gap-3">
-          <Button asChild className="rounded-none bg-ink text-white hover:bg-black text-[10px] tracking-wider py-5 px-6">
-            <Link href="/contact?subject=Returns">
-              START A RETURN
-            </Link>
+          <Button
+            asChild
+            className="rounded-none bg-ink text-white hover:bg-black text-[10px] tracking-wider py-5 px-6"
+          >
+            <Link href="/contact?subject=Returns">START A RETURN</Link>
           </Button>
-          <Button asChild variant="outline" className="rounded-none text-[10px] tracking-wider py-5 px-6">
+          <Button
+            asChild
+            variant="outline"
+            className="rounded-none text-[10px] tracking-wider py-5 px-6"
+          >
             <Link href="/contact" className="inline-flex items-center gap-1.5">
               CONCIERGE HELP <ArrowRight size={13} />
             </Link>

@@ -103,7 +103,8 @@ const QUESTIONS: Question[] = [
       {
         id: "signature",
         title: "Daily Signature Scent",
-        subtitle: "Effortless, poised everyday elegance that seamlessly transitions morning to dusk",
+        subtitle:
+          "Effortless, poised everyday elegance that seamlessly transitions morning to dusk",
         badge: "Everyday Masterpiece",
         icon: Sun,
         keywords: ["Signature", "Daytime"],
@@ -111,7 +112,8 @@ const QUESTIONS: Question[] = [
       {
         id: "evening",
         title: "Nocturne & Black-Tie Gala",
-        subtitle: "Opulent, hypnotic, and formulated for lingering impressions under evening lights",
+        subtitle:
+          "Opulent, hypnotic, and formulated for lingering impressions under evening lights",
         badge: "After-Dark Allure",
         icon: Moon,
         keywords: ["Evening"],
@@ -161,7 +163,8 @@ const QUESTIONS: Question[] = [
       {
         id: "bold",
         title: "Commanding Sillage (10–12+ Hours)",
-        subtitle: "Intense extrait-strength trail that announces your presence and lingers all night",
+        subtitle:
+          "Intense extrait-strength trail that announces your presence and lingers all night",
         badge: "Unapologetic Power",
         icon: Crown,
         keywords: ["10 hours", "10–12 hours"],
@@ -299,13 +302,13 @@ export function ScentFinderClient({ fragrances }: ScentFinderClientProps) {
           const occasionQ = QUESTIONS[1].options.find((o) => o.id === answers.occasion);
           if (occasionQ) {
             const hasOccasion = (perfume.occasion ?? []).some((occ) =>
-              occasionQ.keywords.some((k) => occ.toLowerCase().includes(k.toLowerCase()))
+              occasionQ.keywords.some((k) => occ.toLowerCase().includes(k.toLowerCase())),
             );
             if (hasOccasion) {
               score += 25;
             } else {
               const textMatch = occasionQ.keywords.some((k) =>
-                allProductText.includes(k.toLowerCase())
+                allProductText.includes(k.toLowerCase()),
               );
               if (textMatch) score += 15;
             }
@@ -314,7 +317,11 @@ export function ScentFinderClient({ fragrances }: ScentFinderClientProps) {
           // 3. Sillage & Longevity scoring (+20 max)
           const sillageQ = QUESTIONS[2].options.find((o) => o.id === answers.sillage);
           if (sillageQ && perfume.longevity) {
-            if (sillageQ.keywords.some((k) => perfume.longevity?.toLowerCase().includes(k.toLowerCase()))) {
+            if (
+              sillageQ.keywords.some((k) =>
+                perfume.longevity?.toLowerCase().includes(k.toLowerCase()),
+              )
+            ) {
               score += 20;
             } else {
               score += 10;
@@ -332,7 +339,7 @@ export function ScentFinderClient({ fragrances }: ScentFinderClientProps) {
           }
 
           return { product: perfume, score, reason };
-        }
+        },
       );
 
       // Sort descending by score
@@ -352,8 +359,7 @@ export function ScentFinderClient({ fragrances }: ScentFinderClientProps) {
           product: topTwo[1]?.product ?? topTwo[0].product,
           matchScore: topTwo[1]?.score ?? 90,
           matchPercentage: 94,
-          reason:
-            topTwo[1]?.reason || "Complementary notes for layering or nighttime transitions.",
+          reason: topTwo[1]?.reason || "Complementary notes for layering or nighttime transitions.",
           pairingTitle: "THE NOCTURNE PAIRING",
         },
       ];
@@ -411,7 +417,8 @@ export function ScentFinderClient({ fragrances }: ScentFinderClientProps) {
             <div className="space-y-2">
               <h3 className="font-display text-2xl">Analyzing Olfactory Pyramids</h3>
               <p className="text-xs md:text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
-                Balancing volatile top citrus accords, rare heart petals, and lingering resinous base woods against your sensory profile...
+                Balancing volatile top citrus accords, rare heart petals, and lingering resinous
+                base woods against your sensory profile...
               </p>
             </div>
           </div>
@@ -578,7 +585,10 @@ export function ScentFinderClient({ fragrances }: ScentFinderClientProps) {
                       variant="outline"
                       className="w-full rounded-none py-5 text-[10px] uppercase font-semibold tracking-[0.14em]"
                     >
-                      <Link href={`/products/${match.product.slug}`} className="flex items-center justify-center gap-1.5">
+                      <Link
+                        href={`/products/${match.product.slug}`}
+                        className="flex items-center justify-center gap-1.5"
+                      >
                         <Eye size={13} />
                         <span>Discover Full Formulation</span>
                       </Link>
@@ -593,9 +603,9 @@ export function ScentFinderClient({ fragrances }: ScentFinderClientProps) {
               <Sparkles className="mx-auto text-rosewood" size={20} />
               <h4 className="font-display text-xl">The NOVIXA Bottle Guarantee</h4>
               <p className="text-xs md:text-sm text-muted-foreground max-w-xl mx-auto leading-relaxed">
-                Every full-size eau de parfum order is accompanied by a complimentary 2ml discovery vial. 
-                Experience the fragrance on your skin first; if it does not harmonize, you may return the unopened 
-                full-size presentation box within 7 days for a full refund.
+                Every full-size eau de parfum order is accompanied by a complimentary 2ml discovery
+                vial. Experience the fragrance on your skin first; if it does not harmonize, you may
+                return the unopened full-size presentation box within 7 days for a full refund.
               </p>
               <div className="pt-2 flex flex-wrap justify-center gap-4">
                 <Button
@@ -696,7 +706,11 @@ export function ScentFinderClient({ fragrances }: ScentFinderClientProps) {
                     </div>
 
                     <div className="pt-2 flex items-center justify-between border-t border-border/40 text-[10px] uppercase font-bold tracking-wider">
-                      <span className={isSelected ? "text-rosewood dark:text-amber-400" : "text-muted-foreground"}>
+                      <span
+                        className={
+                          isSelected ? "text-rosewood dark:text-amber-400" : "text-muted-foreground"
+                        }
+                      >
                         {isSelected ? "Selected Accord" : "Tap to Select"}
                       </span>
                       <div

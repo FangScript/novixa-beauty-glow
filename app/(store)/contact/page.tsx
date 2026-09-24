@@ -15,7 +15,13 @@ export default function ContactPage() {
       title="Concierge & Inquiries"
       copy="Whether discovering a new signature accord or requesting order assistance, our dedicated fragrance concierge is here to guide you."
     >
-      <Suspense fallback={<div className="py-20 text-center text-xs text-muted-foreground">Loading concierge desk…</div>}>
+      <Suspense
+        fallback={
+          <div className="py-20 text-center text-xs text-muted-foreground">
+            Loading concierge desk…
+          </div>
+        }
+      >
         <ContactClient />
       </Suspense>
     </PageShell>

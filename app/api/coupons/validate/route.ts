@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
 
-const defaultCoupons: Record<string, { type: "PERCENTAGE" | "FIXED"; value: number; minimumOrder: number }> = {
+const defaultCoupons: Record<
+  string,
+  { type: "PERCENTAGE" | "FIXED"; value: number; minimumOrder: number }
+> = {
   GLOW15: { type: "PERCENTAGE", value: 15, minimumOrder: 50 },
   LUXE20: { type: "FIXED", value: 20, minimumOrder: 100 },
   WELCOME10: { type: "PERCENTAGE", value: 10, minimumOrder: 40 },

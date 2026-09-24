@@ -227,7 +227,9 @@ export default function AdminCouponsPage() {
       description="Manage promotional codes, order discounts, and usage limits across the storefront."
     >
       <div className="flex justify-between items-center border-y border-[#d9cec5] py-4">
-        <span className="text-xs text-[#776a61]">{coupons.length} promotional rules configured</span>
+        <span className="text-xs text-[#776a61]">
+          {coupons.length} promotional rules configured
+        </span>
         <Button
           onClick={() => setOpen(true)}
           className="rounded-none bg-[#211b18] text-white hover:bg-black text-[10px] uppercase tracking-[0.14em]"
@@ -249,8 +251,13 @@ export default function AdminCouponsPage() {
             <th className="px-4 py-3 text-right">Actions</th>
           </TableHeader>
           {coupons.map((coupon) => (
-            <tr key={coupon.code} className="border-b border-[#e7ddd5] last:border-0 hover:bg-black/[0.02]">
-              <TableCell className="font-mono font-semibold text-[#8f5d48]">{coupon.code}</TableCell>
+            <tr
+              key={coupon.code}
+              className="border-b border-[#e7ddd5] last:border-0 hover:bg-black/[0.02]"
+            >
+              <TableCell className="font-mono font-semibold text-[#8f5d48]">
+                {coupon.code}
+              </TableCell>
               <TableCell className="font-medium text-[#211b18]">
                 {coupon.type === "PERCENTAGE" ? `${coupon.value}% Off` : `£${coupon.value} Off`}
               </TableCell>

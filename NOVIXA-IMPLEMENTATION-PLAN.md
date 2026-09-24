@@ -220,20 +220,20 @@ Run performance checks for image sizes, route payloads, font loading, layout shi
 
 The phases should be implemented in this order because each stage supplies dependencies for the next stage:
 
-| Sequence | Phase | Primary outcome | Depends on |
-|---:|---|---|---|
-| 0 | Project hygiene | Stable development and deployment baseline | Existing app |
-| 1 | Product catalogue | Complete, validated catalogue | Phase 0 |
-| 2 | Database foundation | PostgreSQL and Prisma persistence | Phase 1 |
-| 3 | API and mutations | Trusted server business rules | Phase 2 |
-| 4 | Cart and wishlist | Persistent commerce state | Phase 3 |
-| 5 | Authentication | Secure identity and roles | Phase 2–3 |
-| 6 | Account and orders | Customer order history | Phase 4–5 |
-| 7 | Checkout and payments | Real order creation and payment boundary | Phase 3–6 |
-| 8 | Admin operations | Store management tools | Phase 3 and 5 |
-| 9 | Reviews | Verified customer feedback | Phase 6–8 |
-| 10 | Search and analytics | Discovery and operational insight | Phase 2–9 |
-| 11 | Hardening | Release-ready quality and reliability | All required production phases |
+| Sequence | Phase                 | Primary outcome                            | Depends on                     |
+| -------: | --------------------- | ------------------------------------------ | ------------------------------ |
+|        0 | Project hygiene       | Stable development and deployment baseline | Existing app                   |
+|        1 | Product catalogue     | Complete, validated catalogue              | Phase 0                        |
+|        2 | Database foundation   | PostgreSQL and Prisma persistence          | Phase 1                        |
+|        3 | API and mutations     | Trusted server business rules              | Phase 2                        |
+|        4 | Cart and wishlist     | Persistent commerce state                  | Phase 3                        |
+|        5 | Authentication        | Secure identity and roles                  | Phase 2–3                      |
+|        6 | Account and orders    | Customer order history                     | Phase 4–5                      |
+|        7 | Checkout and payments | Real order creation and payment boundary   | Phase 3–6                      |
+|        8 | Admin operations      | Store management tools                     | Phase 3 and 5                  |
+|        9 | Reviews               | Verified customer feedback                 | Phase 6–8                      |
+|       10 | Search and analytics  | Discovery and operational insight          | Phase 2–9                      |
+|       11 | Hardening             | Release-ready quality and reliability      | All required production phases |
 
 Parallel work is possible after Phase 2. For example, the admin shell and product management UI can progress alongside customer account work. Payment provider selection, authentication provider selection, and hosting decisions should be made early because they affect schema and environment configuration.
 
@@ -241,14 +241,14 @@ Parallel work is possible after Phase 2. For example, the admin shell and produc
 
 Before implementing external integrations, the project owner should choose the following services:
 
-| Decision | Options to evaluate | Why it matters |
-|---|---|---|
-| PostgreSQL hosting | Managed PostgreSQL or project-provided database | Determines connection, backups, and migration workflow |
-| Authentication | Auth provider or reviewed custom session layer | Determines session, user, email, and role design |
-| Payments | Provider available in the target market | Determines payment intents, webhooks, refunds, and settlement status |
-| Email | Transactional email provider | Determines password recovery and order notifications |
-| Image storage | Object storage or managed media service | Determines product image uploads and optimization |
-| Deployment | Existing TanStack Start-compatible hosting | Determines server runtime, environment variables, and webhook URLs |
+| Decision           | Options to evaluate                             | Why it matters                                                       |
+| ------------------ | ----------------------------------------------- | -------------------------------------------------------------------- |
+| PostgreSQL hosting | Managed PostgreSQL or project-provided database | Determines connection, backups, and migration workflow               |
+| Authentication     | Auth provider or reviewed custom session layer  | Determines session, user, email, and role design                     |
+| Payments           | Provider available in the target market         | Determines payment intents, webhooks, refunds, and settlement status |
+| Email              | Transactional email provider                    | Determines password recovery and order notifications                 |
+| Image storage      | Object storage or managed media service         | Determines product image uploads and optimization                    |
+| Deployment         | Existing TanStack Start-compatible hosting      | Determines server runtime, environment variables, and webhook URLs   |
 
 No provider should be represented as connected until its credentials, webhook configuration, sandbox behavior, and failure handling have been tested.
 

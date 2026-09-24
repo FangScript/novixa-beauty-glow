@@ -23,26 +23,30 @@ export async function POST(request: Request) {
     // Record inquiry in DB if available
     if (process.env.DATABASE_URL) {
       // Find or link user
-      const existingUser = await prisma.user.findUnique({
-        where: { email: email.trim().toLowerCase() },
-      }).catch(() => null);
+      const existingUser = await prisma.user
+        .findUnique({
+          where: { email: email.trim().toLowerCase() },
+        })
+        .catch(() => null);
 
       if (existingUser) {
-        await prisma.adminAuditLog.create({
-          data: {
-            userId: existingUser.id,
-            action: "CUSTOMER_INQUIRY",
-            resource: "CONCIERGE",
-            resourceId: orderNumber ? orderNumber.trim() : null,
-            metadata: {
-              name: name.trim(),
-              email: email.trim(),
-              phone: phone ? phone.trim() : null,
-              subject: subject || "General Inquiry",
-              message: message.trim(),
+        await prisma.adminAuditLog
+          .create({
+            data: {
+              userId: existingUser.id,
+              action: "CUSTOMER_INQUIRY",
+              resource: "CONCIERGE",
+              resourceId: orderNumber ? orderNumber.trim() : null,
+              metadata: {
+                name: name.trim(),
+                email: email.trim(),
+                phone: phone ? phone.trim() : null,
+                subject: subject || "General Inquiry",
+                message: message.trim(),
+              },
             },
-          },
-        }).catch(() => null);
+          })
+          .catch(() => null);
       }
     }
 

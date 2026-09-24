@@ -150,7 +150,8 @@ export async function POST(request: Request) {
     }
 
     const cleanEmail = (authorEmail || "").trim().toLowerCase();
-    const cleanName = (authorName || "").trim() || (cleanEmail ? cleanEmail.split("@")[0] : "Customer");
+    const cleanName =
+      (authorName || "").trim() || (cleanEmail ? cleanEmail.split("@")[0] : "Customer");
 
     if (process.env.DATABASE_URL) {
       // 1. Resolve product ID (handle slug or id)

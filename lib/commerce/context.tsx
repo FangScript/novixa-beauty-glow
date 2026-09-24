@@ -10,6 +10,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
+import { toast } from "sonner";
 import {
   getProduct,
   products,
@@ -94,7 +95,9 @@ export function CommerceProvider({
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [isCartLoading, setIsCartLoading] = useState(false);
-  const dbAvailable = typeof process !== "undefined" && Boolean(process.env.NEXT_PUBLIC_DB_AVAILABLE !== "false");
+  const hasHydratedRef = useRef(false);
+  const dbAvailable =
+    typeof process !== "undefined" && Boolean(process.env.NEXT_PUBLIC_DB_AVAILABLE !== "false");
   // We use a ref to avoid re-fetching when userId identity changes between renders
   const userIdRef = useRef(userId);
   userIdRef.current = userId;
@@ -111,10 +114,14 @@ export function CommerceProvider({
         const res = await fetch(`/api/cart${qs}`);
         if (res.ok) {
           const data = await res.json();
-          if (Array.isArray(data.items) && data.items.length >= 0) {
+          if (Array.isArray(data.items) && data.items.length > 0) {
             if (data.source === "db") {
               setCart(data.items);
-              writeLS("novixa-cart", data.items.map((i: CartItem) => ({ productId: i.productId, quantity: i.quantity })));
+              writeLS(
+                "novixa-cart",
+                data.items.map((i: CartItem) => ({ productId: i.productId, quantity: i.quantity })),
+              );
+              hasHydratedRef.current = true;
               setIsCartLoading(false);
               return;
             }
@@ -125,6 +132,7 @@ export function CommerceProvider({
       }
       // Fallback: localStorage
       setCart(readLS<CartItem[]>("novixa-cart", []));
+      hasHydratedRef.current = true;
       setIsCartLoading(false);
     }
 
@@ -150,12 +158,12 @@ export function CommerceProvider({
 
     hydrate();
     hydrateWishlist();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
   // ── Persist cart to localStorage as a write-through ───────────────────────
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted || !hasHydratedRef.current) return;
     writeLS(
       "novixa-cart",
       cart.map((i) => ({ productId: i.productId, quantity: i.quantity })),
@@ -169,70 +177,80 @@ export function CommerceProvider({
 
   // ── Cart mutations ─────────────────────────────────────────────────────────
 
-  const addToCart = useCallback(
-    async (productId: string, quantity = 1) => {
-      const localProduct = getProduct(productId);
-      const stock = localProduct?.stock ?? Infinity;
-      if (quantity <= 0) return;
+  const addToCart = useCallback(async (productId: string, quantity = 1) => {
+    const localProduct = getProduct(productId);
+    const stock = localProduct?.stock ?? Infinity;
+    const cleanQty = Math.round(quantity * 100) / 100;
+    if (cleanQty <= 0) return;
 
-      // Optimistic update
-      setCart((prev) => {
-        const existing = prev.find((i) => i.productId === productId);
-        if (existing) {
-          return prev.map((i) =>
-            i.productId === productId
-              ? { ...i, quantity: Math.min(i.quantity + quantity, stock) }
-              : i,
-          );
-        }
-        return [...prev, { productId, quantity: Math.min(quantity, stock) }];
-      });
+    const pName = localProduct?.name || "Product";
 
-      // Server sync (fire-and-forget with rollback on error)
-      if (userIdRef.current !== undefined) {
-        try {
-          const res = await fetch("/api/cart", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ productId, quantity, userId: userIdRef.current }),
-          });
-          const data = await res.json();
-          if (res.ok && data.ok && Array.isArray(data.items)) {
-            setCart(data.items);
-          } else if (!res.ok) {
-            // Rollback
-            setCart((prev) => {
-              const existing = prev.find((i) => i.productId === productId);
-              if (!existing) return prev.filter((i) => i.productId !== productId);
-              return prev.map((i) =>
-                i.productId === productId ? { ...i, quantity: i.quantity - quantity } : i,
-              );
-            });
-          }
-        } catch {
-          // keep optimistic state on network error
-        }
+    // Optimistic update
+    setCart((prev) => {
+      const existing = prev.find((i) => i.productId === productId);
+      if (existing) {
+        return prev.map((i) =>
+          i.productId === productId
+            ? { ...i, quantity: Math.min(Math.round((i.quantity + cleanQty) * 100) / 100, stock) }
+            : i,
+        );
       }
-    },
-    [],
-  );
+      return [...prev, { productId, quantity: Math.min(cleanQty, stock) }];
+    });
+
+    toast.success("Added to shopping bag", {
+      description: `${pName} (${cleanQty} ${cleanQty === 1 ? "unit" : "units"})`,
+    });
+
+    // Server sync (fire-and-forget with rollback on error)
+    if (userIdRef.current !== undefined) {
+      try {
+        const res = await fetch("/api/cart", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ productId, quantity: cleanQty, userId: userIdRef.current }),
+        });
+        const data = await res.json();
+        if (res.ok && data.ok && Array.isArray(data.items)) {
+          setCart(data.items);
+        } else if (!res.ok) {
+          // Rollback
+          setCart((prev) => {
+            const existing = prev.find((i) => i.productId === productId);
+            if (!existing) return prev.filter((i) => i.productId !== productId);
+            return prev.map((i) =>
+              i.productId === productId
+                ? { ...i, quantity: Math.round((i.quantity - cleanQty) * 100) / 100 }
+                : i,
+            );
+          });
+          toast.error(data.error || "Failed to update bag on server");
+        }
+      } catch {
+        // keep optimistic state on network error
+      }
+    }
+  }, []);
 
   const updateQuantity = useCallback(
     async (productId: string, quantity: number) => {
       const prev = [...cart];
+      const cleanQty = Math.round(quantity * 100) / 100;
 
-      if (quantity <= 0) {
+      if (cleanQty <= 0) {
         setCart((c) => c.filter((i) => i.productId !== productId));
         const item = prev.find((i) => i.productId === productId);
+        toast.info("Item removed from bag");
         if (item?.id) {
           fetch(`/api/cart?itemId=${item.id}`, { method: "DELETE" }).catch(() => {});
         }
         return;
       }
 
-      setCart((c) =>
-        c.map((i) => (i.productId === productId ? { ...i, quantity } : i)),
-      );
+      setCart((c) => c.map((i) => (i.productId === productId ? { ...i, quantity: cleanQty } : i)));
+      toast.info("Shopping bag updated", {
+        description: `Quantity updated to ${cleanQty}`,
+      });
 
       const item = prev.find((i) => i.productId === productId);
       if (item?.id) {
@@ -240,7 +258,7 @@ export function CommerceProvider({
           await fetch("/api/cart", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ itemId: item.id, quantity }),
+            body: JSON.stringify({ itemId: item.id, quantity: cleanQty }),
           });
         } catch {}
       }
@@ -251,7 +269,11 @@ export function CommerceProvider({
   const removeFromCart = useCallback(
     async (productId: string) => {
       const item = cart.find((i) => i.productId === productId);
+      const localProduct = getProduct(productId);
       setCart((c) => c.filter((i) => i.productId !== productId));
+      toast.info("Item removed from bag", {
+        description: localProduct?.name,
+      });
       if (item?.id) {
         fetch(`/api/cart?itemId=${item.id}`, { method: "DELETE" }).catch(() => {});
       }
@@ -272,11 +294,17 @@ export function CommerceProvider({
   const toggleWishlist = useCallback(
     async (productId: string) => {
       const isIn = wishlist.includes(productId);
+      const localProduct = getProduct(productId);
+      const pName = localProduct?.name || "Product";
 
       // Optimistic
-      setWishlist((w) =>
-        isIn ? w.filter((id) => id !== productId) : [...w, productId],
-      );
+      setWishlist((w) => (isIn ? w.filter((id) => id !== productId) : [...w, productId]));
+
+      if (isIn) {
+        toast.info("Removed from your wishlist", { description: pName });
+      } else {
+        toast.success("Saved to your wishlist", { description: pName });
+      }
 
       if (!userIdRef.current) return; // guest — localStorage only
 
@@ -295,28 +323,23 @@ export function CommerceProvider({
         }
       } catch {
         // rollback
-        setWishlist((w) =>
-          isIn ? [...w, productId] : w.filter((id) => id !== productId),
-        );
+        setWishlist((w) => (isIn ? [...w, productId] : w.filter((id) => id !== productId)));
       }
     },
     [wishlist],
   );
 
-  const isWishlisted = useCallback(
-    (productId: string) => wishlist.includes(productId),
-    [wishlist],
-  );
+  const isWishlisted = useCallback((productId: string) => wishlist.includes(productId), [wishlist]);
 
   // ── Derived values ─────────────────────────────────────────────────────────
 
   const cartCount = useMemo(
-    () => cart.reduce((sum, i) => sum + i.quantity, 0),
+    () => Math.round(cart.reduce((sum, i) => sum + i.quantity, 0) * 100) / 100,
     [cart],
   );
 
   const subtotal = useMemo(
-    () => cart.reduce((sum, i) => sum + itemPrice(i) * i.quantity, 0),
+    () => Math.round(cart.reduce((sum, i) => sum + itemPrice(i) * i.quantity, 0) * 100) / 100,
     [cart],
   );
 
@@ -372,6 +395,4 @@ export const cartProducts = (cart: CartItem[]) =>
       const product = getProduct(item.productId);
       return product ? { item, product } : null;
     })
-    .filter(
-      (entry): entry is { item: CartItem; product: Product } => entry !== null,
-    );
+    .filter((entry): entry is { item: CartItem; product: Product } => entry !== null);

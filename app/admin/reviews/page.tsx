@@ -67,9 +67,7 @@ export default function AdminReviewsPage() {
 
   const update = async (id: string, status: "Approved" | "Rejected") => {
     // Optimistic UI update
-    setReviews((current) =>
-      current.map((r) => (r.id === id ? { ...r, status } : r)),
-    );
+    setReviews((current) => current.map((r) => (r.id === id ? { ...r, status } : r)));
 
     try {
       await fetch("/api/reviews", {
@@ -118,7 +116,10 @@ export default function AdminReviewsPage() {
             <th className="px-4 py-3 text-right">Moderation</th>
           </TableHeader>
           {reviews.map((rev) => (
-            <tr key={rev.id} className="border-b border-[#e7ddd5] last:border-0 hover:bg-black/[0.02]">
+            <tr
+              key={rev.id}
+              className="border-b border-[#e7ddd5] last:border-0 hover:bg-black/[0.02]"
+            >
               <TableCell className="font-medium text-[#211b18]">{rev.product}</TableCell>
               <TableCell>
                 <p>{rev.customer}</p>

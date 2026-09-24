@@ -123,7 +123,10 @@ export default function AdminCategoriesPage() {
             <th className="px-4 py-3 text-right">Actions</th>
           </TableHeader>
           {categories.map((category) => (
-            <tr key={category.id} className="border-b border-[#e7ddd5] last:border-0 hover:bg-black/[0.02]">
+            <tr
+              key={category.id}
+              className="border-b border-[#e7ddd5] last:border-0 hover:bg-black/[0.02]"
+            >
               <TableCell className="font-medium text-[#211b18]">{category.name}</TableCell>
               <TableCell className="text-[#8f8279]">/{category.slug}</TableCell>
               <TableCell className="font-semibold">{category.products} items</TableCell>
@@ -168,7 +171,11 @@ export default function AdminCategoriesPage() {
               <Button variant="outline" onClick={() => setOpen(false)} disabled={isSaving}>
                 Cancel
               </Button>
-              <Button onClick={add} disabled={isSaving || !name.trim()} className="bg-[#211b18] text-white hover:bg-black">
+              <Button
+                onClick={add}
+                disabled={isSaving || !name.trim()}
+                className="bg-[#211b18] text-white hover:bg-black"
+              >
                 {isSaving ? "Saving..." : "Save Category"}
               </Button>
             </div>

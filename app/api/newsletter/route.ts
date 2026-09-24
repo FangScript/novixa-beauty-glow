@@ -25,28 +25,32 @@ export async function POST(request: Request) {
 
     if (process.env.DATABASE_URL) {
       // 1. Capture customer lead in database if not already present
-      await prisma.user.upsert({
-        where: { email: cleanEmail },
-        update: {},
-        create: {
-          email: cleanEmail,
-          name: cleanEmail.split("@")[0],
-          role: "CUSTOMER",
-        },
-      }).catch(() => null);
+      await prisma.user
+        .upsert({
+          where: { email: cleanEmail },
+          update: {},
+          create: {
+            email: cleanEmail,
+            name: cleanEmail.split("@")[0],
+            role: "CUSTOMER",
+          },
+        })
+        .catch(() => null);
 
       // 2. Fetch or seed the WELCOME10 promotional voucher
-      const welcomeCoupon = await prisma.coupon.upsert({
-        where: { code: "WELCOME10" },
-        update: { active: true, minimumOrder: 40 },
-        create: {
-          code: "WELCOME10",
-          type: "PERCENTAGE",
-          value: 10,
-          minimumOrder: 40,
-          active: true,
-        },
-      }).catch(() => null);
+      const welcomeCoupon = await prisma.coupon
+        .upsert({
+          where: { code: "WELCOME10" },
+          update: { active: true, minimumOrder: 40 },
+          create: {
+            code: "WELCOME10",
+            type: "PERCENTAGE",
+            value: 10,
+            minimumOrder: 40,
+            active: true,
+          },
+        })
+        .catch(() => null);
 
       if (welcomeCoupon) {
         couponDetails = {

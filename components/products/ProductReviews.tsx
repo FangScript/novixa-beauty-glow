@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Star, CheckCircle2, AlertCircle, Loader2, MessageSquarePlus, ThumbsUp } from "lucide-react";
+import {
+  Star,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  MessageSquarePlus,
+  ThumbsUp,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCustomerAuth } from "@/lib/auth/customer-context";
 
@@ -40,7 +47,10 @@ export function ProductReviews({ productId, productSlug, productName }: ProductR
   const [authorName, setAuthorName] = useState(user?.name || "");
   const [authorEmail, setAuthorEmail] = useState(user?.email || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formStatus, setFormStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [formStatus, setFormStatus] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   // Sync auth state into form
   useEffect(() => {
@@ -198,8 +208,12 @@ export function ProductReviews({ productId, productSlug, productName }: ProductR
         {/* Overall Rating Score */}
         <div className="flex flex-col justify-center border-b border-border pb-6 lg:col-span-4 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-8">
           <div className="flex items-baseline gap-3">
-            <span className="font-display text-5xl md:text-6xl text-foreground">{averageRating}</span>
-            <span className="text-xs text-muted-foreground uppercase tracking-widest">out of 5.0</span>
+            <span className="font-display text-5xl md:text-6xl text-foreground">
+              {averageRating}
+            </span>
+            <span className="text-xs text-muted-foreground uppercase tracking-widest">
+              out of 5.0
+            </span>
           </div>
           <div className="mt-2 flex items-center gap-1 text-champagne">
             {[1, 2, 3, 4, 5].map((star) => (
@@ -212,7 +226,8 @@ export function ProductReviews({ productId, productSlug, productName }: ProductR
             ))}
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            Based on {reviews.length} authenticated patron {reviews.length === 1 ? "review" : "reviews"}
+            Based on {reviews.length} authenticated patron{" "}
+            {reviews.length === 1 ? "review" : "reviews"}
           </p>
         </div>
 
@@ -227,7 +242,9 @@ export function ProductReviews({ productId, productSlug, productName }: ProductR
                 type="button"
                 onClick={() => setFilterRating(filterRating === starVal ? 0 : starVal)}
                 className={`group flex items-center gap-3 text-xs transition-colors hover:text-foreground text-left ${
-                  filterRating === starVal ? "font-semibold text-foreground" : "text-muted-foreground"
+                  filterRating === starVal
+                    ? "font-semibold text-foreground"
+                    : "text-muted-foreground"
                 }`}
               >
                 <span className="w-12 text-right">{starVal} stars</span>
@@ -399,7 +416,9 @@ export function ProductReviews({ productId, productSlug, productName }: ProductR
       {/* Filters and Controls */}
       <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
         <div className="flex items-center gap-2 text-xs">
-          <span className="text-muted-foreground uppercase tracking-wider text-[10px]">Filter:</span>
+          <span className="text-muted-foreground uppercase tracking-wider text-[10px]">
+            Filter:
+          </span>
           <button
             type="button"
             onClick={() => setFilterRating(0)}
@@ -502,13 +521,9 @@ export function ProductReviews({ productId, productSlug, productName }: ProductR
                 </div>
 
                 {rev.title && (
-                  <h4 className="mt-4 text-sm font-semibold text-foreground">
-                    {rev.title}
-                  </h4>
+                  <h4 className="mt-4 text-sm font-semibold text-foreground">{rev.title}</h4>
                 )}
-                <p className="mt-2 text-sm leading-relaxed text-[#52443c]">
-                  {rev.review}
-                </p>
+                <p className="mt-2 text-sm leading-relaxed text-[#52443c]">{rev.review}</p>
               </article>
             ))}
           </div>

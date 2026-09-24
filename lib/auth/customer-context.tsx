@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  useCallback,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
 import { createClient } from "@/utils/supabase/client";
 
 export type Customer = {
@@ -38,22 +31,28 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const supabase = createClient();
 
-  const syncPrismaUser = useCallback(async (supabaseUser: { id: string; email?: string; user_metadata?: Record<string, any> }) => {
-    if (!supabaseUser.email) return;
-    try {
-      await fetch("/api/auth/customer/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: supabaseUser.id,
-          email: supabaseUser.email,
-          name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name || supabaseUser.email.split("@")[0],
-        }),
-      });
-    } catch {
-      // Background sync error non-fatal
-    }
-  }, []);
+  const syncPrismaUser = useCallback(
+    async (supabaseUser: { id: string; email?: string; user_metadata?: Record<string, any> }) => {
+      if (!supabaseUser.email) return;
+      try {
+        await fetch("/api/auth/customer/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: supabaseUser.id,
+            email: supabaseUser.email,
+            name:
+              supabaseUser.user_metadata?.full_name ||
+              supabaseUser.user_metadata?.name ||
+              supabaseUser.email.split("@")[0],
+          }),
+        });
+      } catch {
+        // Background sync error non-fatal
+      }
+    },
+    [],
+  );
 
   // Initialize session and listen for auth state changes
   useEffect(() => {
@@ -163,7 +162,7 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
         return { ok: false, error: err.message || "An unexpected error occurred." };
       }
     },
-    [supabase, syncPrismaUser]
+    [supabase, syncPrismaUser],
   );
 
   const register = useCallback(
@@ -207,7 +206,7 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
         return { ok: false, error: err.message || "An unexpected error occurred." };
       }
     },
-    [supabase, syncPrismaUser]
+    [supabase, syncPrismaUser],
   );
 
   const signInWithGoogle = useCallback(
@@ -235,7 +234,7 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
         return { ok: false, error: err.message || "Google sign-in failed." };
       }
     },
-    [supabase]
+    [supabase],
   );
 
   const resetPassword = useCallback(
@@ -256,7 +255,7 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
         return { ok: false, error: err.message || "Password reset request failed." };
       }
     },
-    [supabase]
+    [supabase],
   );
 
   const logout = useCallback(async () => {

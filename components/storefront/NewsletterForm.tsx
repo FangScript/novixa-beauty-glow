@@ -38,11 +38,13 @@ export function NewsletterForm() {
         throw new Error(data.error || "Failed to subscribe. Please try again.");
       }
 
-      setWelcomeOffer(data.welcomeOffer || {
-        code: "WELCOME10",
-        discount: "10% off",
-        terms: "Valid on orders above £40",
-      });
+      setWelcomeOffer(
+        data.welcomeOffer || {
+          code: "WELCOME10",
+          discount: "10% off",
+          terms: "Valid on orders above £40",
+        },
+      );
       setEmail("");
     } catch (err: any) {
       setErrorMessage(err.message || "An unexpected error occurred.");
@@ -70,16 +72,15 @@ export function NewsletterForm() {
         Join the Inner Circle
       </h2>
       <p className="mt-3 text-sm text-primary-foreground/75 leading-relaxed">
-        Be the first to experience private formulation releases, limited edition accords, and receive 10% off your inaugural ritual.
+        Be the first to experience private formulation releases, limited edition accords, and
+        receive 10% off your inaugural ritual.
       </p>
 
       {welcomeOffer ? (
         <div className="mt-6 border border-champagne/40 bg-ink/80 p-5 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div className="flex items-center gap-2 text-champagne">
             <Check size={16} />
-            <p className="text-xs font-semibold uppercase tracking-wider">
-              Private Offer Unlocked
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-wider">Private Offer Unlocked</p>
           </div>
           <p className="mt-1 text-xs text-primary-foreground/80">
             Welcome to NOVIXA. Use your personal invitation voucher at checkout:
@@ -150,9 +151,7 @@ export function NewsletterForm() {
         </form>
       )}
 
-      {errorMessage && (
-        <p className="mt-2.5 text-xs text-[#e87a6b]">{errorMessage}</p>
-      )}
+      {errorMessage && <p className="mt-2.5 text-xs text-[#e87a6b]">{errorMessage}</p>}
     </div>
   );
 }

@@ -9,12 +9,7 @@ export type OrderStatus =
   | "REFUNDED";
 
 export type PaymentStatus =
-  | "PENDING"
-  | "REQUIRES_ACTION"
-  | "PROCESSING"
-  | "SUCCEEDED"
-  | "FAILED"
-  | "REFUNDED";
+  "PENDING" | "REQUIRES_ACTION" | "PROCESSING" | "SUCCEEDED" | "FAILED" | "REFUNDED";
 
 export type OrderRecord = {
   id: string;

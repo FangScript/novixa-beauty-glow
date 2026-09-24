@@ -101,8 +101,7 @@ function AdminProducts() {
             .includes(query.toLowerCase());
         const matchesCategory = category === "all" || product.category === category;
         const matchesStock =
-          stockFilter === "all" ||
-          (stockFilter === "low" ? product.stock <= 8 : product.stock > 8);
+          stockFilter === "all" || (stockFilter === "low" ? product.stock <= 8 : product.stock > 8);
         return matchesQuery && matchesCategory && matchesStock;
       }),
     [records, query, category, stockFilter],
@@ -173,7 +172,8 @@ function AdminProducts() {
           : `Product "${parsed.data.name}" created and saved successfully.`,
       );
     } catch {
-      const err = "The product could not be saved. Check the database connection and product fields.";
+      const err =
+        "The product could not be saved. Check the database connection and product fields.";
       setError(err);
       toast.error(err);
     } finally {
@@ -273,9 +273,7 @@ function AdminProducts() {
             </TableCell>
             <TableCell>{product.category}</TableCell>
             <TableCell>{product.gender}</TableCell>
-            <TableCell>
-              £{(product.salePrice ?? product.price).toLocaleString("en-GB")}
-            </TableCell>
+            <TableCell>£{(product.salePrice ?? product.price).toLocaleString("en-GB")}</TableCell>
             <TableCell>{product.stock}</TableCell>
             <TableCell>
               <AdminStatus

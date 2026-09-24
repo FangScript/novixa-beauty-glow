@@ -52,9 +52,7 @@ export default function AccountOrdersPage() {
     // Prefer the authenticated customer email, fall back to localStorage
     const resolvedEmail =
       user?.email ||
-      (typeof window !== "undefined"
-        ? localStorage.getItem("novixa_customer_email") || ""
-        : "");
+      (typeof window !== "undefined" ? localStorage.getItem("novixa_customer_email") || "" : "");
     setEmail(resolvedEmail);
     setSearchEmail(resolvedEmail);
     fetchOrders(resolvedEmail, user?.id);

@@ -102,7 +102,8 @@ export default function AdminLoginPage() {
         </form>
 
         <p className="mt-8 border-t border-white/10 pt-5 text-[10px] leading-5 text-white/45">
-          Sessions expire after 8 hours. Admin mutations are attributed to the authenticated identity.
+          Sessions expire after 8 hours. Admin mutations are attributed to the authenticated
+          identity.
         </p>
       </section>
     </main>

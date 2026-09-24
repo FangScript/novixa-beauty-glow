@@ -10,16 +10,41 @@ const COOKIE_TTL = 60 * 60 * 24 * 30; // 30 days
 async function resolveCart(userId?: string | null) {
   if (!process.env.DATABASE_URL) return null;
 
-  // Authenticated user — find or create user cart
+  let resolvedUserId: string | null = null;
   if (userId) {
+    const existingUser = await prisma.user
+      .findFirst({
+        where: {
+          OR: [{ id: userId }, { email: userId }],
+        },
+        select: { id: true },
+      })
+      .catch(() => null);
+    if (existingUser) {
+      resolvedUserId = existingUser.id;
+    }
+  }
+
+  // Authenticated user with confirmed DB row
+  if (resolvedUserId) {
     let cart = await prisma.cart.findFirst({
-      where: { userId },
-      include: { items: { include: { product: { include: { images: { orderBy: { sortOrder: "asc" }, take: 1 } } } } } },
+      where: { userId: resolvedUserId },
+      include: {
+        items: {
+          include: { product: { include: { images: { orderBy: { sortOrder: "asc" }, take: 1 } } } },
+        },
+      },
     });
     if (!cart) {
       cart = await prisma.cart.create({
-        data: { userId },
-        include: { items: { include: { product: { include: { images: { orderBy: { sortOrder: "asc" }, take: 1 } } } } } },
+        data: { userId: resolvedUserId },
+        include: {
+          items: {
+            include: {
+              product: { include: { images: { orderBy: { sortOrder: "asc" }, take: 1 } } },
+            },
+          },
+        },
       });
     }
     return cart;
@@ -34,12 +59,20 @@ async function resolveCart(userId?: string | null) {
 
   let cart = await prisma.cart.findFirst({
     where: { sessionId: guestId, userId: null },
-    include: { items: { include: { product: { include: { images: { orderBy: { sortOrder: "asc" }, take: 1 } } } } } },
+    include: {
+      items: {
+        include: { product: { include: { images: { orderBy: { sortOrder: "asc" }, take: 1 } } } },
+      },
+    },
   });
   if (!cart) {
     cart = await prisma.cart.create({
       data: { sessionId: guestId },
-      include: { items: { include: { product: { include: { images: { orderBy: { sortOrder: "asc" }, take: 1 } } } } } },
+      include: {
+        items: {
+          include: { product: { include: { images: { orderBy: { sortOrder: "asc" }, take: 1 } } } },
+        },
+      },
     });
   }
 
@@ -111,12 +144,17 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { productId, quantity = 1, userId } = body;
 
+    const rawQuantity = Number(quantity);
     if (!productId || typeof productId !== "string") {
       return NextResponse.json({ ok: false, error: "productId is required." }, { status: 400 });
     }
-    if (typeof quantity !== "number" || quantity < 1) {
-      return NextResponse.json({ ok: false, error: "quantity must be a positive integer." }, { status: 400 });
+    if (isNaN(rawQuantity) || rawQuantity <= 0) {
+      return NextResponse.json(
+        { ok: false, error: "quantity must be greater than zero." },
+        { status: 400 },
+      );
     }
+    const cleanQuantity = Math.round(rawQuantity * 100) / 100;
 
     // Validate product + stock
     const product = await prisma.product.findUnique({
@@ -124,11 +162,15 @@ export async function POST(request: Request) {
       select: { id: true, stock: true, name: true, status: true },
     });
     if (!product || product.status === "ARCHIVED") {
-      return NextResponse.json({ ok: false, error: "Product not found or unavailable." }, { status: 404 });
+      return NextResponse.json(
+        { ok: false, error: "Product not found or unavailable." },
+        { status: 404 },
+      );
     }
 
     const result = await resolveCart(userId ?? null);
-    if (!result) return NextResponse.json({ ok: false, error: "Could not resolve cart." }, { status: 500 });
+    if (!result)
+      return NextResponse.json({ ok: false, error: "Could not resolve cart." }, { status: 500 });
 
     const cart = "cart" in result ? result.cart : result;
 
@@ -136,7 +178,7 @@ export async function POST(request: Request) {
       where: { cartId_productId: { cartId: cart.id, productId } },
     });
 
-    const newQuantity = (existing?.quantity ?? 0) + quantity;
+    const newQuantity = Math.round(((existing?.quantity ?? 0) + cleanQuantity) * 100) / 100;
     if (newQuantity > product.stock) {
       return NextResponse.json(
         { ok: false, error: `Only ${product.stock} units of "${product.name}" available.` },
@@ -151,14 +193,18 @@ export async function POST(request: Request) {
       });
     } else {
       await prisma.cartItem.create({
-        data: { cartId: cart.id, productId, quantity },
+        data: { cartId: cart.id, productId, quantity: cleanQuantity },
       });
     }
 
     // Refetch cart for response
     const updated = await prisma.cart.findUnique({
       where: { id: cart.id },
-      include: { items: { include: { product: { include: { images: { orderBy: { sortOrder: "asc" }, take: 1 } } } } } },
+      include: {
+        items: {
+          include: { product: { include: { images: { orderBy: { sortOrder: "asc" }, take: 1 } } } },
+        },
+      },
     });
 
     const items = updated?.items.map(formatCartItem) ?? [];
@@ -177,7 +223,10 @@ export async function POST(request: Request) {
     return res;
   } catch (error: any) {
     console.error("POST /api/cart error:", error);
-    return NextResponse.json({ ok: false, error: error.message ?? "Failed to add item." }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: error.message ?? "Failed to add item." },
+      { status: 500 },
+    );
   }
 }
 
@@ -192,15 +241,23 @@ export async function PUT(request: Request) {
     const { itemId, productId, quantity, userId } = body;
 
     if (!itemId && !productId) {
-      return NextResponse.json({ ok: false, error: "itemId or productId required." }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "itemId or productId required." },
+        { status: 400 },
+      );
     }
 
-    if (typeof quantity !== "number" || quantity < 0) {
-      return NextResponse.json({ ok: false, error: "quantity must be a non-negative number." }, { status: 400 });
+    const rawQuantity = Number(quantity);
+    if (isNaN(rawQuantity) || rawQuantity < 0) {
+      return NextResponse.json(
+        { ok: false, error: "quantity must be a non-negative number." },
+        { status: 400 },
+      );
     }
+    const cleanQuantity = Math.round(rawQuantity * 100) / 100;
 
     // quantity === 0 means remove
-    if (quantity === 0) {
+    if (cleanQuantity === 0) {
       if (itemId) {
         await prisma.cartItem.delete({ where: { id: itemId } }).catch(() => {});
       } else {
@@ -225,7 +282,7 @@ export async function PUT(request: Request) {
         where: { id: resolvedProductId },
         select: { stock: true, name: true },
       });
-      if (product && quantity > product.stock) {
+      if (product && cleanQuantity > product.stock) {
         return NextResponse.json(
           { ok: false, error: `Only ${product.stock} units of "${product.name}" available.` },
           { status: 409 },
@@ -234,13 +291,16 @@ export async function PUT(request: Request) {
     }
 
     if (itemId) {
-      await prisma.cartItem.update({ where: { id: itemId }, data: { quantity } });
+      await prisma.cartItem.update({ where: { id: itemId }, data: { quantity: cleanQuantity } });
     }
 
     return NextResponse.json({ ok: true });
   } catch (error: any) {
     console.error("PUT /api/cart error:", error);
-    return NextResponse.json({ ok: false, error: error.message ?? "Failed to update cart." }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: error.message ?? "Failed to update cart." },
+      { status: 500 },
+    );
   }
 }
 
@@ -270,9 +330,15 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    return NextResponse.json({ ok: false, error: "Specify itemId or clear=true." }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: "Specify itemId or clear=true." },
+      { status: 400 },
+    );
   } catch (error: any) {
     console.error("DELETE /api/cart error:", error);
-    return NextResponse.json({ ok: false, error: error.message ?? "Failed to remove item." }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: error.message ?? "Failed to remove item." },
+      { status: 500 },
+    );
   }
 }

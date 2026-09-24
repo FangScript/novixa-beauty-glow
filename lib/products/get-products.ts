@@ -31,9 +31,7 @@ export async function getLiveProducts(): Promise<Product[]> {
           reviewCount: p.reviewCount,
           tags: p.tags,
           images:
-            p.images.length > 0
-              ? p.images.map((img) => img.url)
-              : ["/images/product-perfume.jpg"],
+            p.images.length > 0 ? p.images.map((img) => img.url) : ["/images/product-perfume.jpg"],
           topNotes: p.topNotes,
           middleNotes: p.middleNotes,
           baseNotes: p.baseNotes,

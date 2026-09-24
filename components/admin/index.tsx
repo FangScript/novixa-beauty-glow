@@ -94,8 +94,7 @@ export function AdminShell({
         </p>
         <nav className="mt-8 space-y-1">
           {nav.map(([label, href, Icon]) => {
-            const isActive =
-              href === "/admin" ? pathname === "/admin" : pathname?.startsWith(href);
+            const isActive = href === "/admin" ? pathname === "/admin" : pathname?.startsWith(href);
             return (
               <Link
                 key={label}
@@ -189,7 +188,9 @@ export function MetricCard({
   return (
     <div
       className={`border p-5 ${
-        tone === "dark" ? "border-[#211b18] bg-[#211b18] text-white" : "border-[#d9cec5] bg-white/50"
+        tone === "dark"
+          ? "border-[#211b18] bg-[#211b18] text-white"
+          : "border-[#d9cec5] bg-white/50"
       }`}
     >
       <p
@@ -242,18 +243,30 @@ export function AdminTable({ children }: { children: ReactNode }) {
   );
 }
 
-export function TableHeader({ children, className = "" }: { children: ReactNode; className?: string }) {
+export function TableHeader({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <tr className={`border-b border-[#d9cec5] bg-[#ede4dc] text-[9px] uppercase tracking-[0.15em] text-[#776a61] ${className}`}>
+    <tr
+      className={`border-b border-[#d9cec5] bg-[#ede4dc] text-[9px] uppercase tracking-[0.15em] text-[#776a61] ${className}`}
+    >
       {children}
     </tr>
   );
 }
 
-export function TableHead({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return (
-    <th className={`px-4 py-3 font-semibold ${className}`}>{children}</th>
-  );
+export function TableHead({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <th className={`px-4 py-3 font-semibold ${className}`}>{children}</th>;
 }
 
 export function TableCell({

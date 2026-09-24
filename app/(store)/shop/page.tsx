@@ -13,7 +13,9 @@ export default async function ShopPage() {
   const products = await getLiveProducts();
 
   return (
-    <Suspense fallback={<div className="page-shell py-20 text-center text-sm">Loading catalogue…</div>}>
+    <Suspense
+      fallback={<div className="page-shell py-20 text-center text-sm">Loading catalogue…</div>}
+    >
       <ShopClient initialProducts={products} />
     </Suspense>
   );

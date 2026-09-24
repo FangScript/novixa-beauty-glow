@@ -9,12 +9,7 @@ function AdminDashboard() {
       description="Your operational dashboard is ready for live metrics once authentication and the database are connected."
     >
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Gross sales"
-          value="£28,450"
-          detail="Development preview"
-          tone="dark"
-        />
+        <MetricCard label="Gross sales" value="£28,450" detail="Development preview" tone="dark" />
         <MetricCard label="Orders" value="184" detail="Development preview" />
         <MetricCard label="Customers" value="1,248" detail="Development preview" />
         <MetricCard label="Low stock" value="7" detail="Development preview" />

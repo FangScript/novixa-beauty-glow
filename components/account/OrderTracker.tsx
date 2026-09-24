@@ -45,7 +45,10 @@ const STEPS = [
   { label: "Delivered", desc: "Safely received" },
 ];
 
-function getStepIndex(status: string, hasTracking: boolean): { index: number; isCancelled: boolean } {
+function getStepIndex(
+  status: string,
+  hasTracking: boolean,
+): { index: number; isCancelled: boolean } {
   const upper = (status || "").toUpperCase();
   if (upper === "CANCELLED" || upper === "REFUNDED" || upper === "RETURNED") {
     return { index: -1, isCancelled: true };
@@ -80,7 +83,9 @@ export function OrderTracker({ order }: { order: OrderData }) {
   const shipping = order.shipping ?? 0;
 
   // Percentage for the horizontal progress bar (0% to 100%)
-  const progressPercent = isCancelled ? 0 : Math.max(0, Math.min(100, (currentStepIndex / (STEPS.length - 1)) * 100));
+  const progressPercent = isCancelled
+    ? 0
+    : Math.max(0, Math.min(100, (currentStepIndex / (STEPS.length - 1)) * 100));
 
   return (
     <article className="border border-border bg-white/70 p-6 sm:p-8 shadow-xs transition-all hover:bg-white/85">
@@ -118,9 +123,7 @@ export function OrderTracker({ order }: { order: OrderData }) {
         </div>
 
         <div className="text-right">
-          <p className="text-base font-semibold text-foreground">
-            {formatPrice(order.total)}
-          </p>
+          <p className="text-base font-semibold text-foreground">{formatPrice(order.total)}</p>
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
             {order.paymentStatus === "PAID" ? "Paid Online" : "Cash on Delivery"}
           </p>
@@ -135,7 +138,8 @@ export function OrderTracker({ order }: { order: OrderData }) {
             <div>
               <p className="font-semibold">Order Cancelled</p>
               <p className="mt-0.5 text-[11px] text-[#8f2d18]/80">
-                This order was cancelled. Any pre-authorized charges will be refunded to your source account.
+                This order was cancelled. Any pre-authorized charges will be refunded to your source
+                account.
               </p>
             </div>
           </div>
@@ -335,7 +339,9 @@ export function OrderTracker({ order }: { order: OrderData }) {
                   {addr.fullName || "Customer"} · {addr.phone || ""}
                 </p>
                 <p className="mt-0.5">
-                  {addr.line1}{addr.line2 ? `, ${addr.line2}` : ""}, {addr.city}, {addr.state} - {addr.postalCode}
+                  {addr.line1}
+                  {addr.line2 ? `, ${addr.line2}` : ""}, {addr.city}, {addr.state} -{" "}
+                  {addr.postalCode}
                 </p>
               </div>
             )}

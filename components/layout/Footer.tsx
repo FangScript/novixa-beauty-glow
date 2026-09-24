@@ -37,7 +37,10 @@ export function Footer() {
             >
               <Sparkles size={11} className="text-champagne" /> Scent Finder Quiz
             </Link>
-            <Link href="/admin/login" className="hover:text-white transition-colors pt-2 text-[10px] text-primary-foreground/40">
+            <Link
+              href="/admin/login"
+              className="hover:text-white transition-colors pt-2 text-[10px] text-primary-foreground/40"
+            >
               Admin Portal
             </Link>
           </div>
@@ -61,7 +64,10 @@ export function Footer() {
             </Link>
           </div>
           <p className="mt-4 text-[11px] text-primary-foreground/60">
-            Concierge: <a href="mailto:concierge@novixa.co.uk" className="text-champagne hover:underline">concierge@novixa.co.uk</a>
+            Concierge:{" "}
+            <a href="mailto:concierge@novixa.co.uk" className="text-champagne hover:underline">
+              concierge@novixa.co.uk
+            </a>
           </p>
         </div>
       </div>

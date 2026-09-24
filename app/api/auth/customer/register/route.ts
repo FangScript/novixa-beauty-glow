@@ -27,6 +27,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, user: result.user });
   } catch (error) {
     console.error("Customer register error:", error);
-    return NextResponse.json({ ok: false, error: "Registration failed. Please try again." }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: "Registration failed. Please try again." },
+      { status: 500 },
+    );
   }
 }

@@ -1,13 +1,31 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
 
+async function resolvePrismaUserId(userId?: string | null) {
+  if (!userId) return null;
+  const user = await prisma.user
+    .findFirst({
+      where: {
+        OR: [{ id: userId }, { email: userId }],
+      },
+      select: { id: true },
+    })
+    .catch(() => null);
+  return user?.id ?? null;
+}
+
 // ─── GET /api/wishlist?userId=xxx ─────────────────────────────────────────────
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const userId = searchParams.get("userId");
+  const rawUserId = searchParams.get("userId");
 
-  if (!process.env.DATABASE_URL || !userId) {
+  if (!process.env.DATABASE_URL || !rawUserId) {
     return NextResponse.json({ items: [], source: "no-db" });
+  }
+
+  const userId = await resolvePrismaUserId(rawUserId);
+  if (!userId) {
+    return NextResponse.json({ items: [], source: "no-user" });
   }
 
   try {
@@ -54,13 +72,18 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { productId, userId } = body;
+    const { productId, userId: rawUserId } = body;
 
-    if (!productId || !userId) {
+    if (!productId || !rawUserId) {
       return NextResponse.json(
         { ok: false, error: "productId and userId are required." },
         { status: 400 },
       );
+    }
+
+    const userId = await resolvePrismaUserId(rawUserId);
+    if (!userId) {
+      return NextResponse.json({ ok: false, error: "User account not found." }, { status: 404 });
     }
 
     // Upsert wishlist
@@ -80,7 +103,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   } catch (error: any) {
     console.error("POST /api/wishlist error:", error);
-    return NextResponse.json({ ok: false, error: error.message ?? "Failed to add to wishlist." }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: error.message ?? "Failed to add to wishlist." },
+      { status: 500 },
+    );
   }
 }
 
@@ -93,27 +119,33 @@ export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const productId = searchParams.get("productId");
-    const userId = searchParams.get("userId");
+    const rawUserId = searchParams.get("userId");
 
-    if (!productId || !userId) {
+    if (!productId || !rawUserId) {
       return NextResponse.json(
         { ok: false, error: "productId and userId are required." },
         { status: 400 },
       );
     }
 
-    const wishlist = await prisma.wishlist.findUnique({ where: { userId } });
-    if (wishlist) {
-      await prisma.wishlistItem
-        .delete({
-          where: { wishlistId_productId: { wishlistId: wishlist.id, productId } },
-        })
-        .catch(() => {}); // already removed — ignore
+    const userId = await resolvePrismaUserId(rawUserId);
+    if (userId) {
+      const wishlist = await prisma.wishlist.findUnique({ where: { userId } });
+      if (wishlist) {
+        await prisma.wishlistItem
+          .delete({
+            where: { wishlistId_productId: { wishlistId: wishlist.id, productId } },
+          })
+          .catch(() => {});
+      }
     }
 
     return NextResponse.json({ ok: true });
   } catch (error: any) {
     console.error("DELETE /api/wishlist error:", error);
-    return NextResponse.json({ ok: false, error: error.message ?? "Failed to remove from wishlist." }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: error.message ?? "Failed to remove from wishlist." },
+      { status: 500 },
+    );
   }
 }

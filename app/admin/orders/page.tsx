@@ -37,7 +37,14 @@ type Order = {
   items: OrderItem[];
 };
 
-const statuses: Order["status"][] = ["Pending", "Confirmed", "Processing", "Shipped", "Delivered", "Cancelled"];
+const statuses: Order["status"][] = [
+  "Pending",
+  "Confirmed",
+  "Processing",
+  "Shipped",
+  "Delivered",
+  "Cancelled",
+];
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -57,7 +64,8 @@ export default function AdminOrdersPage() {
       if (data.orders && Array.isArray(data.orders)) {
         const mapped: Order[] = data.orders.map((o: any) => {
           const addr = o.shippingAddressSnapshot || {};
-          const statusFormatted = (o.status.charAt(0) + o.status.slice(1).toLowerCase()) as Order["status"];
+          const statusFormatted = (o.status.charAt(0) +
+            o.status.slice(1).toLowerCase()) as Order["status"];
 
           return {
             id: o.id,
@@ -65,7 +73,9 @@ export default function AdminOrdersPage() {
             customer: addr.fullName || o.user?.name || "Guest Customer",
             email: addr.email || o.user?.email || "No email",
             phone: addr.phone || "",
-            address: [addr.line1, addr.city, addr.state, addr.postalCode].filter(Boolean).join(", "),
+            address: [addr.line1, addr.city, addr.state, addr.postalCode]
+              .filter(Boolean)
+              .join(", "),
             date: new Date(o.createdAt).toLocaleDateString("en-GB", {
               day: "numeric",
               month: "short",
@@ -127,7 +137,9 @@ export default function AdminOrdersPage() {
 
       if (res.ok) {
         setOrders((current) =>
-          current.map((order) => (order.id === selected.id ? { ...order, status: nextStatus } : order)),
+          current.map((order) =>
+            order.id === selected.id ? { ...order, status: nextStatus } : order,
+          ),
         );
         setSelected({ ...selected, status: nextStatus });
         toast.success(`Order ${selected.orderNumber} status updated to "${nextStatus}".`);
@@ -234,8 +246,13 @@ export default function AdminOrdersPage() {
               <th className="px-4 py-3 text-right">Action</th>
             </TableHeader>
             {filtered.map((order) => (
-              <tr key={order.id} className="border-b border-[#e7ddd5] last:border-0 hover:bg-black/[0.02]">
-                <TableCell className="font-medium text-[#8f5d48] font-mono">{order.orderNumber}</TableCell>
+              <tr
+                key={order.id}
+                className="border-b border-[#e7ddd5] last:border-0 hover:bg-black/[0.02]"
+              >
+                <TableCell className="font-medium text-[#8f5d48] font-mono">
+                  {order.orderNumber}
+                </TableCell>
                 <TableCell>
                   <p className="font-medium">{order.customer}</p>
                   <p className="mt-0.5 text-[10px] text-[#8f8279]">{order.email}</p>
@@ -301,8 +318,12 @@ export default function AdminOrdersPage() {
 
             <div className="text-xs border-b border-[#d9cec5] pb-3 space-y-1">
               <p className="text-muted-foreground">Delivery Destination & Contact</p>
-              <p className="font-medium text-foreground">{selected.customer} {selected.phone && `· ${selected.phone}`}</p>
-              <p className="text-muted-foreground">{selected.address || "No delivery address supplied"}</p>
+              <p className="font-medium text-foreground">
+                {selected.customer} {selected.phone && `· ${selected.phone}`}
+              </p>
+              <p className="text-muted-foreground">
+                {selected.address || "No delivery address supplied"}
+              </p>
             </div>
 
             <div className="border-b border-[#d9cec5] pb-3">
@@ -311,10 +332,17 @@ export default function AdminOrdersPage() {
               </p>
               <div className="space-y-2">
                 {selected.items.map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-xs border border-[#e7ddd5] bg-white/40 p-2.5">
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between text-xs border border-[#e7ddd5] bg-white/40 p-2.5"
+                  >
                     <div className="flex items-center gap-2.5">
                       {item.image && (
-                        <img src={item.image} alt="" className="h-9 w-9 object-cover border border-[#e7ddd5] bg-blush/20" />
+                        <img
+                          src={item.image}
+                          alt=""
+                          className="h-9 w-9 object-cover border border-[#e7ddd5] bg-blush/20"
+                        />
                       )}
                       <div>
                         <p className="font-medium text-foreground">{item.name}</p>

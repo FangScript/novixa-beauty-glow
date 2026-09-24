@@ -3,11 +3,7 @@ import { CommerceProviderBridge } from "@/components/layout/CommerceProviderBrid
 import { Navbar } from "@/components/navigation/Navbar";
 import { Footer } from "@/components/layout/Footer";
 
-export default function StoreLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function StoreLayout({ children }: { children: React.ReactNode }) {
   return (
     <CustomerAuthProvider>
       <CommerceProviderBridge>
@@ -20,4 +16,3 @@ export default function StoreLayout({
     </CustomerAuthProvider>
   );
 }
-

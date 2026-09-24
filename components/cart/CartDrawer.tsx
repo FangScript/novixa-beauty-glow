@@ -5,6 +5,7 @@ import Link from "next/link";
 import { X, ShoppingBag, Trash2, Plus, Minus, Sparkles, Truck, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cartProducts, formatPrice, useCommerce } from "@/lib/commerce/context";
+import { QuantityControl } from "@/components/cart/QuantityControl";
 
 interface CartDrawerProps {
   open: boolean;
@@ -66,7 +67,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
 
   // Find the first curated add-on that is not already in the customer's cart
   const activeAddOn = CURATED_ADDONS.find(
-    (addon) => !cart.some((item) => item.productId === addon.id)
+    (addon) => !cart.some((item) => item.productId === addon.id),
   );
 
   const handleAddAddon = async (addon: AddOnProduct) => {
@@ -177,7 +178,11 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                 <span className="text-foreground/90 font-medium flex items-center gap-1.5 leading-tight">
                   <Truck size={13} className="text-rosewood shrink-0" />
                   <span>
-                    Add <strong className="font-semibold text-rosewood">{formatPrice(amountNeeded)}</strong> more for complimentary UK delivery
+                    Add{" "}
+                    <strong className="font-semibold text-rosewood">
+                      {formatPrice(amountNeeded)}
+                    </strong>{" "}
+                    more for complimentary UK delivery
                   </span>
                 </span>
                 <span className="text-[10px] font-semibold text-muted-foreground ml-2 shrink-0">
@@ -228,11 +233,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
               <ul className="divide-y divide-border">
                 {items.map(({ item, product }) => (
                   <li key={product.id} className="flex gap-4 py-4">
-                    <Link
-                      href={`/products/${product.slug}`}
-                      onClick={onClose}
-                      className="shrink-0"
-                    >
+                    <Link href={`/products/${product.slug}`} onClick={onClose} className="shrink-0">
                       <img
                         src={item.product?.image ?? product.images[0]}
                         alt={product.name}
@@ -258,27 +259,11 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                         )}
                       </div>
                       <div className="flex items-center justify-between">
-                        {/* Quantity stepper */}
-                        <div className="flex items-center border border-border">
-                          <button
-                            aria-label="Decrease quantity"
-                            onClick={() => updateQuantity(product.id, item.quantity - 1)}
-                            className="flex h-7 w-7 items-center justify-center text-foreground hover:bg-border/30 transition-colors"
-                          >
-                            <Minus size={12} />
-                          </button>
-                          <span className="flex h-7 w-8 items-center justify-center text-xs font-medium">
-                            {item.quantity}
-                          </span>
-                          <button
-                            aria-label="Increase quantity"
-                            onClick={() => updateQuantity(product.id, item.quantity + 1)}
-                            disabled={item.quantity >= product.stock}
-                            className="flex h-7 w-7 items-center justify-center text-foreground hover:bg-border/30 transition-colors disabled:opacity-40"
-                          >
-                            <Plus size={12} />
-                          </button>
-                        </div>
+                        <QuantityControl
+                          quantity={item.quantity}
+                          max={product.stock}
+                          onChange={(n) => updateQuantity(product.id, n)}
+                        />
                         <button
                           aria-label="Remove item"
                           onClick={() => removeFromCart(product.id)}

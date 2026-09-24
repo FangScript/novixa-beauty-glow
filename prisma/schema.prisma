@@ -40,12 +40,15 @@ enum OrderStatus {
   REFUNDED
 }
 enum PaymentStatus {
-  UNPAID
-  REQUIRES_ACTION
-  AUTHORIZED
+  PENDING
+  PROCESSING
   PAID
   FAILED
+  CANCELLED
   REFUNDED
+  UNPAID
+  AUTHORIZED
+  REQUIRES_ACTION
 }
 enum ReviewStatus {
   PENDING
@@ -136,8 +139,8 @@ model Product {
   skinType        String?
   hairType        String?
   ingredients     String[]
-  stock           Int             @default(0)
-  lowStockAt      Int             @default(5)
+  stock           Float           @default(0)
+  lowStockAt      Float           @default(5)
   rating          Decimal         @default(0) @db.Decimal(2, 1)
   reviewCount     Int             @default(0)
   tags            String[]
@@ -183,7 +186,7 @@ model BundleItem {
   id        String  @id @default(cuid())
   bundleId  String
   productId String
-  quantity  Int     @default(1)
+  quantity  Float   @default(1)
   bundle    Bundle  @relation(fields: [bundleId], references: [id], onDelete: Cascade)
   product   Product @relation(fields: [productId], references: [id])
   @@unique([bundleId, productId])
@@ -222,7 +225,7 @@ model CartItem {
   id        String  @id @default(cuid())
   cartId    String
   productId String
-  quantity  Int
+  quantity  Float
   cart      Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
   product   Product @relation(fields: [productId], references: [id])
   @@unique([cartId, productId])
@@ -296,7 +299,7 @@ model OrderItem {
   productName    String
   sku            String
   unitPrice      Float
-  quantity       Int
+  quantity       Float
   imageUrl       String?
   order          Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product        Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
@@ -307,9 +310,11 @@ model Payment {
   id                String        @id @default(cuid())
   orderId           String        @unique
   provider          String
+  method            String        @default("CARD")
   providerPaymentId String?       @unique
   amount            Float
-  status            PaymentStatus @default(UNPAID)
+  currency          String        @default("GBP")
+  status            PaymentStatus @default(PENDING)
   rawStatus         String?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt

@@ -64,14 +64,21 @@ export async function POST(request: Request) {
     });
 
     if (!prismaUser) {
-      return NextResponse.json({ error: "User profile not found. Please sign out and back in." }, { status: 404 });
+      return NextResponse.json(
+        { error: "User profile not found. Please sign out and back in." },
+        { status: 404 },
+      );
     }
 
     const body = await request.json();
-    const { label, fullName, line1, line2, city, state, postalCode, country, phone, isDefault } = body;
+    const { label, fullName, line1, line2, city, state, postalCode, country, phone, isDefault } =
+      body;
 
     if (!fullName || !line1 || !city || !state || !postalCode) {
-      return NextResponse.json({ error: "Full name, address, city, state, and PIN code are required." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Full name, address, city, state, and PIN code are required." },
+        { status: 400 },
+      );
     }
 
     // If this is being set as default, clear existing defaults first
@@ -122,7 +129,19 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { id, label, fullName, line1, line2, city, state, postalCode, country, phone, isDefault } = body;
+    const {
+      id,
+      label,
+      fullName,
+      line1,
+      line2,
+      city,
+      state,
+      postalCode,
+      country,
+      phone,
+      isDefault,
+    } = body;
 
     if (!id) {
       return NextResponse.json({ error: "Address ID is required." }, { status: 400 });

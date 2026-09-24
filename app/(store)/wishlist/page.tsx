@@ -7,9 +7,7 @@ import { getProduct, useCommerce } from "@/lib/commerce/context";
 
 export default function WishlistPage() {
   const { wishlist } = useCommerce();
-  const saved = wishlist
-    .map(getProduct)
-    .filter((p): p is NonNullable<typeof p> => Boolean(p));
+  const saved = wishlist.map(getProduct).filter((p): p is NonNullable<typeof p> => Boolean(p));
 
   return (
     <PageShell eyebrow="Saved For Later" title="Your Wishlist">

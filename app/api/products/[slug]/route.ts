@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { getLiveProductBySlug } from "@/lib/products/get-products";
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ slug: string }> },
-) {
+export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const product = await getLiveProductBySlug(slug);
 

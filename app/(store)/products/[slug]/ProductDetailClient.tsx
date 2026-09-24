@@ -21,8 +21,7 @@ export function ProductDetailClient({ product }: { product: Product }) {
   const related = products
     .filter(
       (p) =>
-        p.id !== product.id &&
-        (p.category === product.category || p.gender === product.gender),
+        p.id !== product.id && (p.category === product.category || p.gender === product.gender),
     )
     .slice(0, 4);
 
@@ -37,7 +36,9 @@ export function ProductDetailClient({ product }: { product: Product }) {
                 key={src + i}
                 onClick={() => setActiveImageIndex(i)}
                 className={`aspect-square overflow-hidden border transition-all ${
-                  activeImageIndex === i ? "border-rosewood ring-1 ring-rosewood" : "border-border/60"
+                  activeImageIndex === i
+                    ? "border-rosewood ring-1 ring-rosewood"
+                    : "border-border/60"
                 }`}
               >
                 <img src={src} alt="" className="h-full w-full object-cover" />
@@ -152,7 +153,8 @@ export function ProductDetailClient({ product }: { product: Product }) {
           <div className="mt-8 flex items-center gap-3">
             <QuantityControl
               quantity={quantity}
-              onChange={(n) => setQuantity(Math.max(1, Math.min(product.stock, n)))}
+              min={0.1}
+              onChange={(n) => setQuantity(Math.max(0.1, Math.min(product.stock, n)))}
             />
             <Button
               className="h-11 flex-1 rounded-none bg-ink text-white hover:bg-black text-[10px] font-semibold tracking-[0.14em] uppercase"

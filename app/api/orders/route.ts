@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
 import { OrderStatus, PaymentStatus } from "@prisma/client";
+import { verifyPaymentServerSide, type PaymentMethod } from "@/lib/payments/processor";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -16,10 +17,7 @@ export async function GET(request: Request) {
         // Find user by matching the userId (stored as cuid) or by email
         const matchedUser = await prisma.user.findFirst({
           where: {
-            OR: [
-              { id: userId },
-              ...(userId.includes("@") ? [{ email: userId }] : []),
-            ],
+            OR: [{ id: userId }, ...(userId.includes("@") ? [{ email: userId }] : [])],
           },
           select: { id: true },
         });
@@ -78,7 +76,10 @@ export async function POST(request: Request) {
     }
 
     if (!address?.line1 || !address?.city || !address?.state || !address?.postalCode) {
-      return NextResponse.json({ error: "Complete shipping address is required." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Complete shipping address is required." },
+        { status: 400 },
+      );
     }
 
     if (!process.env.DATABASE_URL) {
@@ -127,6 +128,14 @@ export async function POST(request: Request) {
     }[] = [];
 
     for (const item of items) {
+      const itemQty = Math.round(Number(item.quantity) * 100) / 100;
+      if (isNaN(itemQty) || itemQty <= 0) {
+        return NextResponse.json(
+          { error: `Invalid item quantity specified for item ${item.productId}` },
+          { status: 400 },
+        );
+      }
+
       const product = productMap.get(item.productId);
       if (!product) {
         return NextResponse.json(
@@ -135,7 +144,7 @@ export async function POST(request: Request) {
         );
       }
 
-      if (product.stock < item.quantity) {
+      if (product.stock < itemQty) {
         return NextResponse.json(
           {
             error: `Insufficient stock for "${product.name}". Only ${product.stock} left in stock.`,
@@ -145,14 +154,14 @@ export async function POST(request: Request) {
       }
 
       const unitPrice = product.salePrice ?? product.price;
-      subtotal += unitPrice * item.quantity;
+      subtotal += unitPrice * itemQty;
 
       lineItemsToCreate.push({
         productId: product.id,
         productName: product.name,
         sku: product.sku,
         unitPrice,
-        quantity: item.quantity,
+        quantity: itemQty,
         imageUrl: product.images[0]?.url ?? "/images/product-perfume.jpg",
       });
     }
@@ -162,9 +171,11 @@ export async function POST(request: Request) {
     const requestedCouponCode = (body.couponCode || "").trim().toUpperCase();
 
     if (requestedCouponCode) {
-      const foundCoupon = await prisma.coupon.findUnique({
-        where: { code: requestedCouponCode },
-      }).catch(() => null);
+      const foundCoupon = await prisma.coupon
+        .findUnique({
+          where: { code: requestedCouponCode },
+        })
+        .catch(() => null);
 
       if (
         foundCoupon &&
@@ -202,49 +213,88 @@ export async function POST(request: Request) {
     // Resolve the Prisma user ID from the provided userId (Supabase UID or email)
     let resolvedPrismaUserId: string | null = null;
     if (body.userId) {
-      const prismaUser = await prisma.user.findFirst({
-        where: {
-          OR: [
-            { id: body.userId },
-            { email: customer.email.trim() },
-          ],
-        },
-        select: { id: true },
-      }).catch(() => null);
+      const prismaUser = await prisma.user
+        .findFirst({
+          where: {
+            OR: [{ id: body.userId }, { email: customer.email.trim() }],
+          },
+          select: { id: true },
+        })
+        .catch(() => null);
       resolvedPrismaUserId = prismaUser?.id ?? null;
     } else {
       // Try to link by email even without explicit userId
-      const prismaUser = await prisma.user.findUnique({
-        where: { email: customer.email.trim() },
-        select: { id: true },
-      }).catch(() => null);
+      const prismaUser = await prisma.user
+        .findUnique({
+          where: { email: customer.email.trim() },
+          select: { id: true },
+        })
+        .catch(() => null);
       resolvedPrismaUserId = prismaUser?.id ?? null;
     }
+
+    const paymentMethod = (body.paymentMethod || "COD").toUpperCase() as PaymentMethod;
+    const paymentDetails = body.paymentDetails || {};
+
+    // Normalize card details if submitted with alternate field names
+    const normalizedPaymentDetails = {
+      ...paymentDetails,
+      nameOnCard: paymentDetails.nameOnCard || paymentDetails.cardholderName || customer.name,
+      expiry:
+        paymentDetails.expiry ||
+        (paymentDetails.expMonth && paymentDetails.expYear
+          ? `${paymentDetails.expMonth.padStart(2, "0")}/${paymentDetails.expYear.slice(-2)}`
+          : ""),
+    };
+
+    // Verify payment server-side using provider-agnostic engine
+    const verification = verifyPaymentServerSide(
+      paymentMethod,
+      normalizedPaymentDetails,
+      total,
+      "GBP",
+    );
+
+    if (!verification.valid) {
+      return NextResponse.json(
+        {
+          error:
+            verification.error || "Payment verification failed. Please check your payment details.",
+        },
+        { status: 400 },
+      );
+    }
+
+    const orderStatus =
+      verification.status === PaymentStatus.PAID ? OrderStatus.CONFIRMED : OrderStatus.PENDING;
 
     // Execute atomic order placement & stock decrement transaction
     const createdOrder = await prisma.$transaction(async (tx) => {
       // 1. Decrement stock
       for (const item of items) {
+        const decQty = Math.round(Number(item.quantity) * 100) / 100;
         await tx.product.update({
           where: { id: item.productId },
-          data: { stock: { decrement: item.quantity } },
+          data: { stock: { decrement: decQty } },
         });
       }
 
       // 2. Increment coupon usage if applied
       if (validCouponId) {
-        await tx.coupon.update({
-          where: { id: validCouponId },
-          data: { usageCount: { increment: 1 } },
-        }).catch(() => null);
+        await tx.coupon
+          .update({
+            where: { id: validCouponId },
+            data: { usageCount: { increment: 1 } },
+          })
+          .catch(() => null);
       }
 
       // 3. Create Order
       const newOrder = await tx.order.create({
         data: {
           orderNumber,
-          status: OrderStatus.PENDING,
-          paymentStatus: PaymentStatus.UNPAID,
+          status: orderStatus,
+          paymentStatus: verification.status,
           subtotal,
           discount,
           shipping,
@@ -258,14 +308,19 @@ export async function POST(request: Request) {
           },
           payment: {
             create: {
-              provider: "COD",
+              provider: verification.provider,
+              method: verification.method,
+              providerPaymentId: verification.providerPaymentId,
               amount: total,
-              status: PaymentStatus.UNPAID,
+              currency: "GBP",
+              status: verification.status,
+              rawStatus: JSON.stringify(verification.metadata || {}),
             },
           },
         },
         include: {
           items: true,
+          payment: true,
         },
       });
 
@@ -274,7 +329,11 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ok: true,
-      order: createdOrder,
+      order: {
+        ...createdOrder,
+        paymentMethod: verification.method,
+        payments: createdOrder.payment ? [createdOrder.payment] : [],
+      },
     });
   } catch (error: any) {
     console.error("Order placement error:", error);
