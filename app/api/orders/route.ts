@@ -47,6 +47,7 @@ export async function GET(request: Request) {
         where: whereClause,
         include: {
           items: true,
+          payment: true,
           user: { select: { id: true, name: true, email: true } },
         },
         orderBy: { createdAt: "desc" },
