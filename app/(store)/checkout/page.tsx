@@ -16,6 +16,8 @@ import {
   Sparkles,
   Info,
   Check,
+  Truck,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/layout/PageShell";
@@ -23,6 +25,34 @@ import { Button } from "@/components/ui/button";
 import { cartProducts, formatPrice, useCommerce } from "@/lib/commerce/context";
 import { useCustomerAuth } from "@/lib/auth/customer-context";
 import { PayPalCheckoutButton } from "@/components/checkout/PayPalCheckoutButton";
+
+export type ShippingOption = {
+  id: string;
+  name: string;
+  timeframe: string;
+  price: number;
+  description?: string | null;
+  isDefault: boolean;
+};
+
+const DEFAULT_SHIPPING_OPTIONS: ShippingOption[] = [
+  {
+    id: "sm-normal",
+    name: "Normal Delivery",
+    timeframe: "3-5 days",
+    price: 0.20,
+    description: "Standard tracked courier delivery within 3-5 business days.",
+    isDefault: true,
+  },
+  {
+    id: "sm-express",
+    name: "Express Delivery",
+    timeframe: "1-3 days",
+    price: 0.30,
+    description: "Priority expedited courier dispatch with 1-3 business days delivery.",
+    isDefault: false,
+  },
+];
 
 type AppliedCoupon = {
   id?: string;
@@ -137,9 +167,28 @@ export default function CheckoutPage() {
     toast.info("Promotional code removed");
   };
 
+  // Shipping Methods Selection
+  const [shippingMethods, setShippingMethods] = useState<ShippingOption[]>(DEFAULT_SHIPPING_OPTIONS);
+  const [selectedShippingMethod, setSelectedShippingMethod] = useState<ShippingOption>(DEFAULT_SHIPPING_OPTIONS[0]);
+  const [isLoadingShipping, setIsLoadingShipping] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/shipping-methods")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.methods) && data.methods.length > 0) {
+          setShippingMethods(data.methods);
+          const defaultOpt = data.methods.find((m: any) => m.isDefault) || data.methods[0];
+          setSelectedShippingMethod(defaultOpt);
+        }
+      })
+      .catch((err) => console.warn("Failed to load shipping methods:", err))
+      .finally(() => setIsLoadingShipping(false));
+  }, []);
+
   const discount = appliedCoupon?.discount ?? 0;
-  const shippingEstimate = subtotal >= 70 ? 0 : 4.95;
-  const orderTotal = Math.max(0, subtotal - discount) + shippingEstimate;
+  const shippingCharge = selectedShippingMethod ? selectedShippingMethod.price : 0.20;
+  const orderTotal = Math.max(0, Math.round((Math.max(0, subtotal - discount) + shippingCharge) * 100) / 100);
 
   // Format card number with spaces (4 4 4 4)
   const handleCardNumberChange = (val: string) => {
@@ -188,6 +237,9 @@ export default function CheckoutPage() {
           })),
           userId: user?.id ?? null,
           couponCode: appliedCoupon?.code ?? null,
+          shippingMethodId: selectedShippingMethod?.id,
+          shippingMethodName: selectedShippingMethod?.name,
+          shipping: shippingCharge,
           customer: {
             name: formData.name.trim(),
             email: formData.email.trim(),
@@ -331,7 +383,7 @@ export default function CheckoutPage() {
 
   if (submitted && confirmedOrder) {
     const orderDiscount = confirmedOrder.discount ?? discount;
-    const shipping = confirmedOrder.shipping ?? (subtotal >= 70 ? 0 : 4.95);
+    const shipping = confirmedOrder.shipping ?? shippingCharge;
     const total = confirmedOrder.total ?? Math.max(0, subtotal - orderDiscount) + shipping;
     const primaryPayment = confirmedOrder.payments?.[0];
     const orderPayStatus = primaryPayment?.status || confirmedOrder.paymentStatus || "PENDING";
@@ -391,6 +443,12 @@ export default function CheckoutPage() {
               </span>
             </div>
             <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Delivery Method</span>
+              <span className="text-foreground font-medium">
+                {confirmedOrder.shippingMethodName || selectedShippingMethod?.name || "Normal Delivery"}
+              </span>
+            </div>
+            <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Delivery Recipient</span>
               <span className="text-foreground font-medium">
                 {formData.name} ({formData.email})
@@ -447,8 +505,8 @@ export default function CheckoutPage() {
               </div>
             )}
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span>Shipping Delivery</span>
-              <span>{shipping === 0 ? "Complimentary" : formatPrice(shipping)}</span>
+              <span>Delivery ({confirmedOrder.shippingMethodName || selectedShippingMethod?.name || "Standard"})</span>
+              <span>{formatPrice(shipping)}</span>
             </div>
             <div className="flex justify-between pt-2 border-t border-border font-display text-lg text-foreground">
               <span>Total Payable</span>
@@ -565,6 +623,74 @@ export default function CheckoutPage() {
                   className="h-11 border border-border bg-white/40 px-3 text-sm outline-none focus:border-rosewood"
                 />
               </div>
+            </div>
+          </section>
+
+          {/* Delivery Method Selection */}
+          <section>
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-2xl">Delivery Method</h2>
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <Truck size={14} className="text-rosewood" />
+                <span>Tracked UK Royal Mail Dispatch</span>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {shippingMethods.map((method) => {
+                const isSelected = selectedShippingMethod?.id === method.id;
+                return (
+                  <div
+                    key={method.id}
+                    onClick={() => setSelectedShippingMethod(method)}
+                    className={`relative cursor-pointer border p-4 transition-all ${
+                      isSelected
+                        ? "border-rosewood bg-stone-50/90 ring-1 ring-rosewood"
+                        : "border-border bg-white/50 hover:bg-stone-50/50"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="radio"
+                          id={`shipping-${method.id}`}
+                          name="shipping_choice"
+                          checked={isSelected}
+                          onChange={() => setSelectedShippingMethod(method)}
+                          className="mt-0.5 h-4 w-4 text-rosewood"
+                        />
+                        <div>
+                          <label
+                            htmlFor={`shipping-${method.id}`}
+                            className="font-medium text-foreground cursor-pointer text-sm block"
+                          >
+                            {method.name}
+                          </label>
+                          <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
+                            <Clock size={12} />
+                            <span>{method.timeframe}</span>
+                          </div>
+                          {method.description && (
+                            <p className="mt-1.5 text-[11px] text-[#776a61] leading-relaxed">
+                              {method.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-display text-base text-foreground block">
+                          {formatPrice(method.price)}
+                        </span>
+                        {method.isDefault && (
+                          <span className="mt-0.5 inline-block text-[9px] font-semibold uppercase tracking-wider text-rosewood">
+                            Standard
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </section>
 
@@ -762,6 +888,7 @@ export default function CheckoutPage() {
                         quantity: c.quantity,
                       }))}
                       couponCode={appliedCoupon?.code}
+                      shippingMethodId={selectedShippingMethod?.id}
                       validateBeforePayment={validateAddressForm}
                       disabled={isSubmitting}
                       onSuccess={async (res) => {
@@ -1057,9 +1184,9 @@ export default function CheckoutPage() {
 
             {/* Shipping */}
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span>Shipping Delivery</span>
-              <span>
-                {shippingEstimate === 0 ? "Complimentary" : formatPrice(shippingEstimate)}
+              <span>Delivery ({selectedShippingMethod?.name || "Normal"})</span>
+              <span className="font-medium text-foreground">
+                {formatPrice(shippingCharge)}
               </span>
             </div>
 

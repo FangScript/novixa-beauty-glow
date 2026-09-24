@@ -280,6 +280,9 @@ model Order {
   total                 Float
   shippingAddressSnapshot Json
   trackingNumber        String?
+  shippingMethodId      String?
+  shippingMethodName    String?
+  shippingMethod        ShippingMethod? @relation(fields: [shippingMethodId], references: [id], onDelete: SetNull)
   user                  User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
   address               Address?      @relation(fields: [addressId], references: [id], onDelete: SetNull)
   coupon                Coupon?       @relation(fields: [couponId], references: [id], onDelete: SetNull)
@@ -290,6 +293,7 @@ model Order {
   @@index([userId, createdAt])
   @@index([status])
   @@index([paymentStatus])
+  @@index([shippingMethodId])
 }
 
 model OrderItem {
@@ -338,3 +342,20 @@ model Review {
   @@unique([productId, userId])
   @@index([productId, status])
 }
+
+model ShippingMethod {
+  id           String   @id @default(cuid())
+  name         String
+  timeframe    String
+  price        Float
+  description  String?
+  active       Boolean  @default(true)
+  isDefault    Boolean  @default(false)
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  orders       Order[]
+  @@index([active])
+  @@index([displayOrder])
+}
+

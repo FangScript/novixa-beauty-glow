@@ -58,6 +58,8 @@ type Order = {
   payment: string;
   paymentRecord?: PaymentRecord | null;
   trackingNumber: string;
+  shippingMethodName?: string | null;
+  shippingCharge?: number;
   items: OrderItem[];
 };
 
@@ -128,6 +130,8 @@ export default function AdminOrdersPage() {
             payment: o.paymentStatus === "PAID" ? "Paid" : "Pending Payment",
             paymentRecord,
             trackingNumber: o.trackingNumber || "",
+            shippingMethodName: o.shippingMethodName || (o.shippingMethod ? o.shippingMethod.name : null),
+            shippingCharge: o.shipping,
             items: (o.items || []).map((i: any) => ({
               name: i.productName,
               sku: i.sku,
@@ -508,15 +512,28 @@ export default function AdminOrdersPage() {
               )}
             </div>
 
-            {/* Delivery Destination */}
-            <div className="text-xs border-b border-[#d9cec5] pb-3 space-y-1">
-              <p className="text-muted-foreground">Delivery Destination & Contact</p>
-              <p className="font-medium text-foreground">
-                {selected.customer} {selected.phone && `· ${selected.phone}`}
-              </p>
-              <p className="text-muted-foreground">
-                {selected.address || "No delivery address supplied"}
-              </p>
+            {/* Delivery Destination & Shipping Method */}
+            <div className="text-xs border-b border-[#d9cec5] pb-3 space-y-2">
+              <div className="flex items-center justify-between bg-stone-50 border border-[#e7ddd5] p-2.5">
+                <div>
+                  <span className="text-muted-foreground text-[10px] uppercase tracking-wider block">Delivery Option</span>
+                  <span className="font-semibold text-foreground">
+                    {selected.shippingMethodName || "Normal Delivery"}
+                  </span>
+                </div>
+                <span className="font-mono font-medium text-foreground">
+                  {selected.shippingCharge !== undefined ? `£${selected.shippingCharge.toFixed(2)}` : "£0.20"}
+                </span>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-[11px]">Delivery Destination & Contact:</p>
+                <p className="font-medium text-foreground">
+                  {selected.customer} {selected.phone && `· ${selected.phone}`}
+                </p>
+                <p className="text-muted-foreground">
+                  {selected.address || "No delivery address supplied"}
+                </p>
+              </div>
             </div>
 
             {/* Order Items */}

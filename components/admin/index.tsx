@@ -16,6 +16,7 @@ import {
   ShieldAlert,
   Star,
   Tags,
+  Truck,
   Users,
   Warehouse,
 } from "lucide-react";
@@ -33,6 +34,7 @@ export const nav = [
   ["Bundles", "/admin/bundles", Boxes],
   ["Coupons", "/admin/coupons", Percent],
   ["Reviews", "/admin/reviews", Star],
+  ["Shipping", "/admin/shipping", Truck],
   ["Analytics", "/admin/analytics", BarChart3],
   ["Settings", "/admin/settings", Settings],
 ] as const;

@@ -10,6 +10,7 @@ interface PayPalCheckoutButtonProps {
   currency?: string;
   items: Array<{ productId: string; quantity: number; price?: number }>;
   couponCode?: string;
+  shippingMethodId?: string;
   validateBeforePayment: () => boolean;
   onSuccess: (paymentResult: {
     paypalOrderId: string;
@@ -25,6 +26,7 @@ export function PayPalCheckoutButton({
   currency = "GBP",
   items,
   couponCode,
+  shippingMethodId,
   validateBeforePayment,
   onSuccess,
   onError,
@@ -49,6 +51,7 @@ export function PayPalCheckoutButton({
         body: JSON.stringify({
           items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
           couponCode: couponCode || undefined,
+          shippingMethodId: shippingMethodId || undefined,
           currency,
         }),
       });

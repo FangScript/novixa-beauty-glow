@@ -48,6 +48,7 @@ export async function GET(request: Request) {
         include: {
           items: true,
           payment: true,
+          shippingMethod: true,
           user: { select: { id: true, name: true, email: true } },
         },
         orderBy: { createdAt: "desc" },
@@ -66,7 +67,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { items, customer, address } = body;
+    const { items, customer, address, shippingMethodId } = body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: "Your shopping bag is empty." }, { status: 400 });
@@ -194,9 +195,35 @@ export async function POST(request: Request) {
       }
     }
 
-    const shipping = subtotal >= 70 ? 0 : 4.95;
+    // Authoritative Shipping Method Calculation
+    let shipping = 0.20;
+    let resolvedShippingMethodId: string | null = null;
+    let resolvedShippingMethodName: string | null = "Normal Delivery";
+
+    if (shippingMethodId) {
+      const dbMethod = await prisma.shippingMethod
+        .findUnique({ where: { id: shippingMethodId } })
+        .catch(() => null);
+      if (dbMethod && dbMethod.active) {
+        shipping = dbMethod.price;
+        resolvedShippingMethodId = dbMethod.id;
+        resolvedShippingMethodName = dbMethod.name;
+      }
+    }
+
+    if (!resolvedShippingMethodId) {
+      const defaultMethod = await prisma.shippingMethod
+        .findFirst({ where: { active: true, isDefault: true } })
+        .catch(() => null);
+      if (defaultMethod) {
+        shipping = defaultMethod.price;
+        resolvedShippingMethodId = defaultMethod.id;
+        resolvedShippingMethodName = defaultMethod.name;
+      }
+    }
+
     const tax = 0;
-    const total = Math.max(0, subtotal - discount) + shipping + tax;
+    const total = Math.max(0, Math.round((Math.max(0, subtotal - discount) + shipping + tax) * 100) / 100);
     const orderNumber = `NVX-2026-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const fullShippingSnapshot = {
@@ -301,9 +328,11 @@ export async function POST(request: Request) {
           shipping,
           tax,
           total,
+          userId: resolvedPrismaUserId,
+          couponId: validCouponId,
+          shippingMethodId: resolvedShippingMethodId,
+          shippingMethodName: resolvedShippingMethodName,
           shippingAddressSnapshot: fullShippingSnapshot,
-          ...(resolvedPrismaUserId ? { user: { connect: { id: resolvedPrismaUserId } } } : {}),
-          ...(validCouponId ? { coupon: { connect: { id: validCouponId } } } : {}),
           items: {
             create: lineItemsToCreate,
           },
@@ -322,18 +351,21 @@ export async function POST(request: Request) {
         include: {
           items: true,
           payment: true,
+          shippingMethod: true,
         },
       });
 
       return newOrder;
     });
 
+    const paymentRecord = (createdOrder as any).payment;
+
     return NextResponse.json({
       ok: true,
       order: {
         ...createdOrder,
         paymentMethod: verification.method,
-        payments: createdOrder.payment ? [createdOrder.payment] : [],
+        payments: paymentRecord ? [paymentRecord] : [],
       },
     });
   } catch (error: any) {

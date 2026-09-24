@@ -5,7 +5,7 @@ import { createPayPalOrder } from "@/lib/payments/paypal";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { items, couponCode } = body;
+    const { items, couponCode, shippingMethodId } = body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: "Cart is empty." }, { status: 400 });
@@ -59,8 +59,27 @@ export async function POST(request: Request) {
       }
     }
 
-    const shipping = subtotal >= 70 ? 0 : 4.95;
-    const total = Math.max(0.01, Math.max(0, subtotal - discount) + shipping);
+    // Determine authoritative delivery charge
+    let shipping = 0.20;
+    if (process.env.DATABASE_URL) {
+      if (shippingMethodId) {
+        const dbMethod = await prisma.shippingMethod
+          .findUnique({ where: { id: shippingMethodId } })
+          .catch(() => null);
+        if (dbMethod && dbMethod.active) {
+          shipping = dbMethod.price;
+        }
+      } else {
+        const defaultMethod = await prisma.shippingMethod
+          .findFirst({ where: { active: true, isDefault: true } })
+          .catch(() => null);
+        if (defaultMethod) {
+          shipping = defaultMethod.price;
+        }
+      }
+    }
+
+    const total = Math.max(0.01, Math.round((Math.max(0, subtotal - discount) + shipping) * 100) / 100);
 
     const tempOrderRef = `NVX-${Date.now().toString().slice(-6)}`;
 
