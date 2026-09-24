@@ -328,6 +328,7 @@ model Review {
   rating            Int
   title             String?
   body              String
+  images            String[]     @default([])
   verifiedPurchase  Boolean      @default(false)
   status            ReviewStatus @default(PENDING)
   createdAt         DateTime     @default(now())

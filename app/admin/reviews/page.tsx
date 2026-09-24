@@ -19,6 +19,7 @@ type Review = {
   review: string;
   verified: boolean;
   status: "Approved" | "Pending" | "Rejected";
+  images?: string[];
 };
 
 const initialReviews: Review[] = [
@@ -135,7 +136,28 @@ export default function AdminReviewsPage() {
                 </div>
               </TableCell>
               <TableCell className="max-w-xs text-xs text-[#52443c] leading-relaxed">
-                “{rev.review}”
+                <p>“{rev.review}”</p>
+                {rev.images && rev.images.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {rev.images.map((imgUrl, i) => (
+                      <a
+                        key={i}
+                        href={imgUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group relative block h-10 w-10 overflow-hidden rounded border border-[#e7ddd5] shadow-xs"
+                        title="Click to view patron photo full size"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={imgUrl}
+                          alt="Review attachment"
+                          className="h-full w-full object-cover transition-transform group-hover:scale-110"
+                        />
+                      </a>
+                    ))}
+                  </div>
+                )}
               </TableCell>
               <TableCell>
                 <AdminStatus

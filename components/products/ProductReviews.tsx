@@ -8,6 +8,9 @@ import {
   Loader2,
   MessageSquarePlus,
   ThumbsUp,
+  Camera,
+  X,
+  Image as ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCustomerAuth } from "@/lib/auth/customer-context";
@@ -22,6 +25,7 @@ export type ReviewItem = {
   review: string;
   verified: boolean;
   status: string;
+  images?: string[];
   createdAt: string;
 };
 
@@ -46,6 +50,9 @@ export function ProductReviews({ productId, productSlug, productName }: ProductR
   const [body, setBody] = useState("");
   const [authorName, setAuthorName] = useState(user?.name || "");
   const [authorEmail, setAuthorEmail] = useState(user?.email || "");
+  const [reviewImages, setReviewImages] = useState<string[]>([]);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formStatus, setFormStatus] = useState<{
     type: "success" | "error";
@@ -132,6 +139,7 @@ export function ProductReviews({ productId, productSlug, productName }: ProductR
           rating,
           title: title.trim(),
           body: body.trim(),
+          images: reviewImages,
           authorName: authorName.trim() || user?.name || "Customer",
           authorEmail: authorEmail.trim() || user?.email,
         }),
@@ -150,6 +158,7 @@ export function ProductReviews({ productId, productSlug, productName }: ProductR
       // Clear form
       setTitle("");
       setBody("");
+      setReviewImages([]);
       // Keep form open for a moment with confirmation
       setTimeout(() => {
         setShowForm(false);
@@ -163,6 +172,51 @@ export function ProductReviews({ productId, productSlug, productName }: ProductR
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    if (reviewImages.length + files.length > 4) {
+      setFormStatus({
+        type: "error",
+        message: "You can upload up to 4 photos per review.",
+      });
+      return;
+    }
+
+    setIsUploadingImages(true);
+    setFormStatus(null);
+
+    try {
+      const formData = new FormData();
+      Array.from(files).forEach((f) => formData.append("file", f));
+
+      const res = await fetch("/api/reviews/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to upload photo(s).");
+      }
+
+      setReviewImages((prev) => [...prev, ...data.urls].slice(0, 4));
+    } catch (err: any) {
+      setFormStatus({
+        type: "error",
+        message: err.message || "Failed to upload images.",
+      });
+    } finally {
+      setIsUploadingImages(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleRemoveImage = (indexToRemove: number) => {
+    setReviewImages((prev) => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
   const getRatingDescriptor = (val: number) => {
@@ -333,6 +387,71 @@ export function ProductReviews({ productId, productSlug, productName }: ProductR
                 onChange={(e) => setBody(e.target.value)}
                 className="mt-2 w-full border border-border bg-white/60 p-3 text-sm outline-none focus:border-rosewood transition-colors"
               />
+            </div>
+
+            {/* Customer Review Photos Upload */}
+            <div>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-semibold uppercase tracking-[0.14em] text-foreground">
+                  Product Photos (Optional)
+                </label>
+                <span className="text-[11px] text-muted-foreground font-mono">
+                  {reviewImages.length}/4 photos
+                </span>
+              </div>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Attach real customer photos (e.g., packaging, bottle, texture, application). Up to 4 photos (JPG, PNG, WebP, max 5MB each).
+              </p>
+
+              {/* Upload trigger & Previews grid */}
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                {reviewImages.map((imgUrl, idx) => (
+                  <div
+                    key={idx}
+                    className="group relative h-20 w-20 overflow-hidden rounded border border-border bg-sand/30 shadow-sm"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={imgUrl}
+                      alt={`Review photo ${idx + 1}`}
+                      className="h-full w-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveImage(idx)}
+                      className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-ink/80 text-white opacity-90 hover:bg-black hover:opacity-100 transition-opacity"
+                      aria-label="Remove photo"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+
+                {reviewImages.length < 4 && (
+                  <label
+                    className={`flex h-20 w-20 cursor-pointer flex-col items-center justify-center rounded border border-dashed border-border bg-white/60 text-muted-foreground transition-all hover:border-rosewood hover:text-foreground ${
+                      isUploadingImages ? "pointer-events-none opacity-60" : ""
+                    }`}
+                  >
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/avif"
+                      multiple
+                      onChange={handleImageUpload}
+                      disabled={isUploadingImages}
+                      className="hidden"
+                    />
+                    {isUploadingImages ? (
+                      <Loader2 size={18} className="animate-spin text-rosewood" />
+                    ) : (
+                      <>
+                        <Camera size={20} className="mb-1 text-rosewood/80" />
+                        <span className="text-[9px] font-semibold tracking-wider uppercase">Add Photo</span>
+                      </>
+                    )}
+                  </label>
+                )}
+              </div>
             </div>
 
             {/* Author Name and Email */}
@@ -524,11 +643,64 @@ export function ProductReviews({ productId, productSlug, productName }: ProductR
                   <h4 className="mt-4 text-sm font-semibold text-foreground">{rev.title}</h4>
                 )}
                 <p className="mt-2 text-sm leading-relaxed text-[#52443c]">{rev.review}</p>
+
+                {/* Review Photos Gallery */}
+                {rev.images && rev.images.length > 0 && (
+                  <div className="mt-4 flex flex-wrap items-center gap-2.5">
+                    {rev.images.map((imgUrl, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setLightboxImage(imgUrl)}
+                        className="group relative h-20 w-20 overflow-hidden rounded border border-border bg-sand/20 focus:outline-none transition-transform hover:scale-105 hover:shadow-md"
+                        aria-label={`View photo ${i + 1} from ${rev.customer}`}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={imgUrl}
+                          alt={`Review photo by ${rev.customer}`}
+                          className="h-full w-full object-cover transition-opacity duration-200 group-hover:opacity-90"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </article>
             ))}
           </div>
         )}
       </div>
+
+      {/* Photo Lightbox Modal */}
+      {lightboxImage && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setLightboxImage(null)}
+        >
+          <div
+            className="relative max-h-[90vh] max-w-4xl overflow-hidden rounded-lg bg-black p-2 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
+            <button
+              onClick={() => setLightboxImage(null)}
+              className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/75 text-white hover:bg-black transition-colors"
+              aria-label="Close photo preview"
+            >
+              <X size={18} />
+            </button>
+
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={lightboxImage}
+              alt="Enlarged review photo"
+              className="max-h-[85vh] w-auto max-w-full rounded object-contain"
+            />
+          </div>
+        </div>
+      )}
     </section>
   );
 }

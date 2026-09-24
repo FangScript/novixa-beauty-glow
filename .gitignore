@@ -38,3 +38,5 @@ dist-ssr
 *.sw?
 .vercel
 .env*
+public/uploads/reviews/*
+!public/uploads/reviews/.gitkeep

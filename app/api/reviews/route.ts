@@ -87,6 +87,7 @@ export async function GET(request: Request) {
             rating: r.rating,
             title: r.title,
             review: r.body,
+            images: r.images || [],
             verified: r.verifiedPurchase,
             status:
               r.status === "APPROVED"
@@ -140,7 +141,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { productId, userId, rating, title, body: reviewBody, authorName, authorEmail } = body;
+    const { productId, userId, rating, title, body: reviewBody, authorName, authorEmail, images } = body;
 
     if (!productId || !rating || !reviewBody) {
       return NextResponse.json(
@@ -148,6 +149,10 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+
+    const reviewImages = Array.isArray(images)
+      ? images.filter((img) => typeof img === "string" && img.startsWith("/uploads/reviews/")).slice(0, 4)
+      : [];
 
     const cleanEmail = (authorEmail || "").trim().toLowerCase();
     const cleanName =
@@ -214,6 +219,7 @@ export async function POST(request: Request) {
           rating: Number(rating),
           title: title ? title.trim() : null,
           body: reviewBody.trim(),
+          images: reviewImages,
           status: "PENDING",
           verifiedPurchase: Boolean(hasPurchased),
         },
@@ -223,6 +229,7 @@ export async function POST(request: Request) {
           rating: Number(rating),
           title: title ? title.trim() : null,
           body: reviewBody.trim(),
+          images: reviewImages,
           status: "PENDING",
           verifiedPurchase: Boolean(hasPurchased),
         },
