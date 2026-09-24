@@ -64,14 +64,24 @@ function ArrowLink({ light = false }: { light?: boolean }) {
 
 export default async function HomePage() {
   const allProducts = await getLiveProducts();
-  const bestSellerSkus = ["NVP-001", "NVB-001", "NVA-001", "NVA-002"];
+  const bestSellerSkus = [
+    "NVP-001",
+    "NVB-001",
+    "NVA-001",
+    "NVA-002",
+    "NVP-003",
+    "NVP-005",
+    "NVP-011",
+    "NVP-012",
+  ];
   const matches = bestSellerSkus
     .map((sku) => allProducts.find((p) => p.sku === sku))
     .filter(Boolean) as Product[];
 
   const matchIds = new Set(matches.map((p) => p.id));
   const remaining = allProducts.filter((p) => !matchIds.has(p.id));
-  const featuredProducts = matches.length >= 4 ? matches : [...matches, ...remaining].slice(0, 4);
+  const featuredProducts =
+    matches.length >= 8 ? matches.slice(0, 8) : [...matches, ...remaining].slice(0, 8);
 
   return (
     <main className="min-h-screen bg-background text-foreground">
