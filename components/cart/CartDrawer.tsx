@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { X, ShoppingBag, Trash2, Plus, Minus, Check, Sparkles } from "lucide-react";
+import { X, ShoppingBag, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cartProducts, formatPrice, useCommerce } from "@/lib/commerce/context";
 import { QuantityControl } from "@/components/cart/QuantityControl";
@@ -11,46 +11,6 @@ interface CartDrawerProps {
   open: boolean;
   onClose: () => void;
 }
-
-interface AddOnProduct {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  slug: string;
-  image: string;
-  category: string;
-}
-
-const CURATED_ADDONS: AddOnProduct[] = [
-  {
-    id: "p29",
-    name: "Atelier Travel Refill Atomizer",
-    description: "5ml luxury pocket fine-mist atomizer",
-    price: 22,
-    slug: "atelier-travel-refill-atomizer",
-    image: "/images/category-accessories.jpg",
-    category: "Accessories",
-  },
-  {
-    id: "p21",
-    name: "Lustre Lip Oil (Bare Rose)",
-    description: "Cushiony conditioning rose lip glaze",
-    price: 22,
-    slug: "lustre-lip-oil",
-    image: "/images/category-makeup.jpg",
-    category: "Makeup",
-  },
-  {
-    id: "p7",
-    name: "Blending Sponges (Set of 3)",
-    description: "Latex-free velvety airbrush sponges",
-    price: 18,
-    slug: "blending-sponges-set",
-    image: "/images/product-sponges.jpg",
-    category: "Tools",
-  },
-];
 
 interface ShippingOption {
   id: string;
@@ -81,14 +41,13 @@ const DEFAULT_SHIPPING_OPTIONS: ShippingOption[] = [
 ];
 
 export function CartDrawer({ open, onClose }: CartDrawerProps) {
-  const { cart, updateQuantity, removeFromCart, addToCart, subtotal, cartCount, isCartLoading } =
+  const { cart, updateQuantity, removeFromCart, subtotal, cartCount, isCartLoading } =
     useCommerce();
   const items = cartProducts(cart);
   const drawerRef = useRef<HTMLDivElement>(null);
 
   const [shippingMethods, setShippingMethods] = useState<ShippingOption[]>(DEFAULT_SHIPPING_OPTIONS);
   const [selectedMethodId, setSelectedMethodId] = useState<string>("normal");
-  const [addingId, setAddingId] = useState<string | null>(null);
 
   useEffect(() => {
     const saved = typeof window !== "undefined" ? localStorage.getItem("novixa_shipping_method_id") : null;
@@ -143,22 +102,6 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
       document.body.style.overflow = "";
     };
   }, [open]);
-
-  // Find the first curated add-on that is not already in the customer's cart
-  const activeAddOn = CURATED_ADDONS.find(
-    (addon) => !cart.some((item) => item.productId === addon.id),
-  );
-
-  const handleAddAddon = async (addon: AddOnProduct) => {
-    try {
-      setAddingId(addon.id);
-      await addToCart(addon.id, 1);
-    } finally {
-      setTimeout(() => {
-        setAddingId(null);
-      }, 1000);
-    }
-  };
 
   if (!open) return null;
 
@@ -279,68 +222,6 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                   </li>
                 ))}
               </ul>
-
-              {/* 1-Click Curated Add-on */}
-              {activeAddOn && (
-                <div className="mt-5 rounded-none border border-border/80 bg-sand/30 dark:bg-card/70 p-3.5 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase flex items-center gap-1.5">
-                      <Sparkles size={11} className="text-rosewood" />
-                      Curated Pairing
-                    </span>
-                    <span className="text-[9px] font-medium tracking-wide bg-rosewood/10 text-rosewood px-2 py-0.5 rounded-none">
-                      Recommended
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <Link
-                      href={`/products/${activeAddOn.slug}`}
-                      onClick={onClose}
-                      className="shrink-0"
-                    >
-                      <img
-                        src={activeAddOn.image}
-                        alt={activeAddOn.name}
-                        className="h-14 w-14 object-cover border border-border/40 bg-white"
-                      />
-                    </Link>
-                    <div className="flex-1 min-w-0">
-                      <Link
-                        href={`/products/${activeAddOn.slug}`}
-                        onClick={onClose}
-                        className="block font-display text-xs font-medium hover:text-rosewood transition-colors truncate"
-                      >
-                        {activeAddOn.name}
-                      </Link>
-                      <p className="text-[11px] text-muted-foreground truncate">
-                        {activeAddOn.description}
-                      </p>
-                      <p className="text-xs font-semibold text-foreground mt-0.5">
-                        {formatPrice(activeAddOn.price)}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => handleAddAddon(activeAddOn)}
-                      disabled={addingId === activeAddOn.id}
-                      aria-label={`Add ${activeAddOn.name} to bag`}
-                      className="shrink-0 flex items-center gap-1 px-3 py-2 bg-ink text-white hover:bg-black transition-all text-[10px] font-semibold tracking-wider uppercase disabled:opacity-50"
-                    >
-                      {addingId === activeAddOn.id ? (
-                        <>
-                          <Check size={12} className="text-emerald-400" />
-                          <span>Added</span>
-                        </>
-                      ) : (
-                        <>
-                          <Plus size={12} />
-                          <span>Add</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              )}
             </>
           )}
         </div>
