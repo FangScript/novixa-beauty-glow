@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
+import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,14 @@ const ALLOWED_EXTENSIONS = new Set([
 const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB per file
 const MAX_FILES = 4;
 
+function getSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (!supabaseUrl || !supabaseKey) return null;
+  return createClient(supabaseUrl, supabaseKey);
+}
+
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
@@ -47,8 +56,7 @@ export async function POST(request: Request) {
     }
 
     const uploadDir = path.join(process.cwd(), "public", "uploads", "reviews");
-    await mkdir(uploadDir, { recursive: true });
-
+    const supabase = getSupabaseClient();
     const uploadedUrls: string[] = [];
 
     for (const file of files) {
@@ -79,13 +87,52 @@ export async function POST(request: Request) {
         extension = ".jpg";
       }
       const safeFilename = `review-${Date.now()}-${randomUUID().slice(0, 8)}${extension}`;
-      const destinationPath = path.join(uploadDir, safeFilename);
-
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
-      await writeFile(destinationPath, buffer);
+      let fileSaved = false;
 
-      uploadedUrls.push(`/uploads/reviews/${safeFilename}`);
+      // ── Strategy 1: Supabase Storage Cloud Upload (Vercel & Production) ───
+      if (supabase) {
+        try {
+          const { data, error } = await supabase.storage
+            .from("products")
+            .upload(`reviews/${safeFilename}`, buffer, {
+              contentType: mimeType || "image/jpeg",
+              upsert: true,
+            });
+
+          if (!error && data) {
+            const { data: pubData } = supabase.storage
+              .from("products")
+              .getPublicUrl(`reviews/${safeFilename}`);
+            if (pubData?.publicUrl) {
+              uploadedUrls.push(pubData.publicUrl);
+              fileSaved = true;
+            }
+          }
+        } catch (sErr: any) {
+          console.warn("Supabase review upload attempt error:", sErr?.message);
+        }
+      }
+
+      // ── Strategy 2: Local Disk Storage (Local Dev & Self-hosted) ───────────
+      if (!fileSaved) {
+        try {
+          await mkdir(uploadDir, { recursive: true });
+          const destinationPath = path.join(uploadDir, safeFilename);
+          await writeFile(destinationPath, buffer);
+          uploadedUrls.push(`/uploads/reviews/${safeFilename}`);
+          fileSaved = true;
+        } catch (diskErr: any) {
+          console.warn("Local disk write failed for review photo:", diskErr?.message);
+        }
+      }
+
+      // ── Strategy 3: Base64 Data URL Fallback (Never Fails) ─────────────────
+      if (!fileSaved) {
+        const base64 = buffer.toString("base64");
+        uploadedUrls.push(`data:${mimeType || "image/jpeg"};base64,${base64}`);
+      }
     }
 
     return NextResponse.json({
@@ -101,3 +148,4 @@ export async function POST(request: Request) {
     );
   }
 }
+
