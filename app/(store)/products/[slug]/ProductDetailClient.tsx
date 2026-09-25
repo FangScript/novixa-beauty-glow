@@ -1,29 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Heart, Star, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/layout/PageShell";
 import { QuantityControl } from "@/components/cart/QuantityControl";
 import { ProductCard } from "@/components/products/ProductCard";
-import { formatPrice, products, type Product } from "@/lib/products/catalogue";
+import { formatPrice, products, registerLiveProducts, type Product } from "@/lib/products/catalogue";
 import { useCommerce } from "@/lib/commerce/context";
 import { ProductReviews } from "@/components/products/ProductReviews";
 
-export function ProductDetailClient({ product }: { product: Product }) {
+interface ProductDetailClientProps {
+  product: Product;
+  relatedProducts?: Product[];
+}
+
+export function ProductDetailClient({ product, relatedProducts }: ProductDetailClientProps) {
   const { addToCart, toggleWishlist, isWishlisted } = useCommerce();
   const [quantity, setQuantity] = useState(1);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
+  useEffect(() => {
+    registerLiveProducts([product, ...(relatedProducts ?? [])]);
+  }, [product, relatedProducts]);
+
   const wishlisted = isWishlisted(product.id);
 
-  const related = products
-    .filter(
-      (p) =>
-        p.id !== product.id && (p.category === product.category || p.gender === product.gender),
-    )
-    .slice(0, 4);
+  const related = (relatedProducts && relatedProducts.length > 0)
+    ? relatedProducts
+    : products
+        .filter(
+          (p) =>
+            p.id !== product.id && (p.category === product.category || p.gender === product.gender),
+        )
+        .slice(0, 4);
 
   return (
     <PageShell eyebrow={product.category} title={product.name}>
@@ -91,7 +102,7 @@ export function ProductDetailClient({ product }: { product: Product }) {
             <span>
               Availability:{" "}
               <b className="text-foreground">
-                {product.stock > 0 ? `${product.stock} in stock` : "Out of stock"}
+                {product.stock > 0 ? `${Math.round(product.stock)} in stock` : "Out of stock"}
               </b>
             </span>
             <span>

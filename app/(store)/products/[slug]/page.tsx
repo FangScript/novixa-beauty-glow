@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { notFound } from "next/navigation";
 import { getLiveProductBySlug, getLiveProducts } from "@/lib/products/get-products";
 import { ProductDetailClient } from "./ProductDetailClient";
@@ -12,20 +15,24 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   };
 }
 
-export async function generateStaticParams() {
-  try {
-    const products = await getLiveProducts();
-    return products.map((p) => ({ slug: p.slug }));
-  } catch {
-    return [];
-  }
-}
-
 export default async function ProductDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const product = await getLiveProductBySlug(slug);
 
   if (!product) notFound();
 
-  return <ProductDetailClient product={product} />;
+  // Fetch live products for curated related pairing
+  let related: any[] = [];
+  try {
+    const allProducts = await getLiveProducts();
+    related = allProducts
+      .filter(
+        (p) =>
+          p.id !== product.id && (p.category === product.category || p.gender === product.gender),
+      )
+      .slice(0, 4);
+  } catch {}
+
+  return <ProductDetailClient product={product} relatedProducts={related} />;
 }
+

@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { PageShell } from "@/components/layout/PageShell";
 import { ProductCard } from "@/components/products/ProductCard";
 import { getLiveProducts } from "@/lib/products/get-products";

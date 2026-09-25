@@ -5,6 +5,43 @@ import {
   type Product,
 } from "@/lib/products/catalogue";
 
+function mapDbProduct(p: any): Product {
+  return {
+    id: p.id,
+    name: p.name,
+    slug: p.slug,
+    description: p.description,
+    price: p.price,
+    salePrice: p.salePrice ?? undefined,
+    gender: (p.gender?.toLowerCase() ?? "unisex") as Product["gender"],
+    category: (p.category?.toLowerCase() ?? "perfume") as Product["category"],
+    brand: p.brand || "NOVIXA",
+    sku: p.sku,
+    stock: p.stock ?? 0,
+    rating: Number(p.rating ?? 0),
+    reviewCount: p.reviewCount ?? 0,
+    tags: p.tags ?? [],
+    images:
+      p.images && p.images.length > 0
+        ? p.images.map((img: any) => img.url)
+        : ["/images/product-perfume.jpg"],
+    topNotes: p.topNotes ?? [],
+    middleNotes: p.middleNotes ?? [],
+    baseNotes: p.baseNotes ?? [],
+    occasion: p.occasions ?? [],
+    ingredients: p.ingredients ?? [],
+    fragranceFamily: p.fragranceFamily ?? undefined,
+    longevity: p.longevity ?? undefined,
+    shade: p.shade ?? undefined,
+    finish: p.finish ?? undefined,
+    coverage: p.coverage ?? undefined,
+    skinType: p.skinType ?? undefined,
+    hairType: p.hairType ?? undefined,
+    badge:
+      p.tags?.includes("bestseller") || p.sku === "NVP-001" ? "BEST SELLER" : undefined,
+  };
+}
+
 export async function getLiveProducts(): Promise<Product[]> {
   try {
     if (process.env.DATABASE_URL) {
@@ -15,29 +52,7 @@ export async function getLiveProducts(): Promise<Product[]> {
       });
 
       if (dbProducts.length > 0) {
-        const live = dbProducts.map((p) => ({
-          id: p.id,
-          name: p.name,
-          slug: p.slug,
-          description: p.description,
-          price: p.price,
-          salePrice: p.salePrice ?? undefined,
-          gender: p.gender.toLowerCase() as Product["gender"],
-          category: p.category.toLowerCase() as Product["category"],
-          brand: p.brand,
-          sku: p.sku,
-          stock: p.stock,
-          rating: Number(p.rating),
-          reviewCount: p.reviewCount,
-          tags: p.tags,
-          images:
-            p.images.length > 0 ? p.images.map((img) => img.url) : ["/images/product-perfume.jpg"],
-          topNotes: p.topNotes,
-          middleNotes: p.middleNotes,
-          baseNotes: p.baseNotes,
-          occasion: p.occasions,
-          ingredients: p.ingredients,
-        }));
+        const live = dbProducts.map(mapDbProduct);
         registerLiveProducts(live);
         return live;
       }
@@ -50,39 +65,28 @@ export async function getLiveProducts(): Promise<Product[]> {
 }
 
 export async function getLiveProductBySlug(slug: string): Promise<Product | null> {
+  if (!slug) return null;
+  const decoded = decodeURIComponent(slug).trim();
+  const lower = decoded.toLowerCase();
+
   try {
     if (process.env.DATABASE_URL) {
       const dbProduct = await prisma.product.findFirst({
-        where: { slug, status: { not: "ARCHIVED" } },
+        where: {
+          OR: [
+            { slug: lower },
+            { slug: { equals: lower, mode: "insensitive" } },
+            { slug: decoded },
+            { id: decoded },
+            { sku: { equals: decoded, mode: "insensitive" } },
+          ],
+          status: { not: "ARCHIVED" },
+        },
         include: { images: { orderBy: { sortOrder: "asc" } } },
       });
 
       if (dbProduct) {
-        const prod: Product = {
-          id: dbProduct.id,
-          name: dbProduct.name,
-          slug: dbProduct.slug,
-          description: dbProduct.description,
-          price: dbProduct.price,
-          salePrice: dbProduct.salePrice ?? undefined,
-          gender: dbProduct.gender.toLowerCase() as Product["gender"],
-          category: dbProduct.category.toLowerCase() as Product["category"],
-          brand: dbProduct.brand,
-          sku: dbProduct.sku,
-          stock: dbProduct.stock,
-          rating: Number(dbProduct.rating),
-          reviewCount: dbProduct.reviewCount,
-          tags: dbProduct.tags,
-          images:
-            dbProduct.images.length > 0
-              ? dbProduct.images.map((img) => img.url)
-              : ["/images/product-perfume.jpg"],
-          topNotes: dbProduct.topNotes,
-          middleNotes: dbProduct.middleNotes,
-          baseNotes: dbProduct.baseNotes,
-          occasion: dbProduct.occasions,
-          ingredients: dbProduct.ingredients,
-        };
+        const prod = mapDbProduct(dbProduct);
         registerLiveProducts([prod]);
         return prod;
       }
@@ -91,6 +95,15 @@ export async function getLiveProductBySlug(slug: string): Promise<Product | null
     console.warn("Failed to fetch live product by slug from database:", error);
   }
 
-  const fallback = fallbackProducts.find((p) => p.slug === slug);
+  const fallback = fallbackProducts.find(
+    (p) =>
+      p.slug.toLowerCase() === lower ||
+      p.id.toLowerCase() === lower ||
+      p.sku.toLowerCase() === lower,
+  );
   return fallback ?? null;
+}
+
+export async function getLiveProductById(id: string): Promise<Product | null> {
+  return getLiveProductBySlug(id);
 }

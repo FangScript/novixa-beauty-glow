@@ -651,11 +651,21 @@ export const formatPrice = (amount: number) => {
 
 export const getProduct = (idOrSlug: string): Product | undefined => {
   if (!idOrSlug) return undefined;
-  if (liveProductsRegistry.has(idOrSlug)) {
-    return liveProductsRegistry.get(idOrSlug);
+  const key = idOrSlug.trim();
+  const lower = key.toLowerCase();
+  if (liveProductsRegistry.has(key)) {
+    return liveProductsRegistry.get(key);
+  }
+  if (liveProductsRegistry.has(lower)) {
+    return liveProductsRegistry.get(lower);
   }
   return products.find(
-    (product) => product.id === idOrSlug || product.slug === idOrSlug || product.sku === idOrSlug,
+    (product) =>
+      product.id === key ||
+      product.slug === key ||
+      product.sku === key ||
+      product.slug.toLowerCase() === lower ||
+      product.id.toLowerCase() === lower,
   );
 };
 
