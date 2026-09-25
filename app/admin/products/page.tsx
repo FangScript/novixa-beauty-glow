@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { Trash2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AdminDialog,
@@ -257,21 +258,35 @@ export default function AdminProductsPage() {
     }
   };
 
-  const archive = async (id: string) => {
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const deleteProduct = async (id: string, name?: string) => {
     const prod = records.find((p) => p.id === id);
-    const prodName = prod?.name || "Product";
+    const prodName = name || prod?.name || "Product";
+
+    const confirmed = window.confirm(
+      `Are you sure you want to permanently delete "${prodName}"?\n\nThis will remove it from the store, database, and catalogue.`,
+    );
+    if (!confirmed) return;
+
+    setIsDeleting(true);
     try {
-      const res = await fetch(`/api/products?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      const res = await fetch(`/api/products?id=${encodeURIComponent(id)}&permanent=true`, {
+        method: "DELETE",
+      });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to archive product.");
+        throw new Error(data.error || "Failed to delete product.");
       }
-      setRecords((current) => current.filter((p) => p.id !== id));
-      toast.success(`Product "${prodName}" archived successfully.`);
+      setRecords((current) => current.filter((p) => p.id !== id && p.slug !== id));
+      setSelected(null);
+      setCreateOpen(false);
+      toast.success(`Product "${prodName}" deleted successfully.`);
     } catch (err: any) {
-      console.warn("Could not archive product via API:", err);
-      setRecords((current) => current.filter((p) => p.id !== id));
-      toast.error(`Could not archive "${prodName}": ${err.message || "Unknown error"}`);
+      console.error("Could not delete product via API:", err);
+      toast.error(`Could not delete "${prodName}": ${err.message || "Unknown error"}`);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -364,18 +379,22 @@ export default function AdminProductsPage() {
                   {product.stock <= 5 ? "Low Stock" : "Active"}
                 </AdminStatus>
               </TableCell>
-              <TableCell className="text-right space-x-3">
+              <TableCell className="text-right space-x-2">
                 <button
+                  type="button"
                   onClick={() => openEdit(product)}
-                  className="text-xs text-[#8f5d48] underline hover:text-black"
+                  className="inline-flex items-center gap-1 text-xs font-medium text-[#8f5d48] hover:text-black transition-colors px-2 py-1 border border-transparent hover:border-[#d9cec5]"
                 >
+                  <Pencil size={12} />
                   Edit
                 </button>
                 <button
-                  onClick={() => archive(product.id)}
-                  className="text-xs text-muted-foreground underline hover:text-rosewood"
+                  type="button"
+                  onClick={() => deleteProduct(product.id, product.name)}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-[#b86d5a] hover:text-red-700 transition-colors px-2 py-1 border border-transparent hover:border-[#b86d5a]/40"
                 >
-                  Archive
+                  <Trash2 size={12} />
+                  Delete
                 </button>
               </TableCell>
             </tr>
@@ -513,24 +532,41 @@ export default function AdminProductsPage() {
               />
             </AdminField>
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-[#d9cec5]">
-              <Button
-                variant="outline"
-                disabled={isSaving}
-                onClick={() => {
-                  setSelected(null);
-                  setCreateOpen(false);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                disabled={isSaving}
-                onClick={save}
-                className="bg-[#211b18] text-white hover:bg-black min-w-[120px]"
-              >
-                {isSaving ? "Saving..." : "Save Product"}
-              </Button>
+            <div className="flex items-center justify-between pt-4 border-t border-[#d9cec5]">
+              {selected ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isSaving || isDeleting}
+                  onClick={() => deleteProduct(selected.id, selected.name)}
+                  className="border-[#b86d5a] text-[#b86d5a] hover:bg-[#b86d5a] hover:text-white transition-colors"
+                >
+                  <Trash2 size={14} className="mr-1.5" />
+                  {isDeleting ? "Deleting..." : "Delete Product"}
+                </Button>
+              ) : (
+                <div />
+              )}
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isSaving || isDeleting}
+                  onClick={() => {
+                    setSelected(null);
+                    setCreateOpen(false);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  disabled={isSaving || isDeleting}
+                  onClick={save}
+                  className="bg-[#211b18] text-white hover:bg-black min-w-[120px]"
+                >
+                  {isSaving ? "Saving..." : "Save Product"}
+                </Button>
+              </div>
             </div>
           </div>
         </AdminDialog>

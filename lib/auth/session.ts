@@ -30,32 +30,56 @@ export async function getAuthenticatedAdmin() {
   if (!databaseConfigured()) return null;
   const cookieStore = await cookies();
   const rawSession = cookieStore.get(SESSION_COOKIE)?.value;
-  if (!rawSession) return null;
 
-  try {
-    const session = await prisma.session.findUnique({
-      where: { id: hashSession(rawSession) },
-      include: { user: true },
-    });
+  if (rawSession) {
+    try {
+      const session = await prisma.session.findUnique({
+        where: { id: hashSession(rawSession) },
+        include: { user: true },
+      });
 
-    if (!session || session.expiresAt <= new Date() || session.user.role !== "ADMIN") {
-      if (session) {
+      if (session && session.expiresAt > new Date() && session.user.role === "ADMIN") {
+        return {
+          id: session.user.id,
+          email: session.user.email,
+          name: session.user.name,
+          role: session.user.role,
+          sessionId: session.id,
+        };
+      }
+      if (session && session.expiresAt <= new Date()) {
         await prisma.session.delete({ where: { id: session.id } }).catch(() => undefined);
       }
-      return null;
+    } catch (error) {
+      console.error("Failed to authenticate admin session:", error);
     }
-
-    return {
-      id: session.user.id,
-      email: session.user.email,
-      name: session.user.name,
-      role: session.user.role,
-      sessionId: session.id,
-    };
-  } catch (error) {
-    console.error("Failed to authenticate admin session:", error);
-    return null;
   }
+
+  // Fallback: check Supabase auth
+  try {
+    const { createClient } = await import("@/utils/supabase/server");
+    const supabase = createClient(cookieStore);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (user) {
+      const isAdmin =
+        user.user_metadata?.role === "ADMIN" ||
+        (process.env.ADMIN_EMAIL && user.email?.toLowerCase() === process.env.ADMIN_EMAIL.toLowerCase());
+      if (isAdmin) {
+        return {
+          id: user.id,
+          email: user.email || "admin@novixa.com",
+          name: user.user_metadata?.name || "Administrator",
+          role: "ADMIN" as const,
+          sessionId: user.id,
+        };
+      }
+    }
+  } catch {}
+
+  return null;
 }
 
 export async function loginAdmin(email: string, password: string) {

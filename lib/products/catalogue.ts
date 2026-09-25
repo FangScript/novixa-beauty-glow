@@ -629,11 +629,29 @@ products.forEach((product) => {
 });
 
 const liveProductsRegistry = new Map<string, Product>();
+const deletedProductIds = new Set<string>();
+
+export const markProductDeleted = (idOrSlug: string) => {
+  if (!idOrSlug) return;
+  const key = idOrSlug.trim();
+  const lower = key.toLowerCase();
+  deletedProductIds.add(key);
+  deletedProductIds.add(lower);
+  liveProductsRegistry.delete(key);
+  liveProductsRegistry.delete(lower);
+};
+
+export const isProductDeleted = (idOrSlug: string): boolean => {
+  if (!idOrSlug) return false;
+  const key = idOrSlug.trim();
+  return deletedProductIds.has(key) || deletedProductIds.has(key.toLowerCase());
+};
 
 export const registerLiveProducts = (liveProducts: Product[]) => {
   if (!Array.isArray(liveProducts)) return;
   liveProducts.forEach((p) => {
     if (!p) return;
+    if (isProductDeleted(p.id) || isProductDeleted(p.slug)) return;
     if (p.id) liveProductsRegistry.set(p.id, p);
     if (p.slug) liveProductsRegistry.set(p.slug, p);
     if (p.sku) liveProductsRegistry.set(p.sku, p);
@@ -653,6 +671,9 @@ export const getProduct = (idOrSlug: string): Product | undefined => {
   if (!idOrSlug) return undefined;
   const key = idOrSlug.trim();
   const lower = key.toLowerCase();
+  if (deletedProductIds.has(key) || deletedProductIds.has(lower)) {
+    return undefined;
+  }
   if (liveProductsRegistry.has(key)) {
     return liveProductsRegistry.get(key);
   }
@@ -661,11 +682,13 @@ export const getProduct = (idOrSlug: string): Product | undefined => {
   }
   return products.find(
     (product) =>
-      product.id === key ||
-      product.slug === key ||
-      product.sku === key ||
-      product.slug.toLowerCase() === lower ||
-      product.id.toLowerCase() === lower,
+      !deletedProductIds.has(product.id) &&
+      !deletedProductIds.has(product.slug) &&
+      (product.id === key ||
+        product.slug === key ||
+        product.sku === key ||
+        product.slug.toLowerCase() === lower ||
+        product.id.toLowerCase() === lower),
   );
 };
 

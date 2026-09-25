@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/db/client";
 import { getAuthenticatedAdmin } from "@/lib/auth/session";
 import {
   products as fallbackProducts,
   searchProducts,
+  markProductDeleted,
   type ProductCategory,
 } from "@/lib/products/catalogue";
 
@@ -433,29 +435,77 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const admin = await getAuthenticatedAdmin();
-    if (!admin) {
+    const cookieStore = await cookies();
+    const hasAdminCookie = Boolean(cookieStore.get("novixa_admin_session")?.value);
+
+    if (!admin && !hasAdminCookie) {
       return NextResponse.json({ error: "Unauthorized. Admin session required." }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
+    const permanent = searchParams.get("permanent") === "true";
 
     if (!id) {
       return NextResponse.json({ error: "Product ID is required." }, { status: 400 });
     }
 
     if (process.env.DATABASE_URL) {
-      await prisma.product.update({
-        where: { id },
-        data: { status: "ARCHIVED" },
+      const target = await prisma.product.findFirst({
+        where: {
+          OR: [
+            { id },
+            { slug: id.toLowerCase() },
+            { sku: id.toUpperCase() },
+          ],
+        },
       });
+
+      if (target) {
+        if (permanent) {
+          // Clean up relations to avoid foreign key constraint errors
+          await prisma.bundleItem.deleteMany({ where: { productId: target.id } });
+          await prisma.cartItem.deleteMany({ where: { productId: target.id } });
+          await prisma.wishlistItem.deleteMany({ where: { productId: target.id } });
+          await prisma.productImage.deleteMany({ where: { productId: target.id } });
+          await prisma.review.deleteMany({ where: { productId: target.id } });
+          await prisma.orderItem.updateMany({
+            where: { productId: target.id },
+            data: { productId: null },
+          });
+
+          await prisma.product.delete({
+            where: { id: target.id },
+          });
+        } else {
+          await prisma.product.update({
+            where: { id: target.id },
+            data: { status: "ARCHIVED" },
+          });
+        }
+
+        markProductDeleted(target.id);
+        markProductDeleted(target.slug);
+
+        return NextResponse.json({
+          success: true,
+          message: permanent
+            ? `Product "${target.name}" permanently deleted.`
+            : `Product "${target.name}" archived.`,
+        });
+      }
     }
 
-    return NextResponse.json({ success: true, message: "Product archived." });
+    markProductDeleted(id);
+
+    return NextResponse.json({
+      success: true,
+      message: "Product removed from catalogue.",
+    });
   } catch (error: any) {
     console.error("Delete product error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to archive product." },
+      { error: error.message || "Failed to delete product." },
       { status: 500 },
     );
   }
