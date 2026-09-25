@@ -9,10 +9,8 @@ import {
   Tag,
   X,
   CreditCard,
-  Building2,
   ShieldCheck,
   Smartphone,
-  Banknote,
   Sparkles,
   Info,
   Check,
@@ -1020,85 +1018,6 @@ export default function CheckoutPage() {
                   <div className="mt-3 text-xs text-muted-foreground pl-7 leading-relaxed">
                     Split your purchase into <strong>3 interest-free payments</strong> of{" "}
                     <strong>{formatPrice(orderTotal / 3)}</strong>. No added fees when paid on time.
-                  </div>
-                )}
-              </div>
-
-              {/* Option 6: Direct Bank Transfer */}
-              <div
-                onClick={() => setPaymentMethod("BANK_TRANSFER")}
-                className={`cursor-pointer border p-4 transition-colors ${
-                  paymentMethod === "BANK_TRANSFER"
-                    ? "border-rosewood bg-stone-50/90 ring-1 ring-rosewood"
-                    : "border-border bg-white/50 hover:bg-stone-50/50"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      id="method-bacs"
-                      name="payment_choice"
-                      checked={paymentMethod === "BANK_TRANSFER"}
-                      onChange={() => setPaymentMethod("BANK_TRANSFER")}
-                      className="h-4 w-4 text-rosewood"
-                    />
-                    <label
-                      htmlFor="method-bacs"
-                      className="font-medium text-foreground cursor-pointer text-sm flex items-center gap-2"
-                    >
-                      <Building2 size={16} />
-                      Direct Bank Transfer (BACS)
-                    </label>
-                  </div>
-                  <span className="text-xs text-muted-foreground font-mono">UK Wire</span>
-                </div>
-                {paymentMethod === "BANK_TRANSFER" && (
-                  <div className="mt-3 border-t border-border/80 pt-3 text-xs text-muted-foreground pl-7 space-y-1">
-                    <p>Make your payment directly into our UK business bank account.</p>
-                    <p className="text-[11px] text-stone-700">
-                      Sort Code: <strong>20-00-00</strong> | Account: <strong>83920194</strong>
-                    </p>
-                    <p className="text-[10px]">
-                      Your order reference will be generated on confirmation for payment matching.
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Option 7: Cash on Delivery */}
-              <div
-                onClick={() => setPaymentMethod("COD")}
-                className={`cursor-pointer border p-4 transition-colors ${
-                  paymentMethod === "COD"
-                    ? "border-rosewood bg-stone-50/90 ring-1 ring-rosewood"
-                    : "border-border bg-white/50 hover:bg-stone-50/50"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      id="method-cod"
-                      name="payment_choice"
-                      checked={paymentMethod === "COD"}
-                      onChange={() => setPaymentMethod("COD")}
-                      className="h-4 w-4 text-rosewood"
-                    />
-                    <label
-                      htmlFor="method-cod"
-                      className="font-medium text-foreground cursor-pointer text-sm flex items-center gap-2"
-                    >
-                      <Banknote size={16} />
-                      Cash on Delivery
-                    </label>
-                  </div>
-                  <span className="text-xs text-muted-foreground">Pay on Arrival</span>
-                </div>
-                {paymentMethod === "COD" && (
-                  <div className="mt-3 text-xs text-muted-foreground pl-7 leading-relaxed">
-                    Pay securely in cash directly to the courier when your order arrives at your
-                    doorstep. Available across all UK delivery postcodes.
                   </div>
                 )}
               </div>
