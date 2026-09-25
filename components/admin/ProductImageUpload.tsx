@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import {
   UploadCloud,
@@ -18,66 +18,154 @@ interface ProductImageUploadProps {
   onChange: (images: string[]) => void;
 }
 
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
+
 export function ProductImageUpload({ images, onChange }: ProductImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [customUrl, setCustomUrl] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  const handleFileUpload = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
+  const handleFileUpload = useCallback(
+    async (fileList: FileList | File[] | null) => {
+      if (!fileList || fileList.length === 0) return;
 
-    setIsUploading(true);
-    setUploadError(null);
+      const files = Array.from(fileList);
 
-    const formData = new FormData();
-    for (let i = 0; i < files.length; i++) {
-      formData.append("file", files[i]);
-    }
-
-    try {
-      const response = await fetch("/api/admin/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to upload image.");
+      // Pre-validate file sizes
+      for (const file of files) {
+        if (file.size > MAX_FILE_SIZE) {
+          const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+          const errorMsg = `File "${file.name}" (${sizeMb}MB) exceeds the 25MB size limit.`;
+          setUploadError(errorMsg);
+          toast.error(errorMsg);
+          return;
+        }
       }
 
-      if (data.urls && Array.isArray(data.urls)) {
-        onChange([...data.urls, ...images]);
-      } else if (data.url) {
-        onChange([data.url, ...images]);
+      setIsUploading(true);
+      setUploadError(null);
+
+      const formData = new FormData();
+      for (const file of files) {
+        formData.append("file", file);
       }
-      toast.success("Image uploaded successfully.");
-    } catch (err: any) {
-      const msg = err.message || "An unexpected error occurred during upload.";
-      setUploadError(msg);
-      toast.error(msg);
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
+
+      try {
+        const response = await fetch("/api/admin/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        let data: any = {};
+        try {
+          data = await response.json();
+        } catch {
+          const text = await response.text().catch(() => "");
+          data = {
+            error: text || `Upload failed with status ${response.status} (${response.statusText})`,
+          };
+        }
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to upload image.");
+        }
+
+        const newUrls: string[] = (
+          data.urls && Array.isArray(data.urls)
+            ? data.urls
+            : data.url
+              ? [data.url]
+              : []
+        ).filter(Boolean);
+
+        if (newUrls.length > 0) {
+          // Merge without duplicates, prepending newest images
+          const combined = [...newUrls, ...images].filter(
+            (url, index, arr) => arr.indexOf(url) === index,
+          );
+          onChange(combined);
+          toast.success(
+            newUrls.length === 1
+              ? "Image uploaded successfully."
+              : `${newUrls.length} images uploaded successfully.`,
+          );
+        } else {
+          toast.error("Upload succeeded, but no image URL was returned.");
+        }
+      } catch (err: any) {
+        const msg = err.message || "An unexpected error occurred during upload.";
+        setUploadError(msg);
+        toast.error(msg);
+      } finally {
+        setIsUploading(false);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
       }
-    }
+    },
+    [images, onChange],
+  );
+
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       handleFileUpload(e.dataTransfer.files);
     }
   };
+
+  // Support pasting image from clipboard (Ctrl+V)
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      const imageFiles: File[] = [];
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith("image/")) {
+          const file = items[i].getAsFile();
+          if (file) {
+            imageFiles.push(file);
+          }
+        }
+      }
+
+      if (imageFiles.length > 0) {
+        toast.info(`Uploading ${imageFiles.length} pasted image(s)...`);
+        handleFileUpload(imageFiles);
+      }
+    };
+
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, [handleFileUpload]);
 
   const handleAddUrl = () => {
     const trimmed = customUrl.trim();
     if (!trimmed) return;
     if (!images.includes(trimmed)) {
       onChange([trimmed, ...images]);
+      toast.success("Image URL added.");
+    } else {
+      toast.info("Image already in list.");
     }
     setCustomUrl("");
     setShowUrlInput(false);
@@ -85,6 +173,7 @@ export function ProductImageUpload({ images, onChange }: ProductImageUploadProps
 
   const handleRemove = (index: number) => {
     onChange(images.filter((_, i) => i !== index));
+    toast.success("Image removed.");
   };
 
   const handleSetPrimary = (index: number) => {
@@ -92,10 +181,11 @@ export function ProductImageUpload({ images, onChange }: ProductImageUploadProps
     const selected = images[index];
     const filtered = images.filter((_, i) => i !== index);
     onChange([selected, ...filtered]);
+    toast.success("Cover image updated.");
   };
 
   return (
-    <div className="space-y-3">
+    <div ref={containerRef} className="space-y-3">
       <div className="flex items-center justify-between">
         <label className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#776a61]">
           Product Images ({images.length})
@@ -117,6 +207,12 @@ export function ProductImageUpload({ images, onChange }: ProductImageUploadProps
             placeholder="https://example.com/image.jpg or /images/..."
             value={customUrl}
             onChange={(e) => setCustomUrl(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleAddUrl();
+              }
+            }}
             className="h-9 flex-1 border border-[#d9cec5] bg-white/70 px-3 text-xs outline-none focus:border-[#8f5d48]"
           />
           <Button
@@ -132,19 +228,22 @@ export function ProductImageUpload({ images, onChange }: ProductImageUploadProps
 
       {/* Drag and Drop Zone */}
       <div
-        onDragOver={(e) => e.preventDefault()}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onClick={() => fileInputRef.current?.click()}
-        className={`group relative flex cursor-pointer flex-col items-center justify-center border-2 border-dashed p-5 transition-colors ${
+        className={`group relative flex cursor-pointer flex-col items-center justify-center border-2 border-dashed p-6 transition-all ${
           isUploading
             ? "border-[#8f5d48] bg-[#8f5d48]/5"
-            : "border-[#d9cec5] bg-white/40 hover:border-[#8f5d48] hover:bg-white/70"
+            : isDragOver
+              ? "border-[#8f5d48] bg-[#8f5d48]/10 scale-[1.01]"
+              : "border-[#d9cec5] bg-white/40 hover:border-[#8f5d48] hover:bg-white/70"
         }`}
       >
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp,image/avif,image/gif"
+          accept="image/*,.jpg,.jpeg,.png,.webp,.avif,.gif,.svg,.jfif"
           multiple
           className="hidden"
           onChange={(e) => handleFileUpload(e.target.files)}
@@ -152,38 +251,40 @@ export function ProductImageUpload({ images, onChange }: ProductImageUploadProps
 
         {isUploading ? (
           <div className="flex flex-col items-center gap-2 text-center text-[#8f5d48]">
-            <Loader2 size={24} className="animate-spin" />
-            <p className="text-xs font-medium">Uploading image(s)...</p>
+            <Loader2 size={26} className="animate-spin" />
+            <p className="text-xs font-semibold">Uploading image(s)...</p>
+            <p className="text-[10px] text-[#776a61]">Saving high-resolution photos</p>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-1.5 text-center">
-            <div className="rounded-full bg-[#f4ede6] p-2.5 text-[#8f5d48] group-hover:scale-105 transition-transform">
-              <UploadCloud size={20} />
+            <div className="rounded-full bg-[#f4ede6] p-2.5 text-[#8f5d48] group-hover:scale-110 transition-transform">
+              <UploadCloud size={22} />
             </div>
-            <p className="text-xs font-medium text-[#211b18]">
-              Click to browse or drag & drop product photos
+            <p className="text-xs font-semibold text-[#211b18]">
+              Click to browse, drag & drop photos, or paste with Ctrl+V
             </p>
             <p className="text-[10px] text-[#8f8279]">
-              Supports PNG, JPG, WebP, AVIF up to 5MB (stored on your server)
+              Supports PNG, JPG, WebP, AVIF, GIF, SVG up to 25MB
             </p>
           </div>
         )}
       </div>
 
       {uploadError && (
-        <p className="border border-[#b86d5a] bg-[#fbf2ef] p-2.5 text-xs text-[#8f2d18]">
-          {uploadError}
-        </p>
+        <div className="border border-[#b86d5a] bg-[#fbf2ef] p-3 text-xs text-[#8f2d18]">
+          <p className="font-semibold">Upload failed</p>
+          <p className="mt-0.5">{uploadError}</p>
+        </div>
       )}
 
       {/* Thumbnails Gallery */}
       {images.length > 0 && (
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {images.map((url, idx) => (
             <div
               key={`${url}-${idx}`}
-              className={`group relative aspect-square overflow-hidden border bg-[#f9f6f2] transition-all ${
-                idx === 0 ? "border-[#8f5d48] ring-1 ring-[#8f5d48]" : "border-[#d9cec5]"
+              className={`group relative aspect-square overflow-hidden border bg-[#f9f6f2] shadow-xs transition-all ${
+                idx === 0 ? "border-[#8f5d48] ring-2 ring-[#8f5d48]/40" : "border-[#d9cec5]"
               }`}
             >
               <img
@@ -197,7 +298,7 @@ export function ProductImageUpload({ images, onChange }: ProductImageUploadProps
 
               {/* Badge for Primary Image */}
               {idx === 0 && (
-                <span className="absolute left-1.5 top-1.5 z-10 bg-[#8f5d48] px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white shadow">
+                <span className="absolute left-1.5 top-1.5 z-10 bg-[#8f5d48] px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white shadow-xs">
                   ★ Cover Photo
                 </span>
               )}
@@ -211,7 +312,7 @@ export function ProductImageUpload({ images, onChange }: ProductImageUploadProps
                       e.stopPropagation();
                       handleSetPrimary(idx);
                     }}
-                    className="inline-flex items-center gap-1 rounded bg-white px-2 py-1 text-[10px] font-semibold uppercase text-[#211b18] hover:bg-[#8f5d48] hover:text-white transition-colors"
+                    className="inline-flex items-center gap-1 rounded bg-white px-2 py-1 text-[10px] font-semibold uppercase text-[#211b18] hover:bg-[#8f5d48] hover:text-white transition-colors cursor-pointer"
                   >
                     <Star size={11} /> Set as Cover
                   </button>
@@ -223,7 +324,7 @@ export function ProductImageUpload({ images, onChange }: ProductImageUploadProps
                     e.stopPropagation();
                     handleRemove(idx);
                   }}
-                  className="inline-flex items-center gap-1 rounded bg-rose-600 px-2 py-1 text-[10px] font-semibold uppercase text-white hover:bg-rose-700 transition-colors"
+                  className="inline-flex items-center gap-1 rounded bg-rose-600 px-2 py-1 text-[10px] font-semibold uppercase text-white hover:bg-rose-700 transition-colors cursor-pointer"
                 >
                   <Trash2 size={11} /> Remove
                 </button>
@@ -236,9 +337,10 @@ export function ProductImageUpload({ images, onChange }: ProductImageUploadProps
       {images.length === 0 && (
         <div className="flex items-center gap-2 text-[11px] text-[#8f8279]">
           <ImageIcon size={14} />
-          <span>No images uploaded yet. At least one image is recommended.</span>
+          <span>No images uploaded yet. Cover photo is recommended.</span>
         </div>
       )}
     </div>
   );
 }
+

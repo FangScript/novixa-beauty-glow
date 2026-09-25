@@ -184,8 +184,27 @@ export async function POST(request: Request) {
             tags: Array.isArray(tags) ? tags : [],
             status: "ACTIVE",
           },
-          include: { images: true },
+          include: { images: { orderBy: { sortOrder: "asc" } } },
         });
+
+        if (Array.isArray(images)) {
+          await prisma.productImage.deleteMany({ where: { productId: existingProduct.id } });
+          const finalImages = images.length > 0 ? images : ["/images/product-perfume.jpg"];
+          await prisma.productImage.createMany({
+            data: finalImages.map((url: string, index: number) => ({
+              productId: existingProduct.id,
+              url,
+              alt: `${name} photo ${index + 1}`,
+              sortOrder: index,
+            })),
+          });
+
+          const refreshed = await prisma.product.findUnique({
+            where: { id: existingProduct.id },
+            include: { images: { orderBy: { sortOrder: "asc" } } },
+          });
+          if (refreshed) product = refreshed;
+        }
       } else {
         product = await prisma.product.create({
           data: {

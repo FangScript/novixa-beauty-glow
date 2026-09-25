@@ -3,14 +3,31 @@ import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 
+export const dynamic = "force-dynamic";
+
 const ALLOWED_MIME_TYPES = new Set([
   "image/jpeg",
+  "image/jpg",
+  "image/pjpeg",
+  "image/jfif",
   "image/png",
+  "image/x-png",
   "image/webp",
   "image/avif",
+  "image/gif",
 ]);
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB per file
+const ALLOWED_EXTENSIONS = new Set([
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".avif",
+  ".gif",
+  ".jfif",
+]);
+
+const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB per file
 const MAX_FILES = 4;
 
 export async function POST(request: Request) {
@@ -35,10 +52,16 @@ export async function POST(request: Request) {
     const uploadedUrls: string[] = [];
 
     for (const file of files) {
-      if (!ALLOWED_MIME_TYPES.has(file.type)) {
+      const mimeType = (file.type || "").toLowerCase().trim();
+      const rawExt = path.extname(file.name || "").toLowerCase().trim();
+
+      const isMimeAllowed = ALLOWED_MIME_TYPES.has(mimeType);
+      const isExtAllowed = ALLOWED_EXTENSIONS.has(rawExt);
+
+      if (!isMimeAllowed && !isExtAllowed) {
         return NextResponse.json(
           {
-            error: `Unsupported file format (${file.type}). Please upload JPG, PNG, WebP or AVIF images.`,
+            error: `Unsupported file format (${file.type || "unknown"}). Please upload JPG, PNG, WebP or AVIF images.`,
           },
           { status: 400 },
         );
@@ -46,12 +69,15 @@ export async function POST(request: Request) {
 
       if (file.size > MAX_FILE_SIZE) {
         return NextResponse.json(
-          { error: `Image "${file.name}" exceeds the 5MB size limit.` },
+          { error: `Image "${file.name}" exceeds the 15MB size limit.` },
           { status: 400 },
         );
       }
 
-      const extension = path.extname(file.name) || `.${file.type.split("/")[1]}`;
+      let extension = isExtAllowed ? rawExt : ".jpg";
+      if (extension === ".jpeg" || extension === ".jfif") {
+        extension = ".jpg";
+      }
       const safeFilename = `review-${Date.now()}-${randomUUID().slice(0, 8)}${extension}`;
       const destinationPath = path.join(uploadDir, safeFilename);
 
