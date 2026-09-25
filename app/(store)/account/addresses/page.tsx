@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
 import { Button } from "@/components/ui/button";
+import { AddressSelector } from "@/components/address/AddressSelector";
 
 type Address = {
   id: string;
@@ -207,19 +208,32 @@ export default function AccountAddressesPage() {
               {field("Label (e.g. Home, Work)", "label", { placeholder: "Home" })}
               {field("Full Name", "fullName", { required: true, placeholder: "Recipient name" })}
             </div>
-            {field("Street Address", "line1", {
-              required: true,
-              placeholder: "Flat / House / Street",
-            })}
-            {field("Address Line 2", "line2", { placeholder: "Landmark, Colony (optional)" })}
-            <div className="grid gap-4 sm:grid-cols-3">
-              {field("City", "city", { required: true })}
-              {field("State", "state", { required: true })}
-              {field("PIN Code", "postalCode", { required: true, pattern: "[0-9]{5,6}" })}
-            </div>
+
+            <AddressSelector
+              value={{
+                address: form.line1,
+                city: form.city,
+                state: form.state,
+                pinCode: form.postalCode,
+                country: form.country,
+              }}
+              onChange={(updated) =>
+                setForm((prev) => ({
+                  ...prev,
+                  line1: updated.address,
+                  city: updated.city,
+                  state: updated.state,
+                  postalCode: updated.pinCode,
+                  country: updated.country || prev.country,
+                }))
+              }
+            />
+
+            {field("Address Line 2 (optional)", "line2", { placeholder: "Apartment, suite, unit, etc." })}
+
             {field("Phone (for delivery)", "phone", {
               type: "tel",
-              placeholder: "+91 XXXXX XXXXX",
+              placeholder: "+44 7123 456789",
             })}
 
             <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer select-none">

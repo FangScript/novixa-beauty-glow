@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { PageShell } from "@/components/layout/PageShell";
 import { Button } from "@/components/ui/button";
 import { cartProducts, formatPrice, useCommerce } from "@/lib/commerce/context";
+import { AddressSelector } from "@/components/address/AddressSelector";
 import { useCustomerAuth } from "@/lib/auth/customer-context";
 import { PayPalCheckoutButton } from "@/components/checkout/PayPalCheckoutButton";
 
@@ -87,6 +88,7 @@ export default function CheckoutPage() {
     city: "",
     state: "",
     pinCode: "",
+    country: "United Kingdom",
   });
 
   // Payment Selection
@@ -593,38 +595,26 @@ export default function CheckoutPage() {
           {/* Shipping Address */}
           <section>
             <h2 className="font-display text-2xl">Shipping Address</h2>
-            <div className="mt-4 grid gap-3">
-              <input
-                required
-                placeholder="Street address / Apartment / Suite"
-                value={formData.address}
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                className="h-11 border border-border bg-white/40 px-3 text-sm outline-none focus:border-rosewood"
+            <div className="mt-4">
+              <AddressSelector
+                value={{
+                  address: formData.address,
+                  city: formData.city,
+                  state: formData.state,
+                  pinCode: formData.pinCode,
+                  country: formData.country,
+                }}
+                onChange={(updated) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    address: updated.address,
+                    city: updated.city,
+                    state: updated.state,
+                    pinCode: updated.pinCode,
+                    country: updated.country || prev.country,
+                  }))
+                }
               />
-              <div className="grid gap-3 sm:grid-cols-3">
-                <input
-                  required
-                  placeholder="City"
-                  value={formData.city}
-                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                  className="h-11 border border-border bg-white/40 px-3 text-sm outline-none focus:border-rosewood"
-                />
-                <input
-                  placeholder="County (e.g. Greater London)"
-                  value={formData.state}
-                  onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                  className="h-11 border border-border bg-white/40 px-3 text-sm outline-none focus:border-rosewood"
-                />
-                <input
-                  required
-                  placeholder="Postcode (e.g. W1K 7AA)"
-                  value={formData.pinCode}
-                  onChange={(e) =>
-                    setFormData({ ...formData, pinCode: e.target.value.toUpperCase() })
-                  }
-                  className="h-11 border border-border bg-white/40 px-3 text-sm outline-none focus:border-rosewood"
-                />
-              </div>
             </div>
           </section>
 
