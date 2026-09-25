@@ -173,12 +173,14 @@ export default function CheckoutPage() {
   const [isLoadingShipping, setIsLoadingShipping] = useState(true);
 
   useEffect(() => {
+    const savedMethodId = typeof window !== "undefined" ? localStorage.getItem("novixa_shipping_method_id") : null;
     fetch("/api/shipping-methods")
       .then((res) => res.json())
       .then((data) => {
         if (data.success && Array.isArray(data.methods) && data.methods.length > 0) {
           setShippingMethods(data.methods);
-          const defaultOpt = data.methods.find((m: any) => m.isDefault) || data.methods[0];
+          const matched = savedMethodId ? data.methods.find((m: any) => m.id === savedMethodId) : null;
+          const defaultOpt = matched || data.methods.find((m: any) => m.isDefault) || data.methods[0];
           setSelectedShippingMethod(defaultOpt);
         }
       })
@@ -642,7 +644,10 @@ export default function CheckoutPage() {
                 return (
                   <div
                     key={method.id}
-                    onClick={() => setSelectedShippingMethod(method)}
+                    onClick={() => {
+                      setSelectedShippingMethod(method);
+                      try { localStorage.setItem("novixa_shipping_method_id", method.id); } catch {}
+                    }}
                     className={`relative cursor-pointer border p-4 transition-all ${
                       isSelected
                         ? "border-rosewood bg-stone-50/90 ring-1 ring-rosewood"
@@ -656,7 +661,10 @@ export default function CheckoutPage() {
                           id={`shipping-${method.id}`}
                           name="shipping_choice"
                           checked={isSelected}
-                          onChange={() => setSelectedShippingMethod(method)}
+                          onChange={() => {
+                            setSelectedShippingMethod(method);
+                            try { localStorage.setItem("novixa_shipping_method_id", method.id); } catch {}
+                          }}
                           className="mt-0.5 h-4 w-4 text-rosewood"
                         />
                         <div>

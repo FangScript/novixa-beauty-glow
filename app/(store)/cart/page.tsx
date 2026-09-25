@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { PageShell } from "@/components/layout/PageShell";
 import { QuantityControl, RemoveButton } from "@/components/cart/QuantityControl";
@@ -7,10 +8,73 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { cartProducts, formatPrice, useCommerce } from "@/lib/commerce/context";
 import { Button } from "@/components/ui/button";
 
+interface ShippingOption {
+  id: string;
+  name: string;
+  price: number;
+  timeframe: string;
+  description?: string;
+  isDefault?: boolean;
+}
+
+const DEFAULT_SHIPPING_OPTIONS: ShippingOption[] = [
+  {
+    id: "normal",
+    name: "Normal Delivery",
+    price: 0.20,
+    timeframe: "3-5 days",
+    description: "Standard tracked courier delivery within 3-5 business days.",
+    isDefault: true,
+  },
+  {
+    id: "express",
+    name: "Express Delivery",
+    price: 0.30,
+    timeframe: "1-3 days",
+    description: "Priority expedited courier dispatch with 1-3 business days delivery.",
+    isDefault: false,
+  },
+];
+
 export default function CartPage() {
   const { cart, updateQuantity, removeFromCart, subtotal } = useCommerce();
   const items = cartProducts(cart);
-  const shipping = subtotal >= 70 || subtotal === 0 ? 0 : 4.95;
+
+  const [shippingMethods, setShippingMethods] = useState<ShippingOption[]>(DEFAULT_SHIPPING_OPTIONS);
+  const [selectedMethodId, setSelectedMethodId] = useState<string>("normal");
+
+  useEffect(() => {
+    const saved = typeof window !== "undefined" ? localStorage.getItem("novixa_shipping_method_id") : null;
+    fetch("/api/shipping-methods")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.methods) && data.methods.length > 0) {
+          setShippingMethods(data.methods);
+          if (saved && data.methods.some((m: any) => m.id === saved)) {
+            setSelectedMethodId(saved);
+          } else {
+            const def = data.methods.find((m: any) => m.isDefault) || data.methods[0];
+            setSelectedMethodId(def.id);
+          }
+        }
+      })
+      .catch((err) => console.warn("Failed to load shipping methods:", err));
+  }, []);
+
+  const selectedShipping =
+    shippingMethods.find((m) => m.id === selectedMethodId) ||
+    shippingMethods[0] ||
+    DEFAULT_SHIPPING_OPTIONS[0];
+
+  const shipping = items.length > 0 ? selectedShipping.price : 0;
+
+  const handleSelectShipping = (method: ShippingOption) => {
+    setSelectedMethodId(method.id);
+    try {
+      localStorage.setItem("novixa_shipping_method_id", method.id);
+      localStorage.setItem("novixa_shipping_method_name", method.name);
+    } catch {}
+  };
 
   return (
     <PageShell eyebrow="Your Edit" title="Shopping Bag">
@@ -64,17 +128,57 @@ export default function CartPage() {
             ))}
           </div>
 
-          <aside className="h-fit border border-border bg-white/40 p-6 backdrop-blur-xs">
+          <aside className="h-fit border border-border bg-white/40 p-6 backdrop-blur-xs space-y-5">
             <h2 className="font-display text-2xl">Order Summary</h2>
-            <div className="mt-6 space-y-3.5 text-sm">
+
+            {/* Delivery Method Selection */}
+            <div className="space-y-2 pt-2 border-t border-border/60">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold uppercase tracking-wider text-muted-foreground text-[10px]">
+                  Select Delivery
+                </span>
+                <span className="text-[10px] text-muted-foreground">Tracked UK Courier</span>
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                {shippingMethods.map((method) => {
+                  const isSelected = method.id === selectedShipping.id;
+                  return (
+                    <button
+                      key={method.id}
+                      type="button"
+                      onClick={() => handleSelectShipping(method)}
+                      className={`relative flex items-center justify-between p-3 text-left border transition-all text-xs cursor-pointer ${
+                        isSelected
+                          ? "border-rosewood bg-rosewood/5 text-foreground ring-1 ring-rosewood"
+                          : "border-border/70 hover:border-border text-muted-foreground hover:text-foreground bg-white/50"
+                      }`}
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-xs text-foreground">
+                          {method.name}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground mt-0.5">
+                          {method.timeframe}
+                        </span>
+                      </div>
+                      <span className="font-bold text-rosewood text-sm">
+                        {formatPrice(method.price)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-3 text-sm border-t border-border/60 pt-4">
               <div className="flex justify-between text-muted-foreground">
                 <span>Subtotal</span>
                 <span className="text-foreground font-medium">{formatPrice(subtotal)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
-                <span>Shipping</span>
+                <span>Delivery ({selectedShipping.name})</span>
                 <span className="text-foreground font-medium">
-                  {shipping ? formatPrice(shipping) : "Complimentary"}
+                  {formatPrice(shipping)}
                 </span>
               </div>
               <div className="flex justify-between border-t border-border pt-4 font-semibold text-base text-foreground">
@@ -82,15 +186,13 @@ export default function CartPage() {
                 <span>{formatPrice(subtotal + shipping)}</span>
               </div>
             </div>
+
             <Button
               asChild
-              className="mt-8 w-full rounded-none bg-ink text-white hover:bg-black py-6 text-[10px] font-semibold tracking-[0.14em]"
+              className="w-full rounded-none bg-ink text-white hover:bg-black py-6 text-[10px] font-semibold tracking-[0.14em]"
             >
               <Link href="/checkout">PROCEED TO CHECKOUT</Link>
             </Button>
-            <p className="mt-3.5 text-center text-[10px] text-muted-foreground">
-              Complimentary UK delivery on orders above £70.
-            </p>
           </aside>
         </div>
       )}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { X, ShoppingBag, Trash2, Plus, Minus, Sparkles, Truck, Check } from "lucide-react";
+import { X, ShoppingBag, Trash2, Plus, Minus, Check, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cartProducts, formatPrice, useCommerce } from "@/lib/commerce/context";
 import { QuantityControl } from "@/components/cart/QuantityControl";
@@ -52,33 +52,75 @@ const CURATED_ADDONS: AddOnProduct[] = [
   },
 ];
 
+interface ShippingOption {
+  id: string;
+  name: string;
+  price: number;
+  timeframe: string;
+  description?: string;
+  isDefault?: boolean;
+}
+
+const DEFAULT_SHIPPING_OPTIONS: ShippingOption[] = [
+  {
+    id: "normal",
+    name: "Normal Delivery",
+    price: 0.20,
+    timeframe: "3-5 days",
+    description: "Standard tracked courier delivery within 3-5 business days.",
+    isDefault: true,
+  },
+  {
+    id: "express",
+    name: "Express Delivery",
+    price: 0.30,
+    timeframe: "1-3 days",
+    description: "Priority expedited courier dispatch with 1-3 business days delivery.",
+    isDefault: false,
+  },
+];
+
 export function CartDrawer({ open, onClose }: CartDrawerProps) {
   const { cart, updateQuantity, removeFromCart, addToCart, subtotal, cartCount, isCartLoading } =
     useCommerce();
   const items = cartProducts(cart);
-  const FREE_SHIPPING_THRESHOLD = 70;
-  const isFreeShipping = subtotal >= FREE_SHIPPING_THRESHOLD;
-  const amountNeeded = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal);
-  const progressPercent = Math.min(100, Math.round((subtotal / FREE_SHIPPING_THRESHOLD) * 100));
-  const shipping = isFreeShipping || subtotal === 0 ? 0 : 4.95;
   const drawerRef = useRef<HTMLDivElement>(null);
 
+  const [shippingMethods, setShippingMethods] = useState<ShippingOption[]>(DEFAULT_SHIPPING_OPTIONS);
+  const [selectedMethodId, setSelectedMethodId] = useState<string>("normal");
   const [addingId, setAddingId] = useState<string | null>(null);
 
-  // Find the first curated add-on that is not already in the customer's cart
-  const activeAddOn = CURATED_ADDONS.find(
-    (addon) => !cart.some((item) => item.productId === addon.id),
-  );
+  useEffect(() => {
+    const saved = typeof window !== "undefined" ? localStorage.getItem("novixa_shipping_method_id") : null;
+    fetch("/api/shipping-methods")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.methods) && data.methods.length > 0) {
+          setShippingMethods(data.methods);
+          if (saved && data.methods.some((m: any) => m.id === saved)) {
+            setSelectedMethodId(saved);
+          } else {
+            const def = data.methods.find((m: any) => m.isDefault) || data.methods[0];
+            setSelectedMethodId(def.id);
+          }
+        }
+      })
+      .catch((err) => console.warn("Failed to load shipping methods:", err));
+  }, []);
 
-  const handleAddAddon = async (addon: AddOnProduct) => {
+  const selectedShipping =
+    shippingMethods.find((m) => m.id === selectedMethodId) ||
+    shippingMethods[0] ||
+    DEFAULT_SHIPPING_OPTIONS[0];
+
+  const shippingCharge = items.length > 0 ? selectedShipping.price : 0;
+
+  const handleSelectShipping = (method: ShippingOption) => {
+    setSelectedMethodId(method.id);
     try {
-      setAddingId(addon.id);
-      await addToCart(addon.id, 1);
-    } finally {
-      setTimeout(() => {
-        setAddingId(null);
-      }, 1000);
-    }
+      localStorage.setItem("novixa_shipping_method_id", method.id);
+      localStorage.setItem("novixa_shipping_method_name", method.name);
+    } catch {}
   };
 
   // Close on Escape
@@ -101,6 +143,22 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
       document.body.style.overflow = "";
     };
   }, [open]);
+
+  // Find the first curated add-on that is not already in the customer's cart
+  const activeAddOn = CURATED_ADDONS.find(
+    (addon) => !cart.some((item) => item.productId === addon.id),
+  );
+
+  const handleAddAddon = async (addon: AddOnProduct) => {
+    try {
+      setAddingId(addon.id);
+      await addToCart(addon.id, 1);
+    } finally {
+      setTimeout(() => {
+        setAddingId(null);
+      }, 1000);
+    }
+  };
 
   if (!open) return null;
 
@@ -142,61 +200,6 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
           >
             <X size={18} />
           </button>
-        </div>
-
-        {/* Visual Free Shipping Progress Meter */}
-        <div className="border-b border-border/80 bg-sand/30 dark:bg-card/80 px-5 py-3.5 transition-colors">
-          {subtotal === 0 ? (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Truck size={14} className="text-rosewood shrink-0" />
-              <span>
-                Complimentary Royal Mail delivery on orders over{" "}
-                <strong className="text-foreground">{formatPrice(FREE_SHIPPING_THRESHOLD)}</strong>
-              </span>
-            </div>
-          ) : isFreeShipping ? (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="flex items-center gap-1.5 font-medium text-rosewood dark:text-amber-400">
-                  <Sparkles size={14} className="text-amber-500 animate-pulse shrink-0" />
-                  <span className="font-semibold">✨ Complimentary UK Delivery Unlocked!</span>
-                </span>
-                <span className="text-[10px] uppercase font-bold tracking-wider text-rosewood dark:text-amber-400">
-                  100%
-                </span>
-              </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-border/60">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-rosewood via-amber-400 to-[#c9a982] transition-all duration-700 ease-out shadow-sm"
-                  style={{ width: "100%" }}
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-foreground/90 font-medium flex items-center gap-1.5 leading-tight">
-                  <Truck size={13} className="text-rosewood shrink-0" />
-                  <span>
-                    Add{" "}
-                    <strong className="font-semibold text-rosewood">
-                      {formatPrice(amountNeeded)}
-                    </strong>{" "}
-                    more for complimentary UK delivery
-                  </span>
-                </span>
-                <span className="text-[10px] font-semibold text-muted-foreground ml-2 shrink-0">
-                  {progressPercent}%
-                </span>
-              </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-border/60">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-rosewood via-[#c9a982] to-[#b3895b] transition-all duration-700 ease-out"
-                  style={{ width: `${Math.max(6, progressPercent)}%` }}
-                />
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Items */}
@@ -285,11 +288,9 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                       <Sparkles size={11} className="text-rosewood" />
                       Curated Pairing
                     </span>
-                    {!isFreeShipping && (
-                      <span className="text-[9px] font-medium tracking-wide bg-rosewood/10 text-rosewood px-2 py-0.5 rounded-none">
-                        Reaches Free Shipping
-                      </span>
-                    )}
+                    <span className="text-[9px] font-medium tracking-wide bg-rosewood/10 text-rosewood px-2 py-0.5 rounded-none">
+                      Recommended
+                    </span>
                   </div>
 
                   <div className="flex items-center gap-3">
@@ -346,26 +347,60 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
 
         {/* Footer */}
         {items.length > 0 && (
-          <div className="border-t border-border px-5 py-5 space-y-4">
-            <div className="space-y-2 text-sm">
+          <div className="border-t border-border px-5 py-4 space-y-4 bg-background">
+            {/* Delivery Method Options */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-semibold uppercase tracking-wider text-muted-foreground text-[10px]">
+                  Delivery Method
+                </span>
+                <span className="text-[10px] text-muted-foreground">Select courier speed</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {shippingMethods.map((method) => {
+                  const isSelected = method.id === selectedShipping.id;
+                  return (
+                    <button
+                      key={method.id}
+                      type="button"
+                      onClick={() => handleSelectShipping(method)}
+                      className={`relative flex flex-col justify-between p-2.5 text-left border transition-all text-xs cursor-pointer ${
+                        isSelected
+                          ? "border-rosewood bg-rosewood/5 text-foreground ring-1 ring-rosewood"
+                          : "border-border/70 hover:border-border text-muted-foreground hover:text-foreground bg-sand/20"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <span className="font-semibold text-[11px] text-foreground leading-tight">
+                          {method.name}
+                        </span>
+                        <span className="font-bold text-rosewood text-xs">
+                          {formatPrice(method.price)}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground mt-1">
+                        {method.timeframe}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-2 text-sm pt-1">
               <div className="flex justify-between text-muted-foreground">
                 <span>Subtotal</span>
                 <span className="font-medium text-foreground">{formatPrice(subtotal)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
-                <span>Shipping</span>
+                <span>Delivery ({selectedShipping.name})</span>
                 <span className="font-medium text-foreground">
-                  {shipping === 0 ? "Complimentary" : formatPrice(shipping)}
+                  {formatPrice(shippingCharge)}
                 </span>
               </div>
-              {shipping > 0 && (
-                <p className="text-[10px] text-muted-foreground">
-                  Add {formatPrice(FREE_SHIPPING_THRESHOLD - subtotal)} more for free delivery.
-                </p>
-              )}
               <div className="flex justify-between border-t border-border pt-2 font-semibold text-base text-foreground">
                 <span>Total</span>
-                <span>{formatPrice(subtotal + shipping)}</span>
+                <span>{formatPrice(subtotal + shippingCharge)}</span>
               </div>
             </div>
             <div className="flex flex-col gap-2">
