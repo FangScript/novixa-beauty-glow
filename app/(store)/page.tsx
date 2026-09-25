@@ -272,33 +272,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Scent Concierge Quiz Promo */}
-      <section className="page-shell pb-20">
-        <div className="relative overflow-hidden border border-border bg-sand/30 dark:bg-card p-8 md:p-14 flex flex-col md:flex-row items-center justify-between gap-8">
-          <div className="max-w-xl space-y-3 text-center md:text-left">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rosewood/10 text-rosewood dark:text-amber-400 text-[10px] font-bold uppercase tracking-[0.25em]">
-              <Sparkles size={12} className="text-amber-500" />
-              <span>Interactive Scent Concierge</span>
-            </div>
-            <h2 className="font-display text-3xl sm:text-4xl text-foreground">
-              Not Sure Which Fragrance Fits Your Aura?
-            </h2>
-            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              Take our 2-minute olfactive consultation. Answer 4 sensory questions to reveal your
-              personalized signature fragrance and complementary evening pairing.
-            </p>
-          </div>
-          <Button
-            asChild
-            className="shrink-0 rounded-none bg-ink text-white hover:bg-black px-8 py-6 text-[10px] font-semibold tracking-[0.16em] uppercase shadow-md"
-          >
-            <Link href="/scent-finder" className="flex items-center gap-2">
-              <span>Begin Scent Quiz</span>
-              <ArrowRight size={13} />
-            </Link>
-          </Button>
-        </div>
-      </section>
 
       {/* Customer Testimonial */}
       <section id="reviews" className="page-shell pb-20">

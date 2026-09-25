@@ -91,12 +91,6 @@ export function Navbar() {
             <Link href="/bundles" className="transition-colors hover:text-champagne">
               Bundles
             </Link>
-            <Link
-              href="/scent-finder"
-              className="transition-colors hover:text-champagne text-champagne/90 flex items-center gap-1 font-semibold"
-            >
-              <Sparkles size={11} className="text-champagne" /> Scent Finder
-            </Link>
           </nav>
           <div className="flex items-center gap-1">
             <form
@@ -237,13 +231,6 @@ export function Navbar() {
               className="py-2.5 uppercase tracking-wider text-xs hover:text-champagne"
             >
               Bundles
-            </Link>
-            <Link
-              href="/scent-finder"
-              onClick={() => setOpen(false)}
-              className="py-2.5 uppercase tracking-wider text-xs text-champagne hover:text-white flex items-center gap-1.5 font-semibold"
-            >
-              <Sparkles size={12} className="text-champagne" /> Scent Finder Quiz
             </Link>
             {user ? (
               <>

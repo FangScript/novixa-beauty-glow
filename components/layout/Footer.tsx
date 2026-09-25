@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
 
 export function Footer() {
   return (
@@ -30,12 +29,6 @@ export function Footer() {
             </Link>
             <Link href="/bundles" className="hover:text-white transition-colors">
               Curated Bundles
-            </Link>
-            <Link
-              href="/scent-finder"
-              className="hover:text-champagne transition-colors flex items-center gap-1.5 text-champagne font-medium"
-            >
-              <Sparkles size={11} className="text-champagne" /> Scent Finder Quiz
             </Link>
             <Link
               href="/admin/login"
