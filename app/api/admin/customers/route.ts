@@ -1,8 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
+import { getAuthenticatedAdmin } from "@/lib/auth/session";
 
 export async function GET() {
   try {
+    const admin = await getAuthenticatedAdmin();
+    if (!admin) {
+      return NextResponse.json(
+        { error: "Unauthorized. Administrator session required." },
+        { status: 401 },
+      );
+    }
+
     if (!process.env.DATABASE_URL) {
       return NextResponse.json({ customers: [] });
     }

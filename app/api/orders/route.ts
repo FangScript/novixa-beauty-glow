@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
 import { OrderStatus, PaymentStatus } from "@prisma/client";
 import { verifyPaymentServerSide, type PaymentMethod } from "@/lib/payments/processor";
+import { getAuthenticatedAdmin, getAuthenticatedCustomer } from "@/lib/auth/session";
+import { sendOrderConfirmationEmail } from "@/lib/email/service";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -9,35 +11,55 @@ export async function GET(request: Request) {
   const userId = searchParams.get("userId");
 
   try {
+    const admin = await getAuthenticatedAdmin();
+    const customer = await getAuthenticatedCustomer();
+
+    if (!admin && !customer) {
+      return NextResponse.json(
+        { error: "Authentication required to view order history." },
+        { status: 401 },
+      );
+    }
+
     if (process.env.DATABASE_URL) {
-      // Build the where clause based on available params
       let whereClause: any = {};
 
-      if (userId) {
-        // Find user by matching the userId (stored as cuid) or by email
-        const matchedUser = await prisma.user.findFirst({
-          where: {
-            OR: [{ id: userId }, ...(userId.includes("@") ? [{ email: userId }] : [])],
-          },
-          select: { id: true },
-        });
-
-        if (matchedUser) {
-          whereClause = { userId: matchedUser.id };
-        } else {
-          whereClause = { id: { equals: "__none__" } };
+      if (admin) {
+        // Admin has permission to view all orders or filter
+        if (userId) {
+          const matchedUser = await prisma.user.findFirst({
+            where: {
+              OR: [{ id: userId }, ...(userId.includes("@") ? [{ email: userId }] : [])],
+            },
+            select: { id: true },
+          });
+          whereClause = matchedUser ? { userId: matchedUser.id } : { id: { equals: "__none__" } };
+        } else if (email) {
+          whereClause = {
+            OR: [
+              {
+                shippingAddressSnapshot: {
+                  path: ["email"],
+                  string_contains: email,
+                },
+              },
+              {
+                user: { email: { equals: email, mode: "insensitive" } },
+              },
+            ],
+          };
         }
-      } else if (email) {
+      } else if (customer) {
+        // Customer strictly restricted to viewing only their own orders
         whereClause = {
           OR: [
+            { userId: customer.id },
+            { user: { email: customer.email } },
             {
               shippingAddressSnapshot: {
                 path: ["email"],
-                string_contains: email,
+                string_contains: customer.email,
               },
-            },
-            {
-              user: { email: { equals: email, mode: "insensitive" } },
             },
           ],
         };
@@ -66,6 +88,29 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const authAdmin = await getAuthenticatedAdmin();
+    const authCustomer = await getAuthenticatedCustomer();
+    const authenticatedUser =
+      authCustomer ||
+      (authAdmin
+        ? {
+            id: authAdmin.id,
+            email: authAdmin.email,
+            name: authAdmin.name,
+            role: authAdmin.role,
+          }
+        : null);
+
+    if (!authenticatedUser) {
+      return NextResponse.json(
+        {
+          error:
+            "Authentication required. You must sign in or create an account before placing an order.",
+        },
+        { status: 401 },
+      );
+    }
+
     const body = await request.json();
     const { items, customer, address, shippingMethodId } = body;
 
@@ -238,28 +283,8 @@ export async function POST(request: Request) {
       country: address.country ?? "GB",
     };
 
-    // Resolve the Prisma user ID from the provided userId (Supabase UID or email)
-    let resolvedPrismaUserId: string | null = null;
-    if (body.userId) {
-      const prismaUser = await prisma.user
-        .findFirst({
-          where: {
-            OR: [{ id: body.userId }, { email: customer.email.trim() }],
-          },
-          select: { id: true },
-        })
-        .catch(() => null);
-      resolvedPrismaUserId = prismaUser?.id ?? null;
-    } else {
-      // Try to link by email even without explicit userId
-      const prismaUser = await prisma.user
-        .findUnique({
-          where: { email: customer.email.trim() },
-          select: { id: true },
-        })
-        .catch(() => null);
-      resolvedPrismaUserId = prismaUser?.id ?? null;
-    }
+    // Authoritatively link the order to the authenticated user ID
+    const resolvedPrismaUserId: string = authenticatedUser.id;
 
     const paymentMethod = (body.paymentMethod || "COD").toUpperCase() as PaymentMethod;
     const paymentDetails = body.paymentDetails || {};
@@ -358,6 +383,21 @@ export async function POST(request: Request) {
       return newOrder;
     });
 
+    // Send confirmation email asynchronously
+    sendOrderConfirmationEmail({
+      orderNumber: createdOrder.orderNumber,
+      customerName: customer.name,
+      customerEmail: customer.email,
+      items: createdOrder.items,
+      subtotal: createdOrder.subtotal,
+      discount: createdOrder.discount,
+      shipping: createdOrder.shipping,
+      total: createdOrder.total,
+      shippingAddress: fullShippingSnapshot,
+      paymentMethod: verification.method,
+      deliveryMethodName: resolvedShippingMethodName,
+    }).catch((err) => console.warn("Order confirmation email failed:", err));
+
     const paymentRecord = (createdOrder as any).payment;
 
     return NextResponse.json({
@@ -379,6 +419,14 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    const admin = await getAuthenticatedAdmin();
+    if (!admin) {
+      return NextResponse.json(
+        { error: "Unauthorized. Administrator session required." },
+        { status: 401 },
+      );
+    }
+
     const body = await request.json();
     const { id, status, trackingNumber, paymentStatus } = body;
 

@@ -18,8 +18,12 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── Customer guard ────────────────────────────────────────────────────────
-  if (pathname.startsWith("/account")) {
+  // ── Customer guard (Account & Checkout) ───────────────────────────────────
+  if (
+    pathname.startsWith("/account") ||
+    pathname === "/checkout" ||
+    pathname.startsWith("/checkout/")
+  ) {
     const legacySession = request.cookies.get("novixa_customer_session")?.value;
     if (!user && !legacySession) {
       const loginUrl = new URL("/login", request.url);

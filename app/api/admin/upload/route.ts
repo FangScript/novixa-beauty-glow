@@ -3,6 +3,7 @@ import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 import { createClient } from "@supabase/supabase-js";
+import { getAuthenticatedAdmin } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -62,6 +63,14 @@ function getSupabaseClient() {
 
 export async function POST(request: Request) {
   try {
+    const admin = await getAuthenticatedAdmin();
+    if (!admin) {
+      return NextResponse.json(
+        { error: "Unauthorized. Administrator session required." },
+        { status: 401 },
+      );
+    }
+
     const formData = await request.formData();
     // Support "file", "files", or "image" field names
     let files = formData.getAll("file") as File[];

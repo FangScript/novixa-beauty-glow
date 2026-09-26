@@ -1,9 +1,19 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
 import { createPayPalOrder } from "@/lib/payments/paypal";
+import { getAuthenticatedAdmin, getAuthenticatedCustomer } from "@/lib/auth/session";
 
 export async function POST(request: Request) {
   try {
+    const authAdmin = await getAuthenticatedAdmin();
+    const authCustomer = await getAuthenticatedCustomer();
+    if (!authAdmin && !authCustomer) {
+      return NextResponse.json(
+        { error: "Authentication required. You must sign in before initiating payment." },
+        { status: 401 },
+      );
+    }
+
     const body = await request.json();
     const { items, couponCode, shippingMethodId } = body;
 

@@ -1,46 +1,17 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createServerClient } from "@supabase/ssr";
 import { prisma } from "@/lib/db/client";
-
-async function getAuthUser() {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-      },
-    },
-  );
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user;
-}
+import { getAuthenticatedCustomer } from "@/lib/auth/session";
 
 // GET /api/addresses — fetch all addresses for the authenticated user
 export async function GET() {
   try {
-    const supabaseUser = await getAuthUser();
-    if (!supabaseUser) {
+    const customer = await getAuthenticatedCustomer();
+    if (!customer) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Find the Prisma user by email (Supabase ID is stored separately)
-    const prismaUser = await prisma.user.findUnique({
-      where: { email: supabaseUser.email! },
-    });
-
-    if (!prismaUser) {
-      return NextResponse.json({ addresses: [] });
-    }
-
     const addresses = await prisma.address.findMany({
-      where: { userId: prismaUser.id },
+      where: { userId: customer.id },
       orderBy: [{ isDefault: "desc" }, { id: "asc" }],
     });
 
@@ -54,20 +25,9 @@ export async function GET() {
 // POST /api/addresses — create a new address
 export async function POST(request: Request) {
   try {
-    const supabaseUser = await getAuthUser();
-    if (!supabaseUser) {
+    const customer = await getAuthenticatedCustomer();
+    if (!customer) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const prismaUser = await prisma.user.findUnique({
-      where: { email: supabaseUser.email! },
-    });
-
-    if (!prismaUser) {
-      return NextResponse.json(
-        { error: "User profile not found. Please sign out and back in." },
-        { status: 404 },
-      );
     }
 
     const body = await request.json();
@@ -76,7 +36,7 @@ export async function POST(request: Request) {
 
     if (!fullName || !line1 || !city || !state || !postalCode) {
       return NextResponse.json(
-        { error: "Full name, address, city, state, and PIN code are required." },
+        { error: "Full name, address, city, state, and postal code are required." },
         { status: 400 },
       );
     }
@@ -84,14 +44,14 @@ export async function POST(request: Request) {
     // If this is being set as default, clear existing defaults first
     if (isDefault) {
       await prisma.address.updateMany({
-        where: { userId: prismaUser.id, isDefault: true },
+        where: { userId: customer.id, isDefault: true },
         data: { isDefault: false },
       });
     }
 
     const address = await prisma.address.create({
       data: {
-        userId: prismaUser.id,
+        userId: customer.id,
         label: label || null,
         fullName: fullName.trim(),
         line1: line1.trim(),
@@ -99,7 +59,7 @@ export async function POST(request: Request) {
         city: city.trim(),
         state: state.trim(),
         postalCode: postalCode.trim(),
-        country: country || "IN",
+        country: country || "GB",
         phone: phone?.trim() || null,
         isDefault: Boolean(isDefault),
       },
@@ -115,17 +75,9 @@ export async function POST(request: Request) {
 // PUT /api/addresses — update an existing address
 export async function PUT(request: Request) {
   try {
-    const supabaseUser = await getAuthUser();
-    if (!supabaseUser) {
+    const customer = await getAuthenticatedCustomer();
+    if (!customer) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const prismaUser = await prisma.user.findUnique({
-      where: { email: supabaseUser.email! },
-    });
-
-    if (!prismaUser) {
-      return NextResponse.json({ error: "User profile not found." }, { status: 404 });
     }
 
     const body = await request.json();
@@ -149,7 +101,7 @@ export async function PUT(request: Request) {
 
     // Ensure this address belongs to the current user
     const existing = await prisma.address.findFirst({
-      where: { id, userId: prismaUser.id },
+      where: { id, userId: customer.id },
     });
 
     if (!existing) {
@@ -159,7 +111,7 @@ export async function PUT(request: Request) {
     // If setting as default, clear other defaults first
     if (isDefault) {
       await prisma.address.updateMany({
-        where: { userId: prismaUser.id, isDefault: true, NOT: { id } },
+        where: { userId: customer.id, isDefault: true, NOT: { id } },
         data: { isDefault: false },
       });
     }
@@ -174,7 +126,7 @@ export async function PUT(request: Request) {
         city: city?.trim(),
         state: state?.trim(),
         postalCode: postalCode?.trim(),
-        country: country || "IN",
+        country: country || "GB",
         phone: phone?.trim() || null,
         isDefault: Boolean(isDefault),
       },
@@ -190,17 +142,9 @@ export async function PUT(request: Request) {
 // DELETE /api/addresses — delete an address by id (?id=...)
 export async function DELETE(request: Request) {
   try {
-    const supabaseUser = await getAuthUser();
-    if (!supabaseUser) {
+    const customer = await getAuthenticatedCustomer();
+    if (!customer) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const prismaUser = await prisma.user.findUnique({
-      where: { email: supabaseUser.email! },
-    });
-
-    if (!prismaUser) {
-      return NextResponse.json({ error: "User profile not found." }, { status: 404 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -212,7 +156,7 @@ export async function DELETE(request: Request) {
 
     // Ensure ownership
     const existing = await prisma.address.findFirst({
-      where: { id, userId: prismaUser.id },
+      where: { id, userId: customer.id },
     });
 
     if (!existing) {

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { Trash2, Search, Check, Plus, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AdminDialog,
@@ -22,6 +22,15 @@ type Bundle = {
   originalValue: number;
   status: string;
   description?: string;
+};
+
+type AvailableProduct = {
+  id: string;
+  name: string;
+  price: number;
+  salePrice?: number;
+  category: string;
+  images: string[];
 };
 
 const initialBundles: Bundle[] = [
@@ -61,6 +70,9 @@ const initialBundles: Bundle[] = [
 
 export default function AdminBundlesPage() {
   const [bundles, setBundles] = useState<Bundle[]>(initialBundles);
+  const [availableProducts, setAvailableProducts] = useState<AvailableProduct[]>([]);
+  const [productQuery, setProductQuery] = useState("");
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [form, setForm] = useState({
@@ -71,6 +83,7 @@ export default function AdminBundlesPage() {
   });
 
   useEffect(() => {
+    // 1. Fetch live bundles
     fetch("/api/bundles")
       .then((res) => res.json())
       .then((data) => {
@@ -79,7 +92,44 @@ export default function AdminBundlesPage() {
         }
       })
       .catch((err) => console.warn("Could not load bundles from API:", err));
+
+    // 2. Fetch available products to attach to bundles
+    fetch("/api/products")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.products && Array.isArray(data.products)) {
+          setAvailableProducts(data.products);
+        }
+      })
+      .catch((err) => console.warn("Could not load products for bundles:", err));
   }, []);
+
+  const filteredProducts = useMemo(() => {
+    if (!productQuery.trim()) return availableProducts;
+    const q = productQuery.toLowerCase();
+    return availableProducts.filter((p) => p.name.toLowerCase().includes(q));
+  }, [availableProducts, productQuery]);
+
+  const toggleProduct = (productId: string) => {
+    setSelectedProductIds((prev) => {
+      const next = prev.includes(productId)
+        ? prev.filter((id) => id !== productId)
+        : [...prev, productId];
+
+      // Automatically recalculate suggested original value
+      const sum = next.reduce((acc, id) => {
+        const prod = availableProducts.find((p) => p.id === id);
+        return acc + (prod ? prod.salePrice ?? prod.price : 0);
+      }, 0);
+
+      setForm((curr) => ({
+        ...curr,
+        originalValue: sum > 0 ? String(Math.round(sum)) : curr.originalValue,
+      }));
+
+      return next;
+    });
+  };
 
   const handleCreate = async () => {
     if (!form.name.trim() || !form.price || !form.originalValue) {
@@ -101,7 +151,7 @@ export default function AdminBundlesPage() {
           description: form.description.trim(),
           price: numPrice,
           originalValue: numOrig,
-          items: [],
+          items: selectedProductIds.map((id) => ({ productId: id, quantity: 1 })),
         }),
       });
 
@@ -111,7 +161,7 @@ export default function AdminBundlesPage() {
           {
             id: data.bundle.id,
             name: data.bundle.name,
-            products: data.bundle.items?.length ?? 0,
+            products: data.bundle.items?.length ?? selectedProductIds.length,
             price: data.bundle.price,
             originalValue: data.bundle.originalValue,
             status: data.bundle.status,
@@ -119,14 +169,14 @@ export default function AdminBundlesPage() {
           },
           ...curr,
         ]);
-        toast.success(`Bundle "${bundleName}" created and saved successfully.`);
+        toast.success(`Bundle "${bundleName}" created with ${selectedProductIds.length} items.`);
       } else {
         // Fallback local update
         setBundles((curr) => [
           {
             id: `b-${Date.now()}`,
             name: bundleName,
-            products: 0,
+            products: selectedProductIds.length,
             price: numPrice,
             originalValue: numOrig,
             status: "ACTIVE",
@@ -142,6 +192,7 @@ export default function AdminBundlesPage() {
     } finally {
       setIsSaving(false);
       setForm({ name: "", description: "", price: "", originalValue: "" });
+      setSelectedProductIds([]);
       setOpen(false);
     }
   };
@@ -168,7 +219,10 @@ export default function AdminBundlesPage() {
       <div className="flex justify-between items-center border-y border-[#d9cec5] py-4">
         <span className="text-xs text-[#776a61]">{bundles.length} bundles configured</span>
         <Button
-          onClick={() => setOpen(true)}
+          onClick={() => {
+            setSelectedProductIds([]);
+            setOpen(true);
+          }}
           className="rounded-none bg-[#211b18] text-white hover:bg-black text-[10px] uppercase tracking-[0.14em]"
         >
           + Create Bundle
@@ -231,7 +285,7 @@ export default function AdminBundlesPage() {
           description="Group complimentary catalogue items into a high-value promotional set."
           onClose={() => setOpen(false)}
         >
-          <div className="space-y-4">
+          <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
             <AdminField label="Bundle Name">
               <input
                 className="h-10 w-full border border-[#d9cec5] bg-white/60 px-3 text-sm outline-none focus:border-[#8f5d48]"
@@ -243,12 +297,79 @@ export default function AdminBundlesPage() {
             </AdminField>
             <AdminField label="Description">
               <textarea
-                className="h-20 w-full border border-[#d9cec5] bg-white/60 p-3 text-sm outline-none focus:border-[#8f5d48]"
+                className="h-16 w-full border border-[#d9cec5] bg-white/60 p-3 text-sm outline-none focus:border-[#8f5d48]"
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 placeholder="Briefly describe the curated bundle..."
               />
             </AdminField>
+
+            {/* Product Selector */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-[10px] uppercase tracking-[0.14em] text-[#776a61]">
+                  Select Products ({selectedProductIds.length} included)
+                </label>
+                {selectedProductIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProductIds([])}
+                    className="text-[10px] text-[#8f5d48] hover:underline"
+                  >
+                    Clear selection
+                  </button>
+                )}
+              </div>
+              <div className="relative mb-2">
+                <Search size={13} className="absolute left-2.5 top-3 text-[#776a61]" />
+                <input
+                  type="text"
+                  placeholder="Filter products to add..."
+                  value={productQuery}
+                  onChange={(e) => setProductQuery(e.target.value)}
+                  className="h-9 w-full border border-[#d9cec5] bg-white/80 pl-8 pr-3 text-xs outline-none focus:border-[#8f5d48]"
+                />
+              </div>
+
+              <div className="max-h-40 overflow-y-auto border border-[#d9cec5] bg-white/40 divide-y divide-[#eee]">
+                {filteredProducts.length === 0 ? (
+                  <p className="p-3 text-center text-xs text-[#776a61]">No matching products found.</p>
+                ) : (
+                  filteredProducts.map((p) => {
+                    const isSelected = selectedProductIds.includes(p.id);
+                    return (
+                      <div
+                        key={p.id}
+                        onClick={() => toggleProduct(p.id)}
+                        className={`flex items-center justify-between p-2.5 text-xs cursor-pointer transition-colors ${
+                          isSelected ? "bg-[#8f5d48]/10" : "hover:bg-black/[0.02]"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={`flex h-4 w-4 items-center justify-center border ${
+                              isSelected
+                                ? "border-[#8f5d48] bg-[#8f5d48] text-white"
+                                : "border-[#ccc]"
+                            }`}
+                          >
+                            {isSelected && <Check size={11} />}
+                          </div>
+                          <div>
+                            <p className="font-medium text-[#211b18]">{p.name}</p>
+                            <p className="text-[10px] text-[#776a61] capitalize">{p.category}</p>
+                          </div>
+                        </div>
+                        <span className="font-medium text-[#211b18]">
+                          £{(p.salePrice ?? p.price).toFixed(2)}
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <AdminField label="Bundle Price (£)">
                 <input
@@ -273,6 +394,7 @@ export default function AdminBundlesPage() {
                 />
               </AdminField>
             </div>
+
             <div className="flex justify-end gap-3 pt-3 border-t border-[#d9cec5]">
               <Button variant="outline" onClick={() => setOpen(false)} disabled={isSaving}>
                 Cancel

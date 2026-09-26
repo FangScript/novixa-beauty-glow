@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
+import { sendSupportInquiryEmail } from "@/lib/email/service";
 
 export async function POST(request: Request) {
   try {
@@ -20,35 +21,67 @@ export async function POST(request: Request) {
       );
     }
 
+    let createdInquiryId: string | undefined = undefined;
+
     // Record inquiry in DB if available
     if (process.env.DATABASE_URL) {
-      // Find or link user
-      const existingUser = await prisma.user
-        .findUnique({
-          where: { email: email.trim().toLowerCase() },
+      const cleanEmail = email.trim().toLowerCase();
+      // Ensure customer record exists so the inquiry is never dropped
+      const customer = await prisma.user
+        .upsert({
+          where: { email: cleanEmail },
+          update: {
+            ...(phone ? { phone: phone.trim() } : {}),
+          },
+          create: {
+            email: cleanEmail,
+            name: name.trim(),
+            phone: phone ? phone.trim() : null,
+            role: "CUSTOMER",
+          },
         })
         .catch(() => null);
 
-      if (existingUser) {
-        await prisma.adminAuditLog
+      if (customer) {
+        const auditLog = await prisma.adminAuditLog
           .create({
             data: {
-              userId: existingUser.id,
+              userId: customer.id,
               action: "CUSTOMER_INQUIRY",
               resource: "CONCIERGE",
               resourceId: orderNumber ? orderNumber.trim() : null,
               metadata: {
                 name: name.trim(),
-                email: email.trim(),
+                email: cleanEmail,
                 phone: phone ? phone.trim() : null,
                 subject: subject || "General Inquiry",
                 message: message.trim(),
+                status: "PENDING",
+                submittedAt: new Date().toISOString(),
               },
             },
           })
-          .catch(() => null);
+          .catch((err) => {
+            console.warn("Failed to create audit log for inquiry:", err);
+            return null;
+          });
+
+        if (auditLog) {
+          createdInquiryId = auditLog.id;
+        }
       }
     }
+
+    // Dispatch emails asynchronously
+    sendSupportInquiryEmail({
+      name: name.trim(),
+      email: email.trim(),
+      phone: phone ? phone.trim() : null,
+      subject: subject || "General Inquiry",
+      orderNumber: orderNumber ? orderNumber.trim() : null,
+      message: message.trim(),
+      inquiryId: createdInquiryId,
+    }).catch((err) => console.warn("Background support email failed:", err));
 
     return NextResponse.json({
       success: true,

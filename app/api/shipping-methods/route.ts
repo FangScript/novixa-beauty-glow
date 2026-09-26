@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
+import { getAuthenticatedAdmin } from "@/lib/auth/session";
 
 export const DEFAULT_SHIPPING_METHODS = [
   {
@@ -71,6 +72,14 @@ export async function GET(request: Request) {
 // POST: Create a new shipping method
 export async function POST(request: Request) {
   try {
+    const admin = await getAuthenticatedAdmin();
+    if (!admin) {
+      return NextResponse.json(
+        { error: "Unauthorized. Administrator session required." },
+        { status: 401 },
+      );
+    }
+
     const body = await request.json();
     const { name, timeframe, price, description, active = true, isDefault = false, displayOrder = 0 } = body;
 
@@ -136,6 +145,14 @@ export async function POST(request: Request) {
 // PUT: Update an existing shipping method
 export async function PUT(request: Request) {
   try {
+    const admin = await getAuthenticatedAdmin();
+    if (!admin) {
+      return NextResponse.json(
+        { error: "Unauthorized. Administrator session required." },
+        { status: 401 },
+      );
+    }
+
     const body = await request.json();
     const { id, name, timeframe, price, description, active, isDefault, displayOrder } = body;
 
@@ -196,6 +213,14 @@ export async function PUT(request: Request) {
 // DELETE: Remove or soft-delete a shipping method
 export async function DELETE(request: Request) {
   try {
+    const admin = await getAuthenticatedAdmin();
+    if (!admin) {
+      return NextResponse.json(
+        { error: "Unauthorized. Administrator session required." },
+        { status: 401 },
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     let id = searchParams.get("id");
 

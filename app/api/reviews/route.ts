@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
+import { getAuthenticatedAdmin } from "@/lib/auth/session";
 
 const defaultReviews = [
   {
@@ -270,6 +271,14 @@ export async function POST(request: Request) {
 // ─── PUT /api/reviews ─────────────────────────────────────────────────────────
 export async function PUT(request: Request) {
   try {
+    const admin = await getAuthenticatedAdmin();
+    if (!admin) {
+      return NextResponse.json(
+        { error: "Unauthorized. Administrator session required." },
+        { status: 401 },
+      );
+    }
+
     const body = await request.json();
     const { id, status } = body;
 

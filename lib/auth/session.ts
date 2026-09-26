@@ -246,18 +246,54 @@ export async function getAuthenticatedCustomer() {
       if (session) {
         await prisma.session.delete({ where: { id: session.id } }).catch(() => undefined);
       }
-      return null;
+    } else {
+      return {
+        id: session.user.id,
+        email: session.user.email,
+        name: session.user.name,
+        role: session.user.role,
+      };
     }
-
-    return {
-      id: session.user.id,
-      email: session.user.email,
-      name: session.user.name,
-      role: session.user.role,
-    };
   } catch {
-    return null;
+    // continue to Supabase fallback
   }
+
+  // Fallback: check Supabase auth
+  try {
+    const { createClient } = await import("@/utils/supabase/server");
+    const supabase = createClient(cookieStore);
+    const {
+      data: { user: sbUser },
+    } = await supabase.auth.getUser();
+
+    if (sbUser?.email) {
+      const cleanEmail = sbUser.email.toLowerCase().trim();
+      const dbUser = await prisma.user.upsert({
+        where: { email: cleanEmail },
+        update: { lastLoginAt: new Date() },
+        create: {
+          id: sbUser.id,
+          email: cleanEmail,
+          name:
+            sbUser.user_metadata?.full_name ||
+            sbUser.user_metadata?.name ||
+            cleanEmail.split("@")[0] ||
+            "Customer",
+          role: "CUSTOMER",
+          lastLoginAt: new Date(),
+        },
+      });
+
+      return {
+        id: dbUser.id,
+        email: dbUser.email,
+        name: dbUser.name,
+        role: dbUser.role,
+      };
+    }
+  } catch {}
+
+  return null;
 }
 
 export async function logoutCustomer() {
