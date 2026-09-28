@@ -14,4 +14,4 @@ deployment:
     - /usr/local/bin/node node_modules/.bin/prisma migrate deploy
 
     # 5. Restart the Node.js Passenger app
-    - touch /home/novixaretail/novixa/tmp/restart.txt
+    - touch /home/noviqzwh/novixa/tmp/restart.txt
