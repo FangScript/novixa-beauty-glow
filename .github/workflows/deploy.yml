@@ -7,21 +7,21 @@ on:
 
 jobs:
   deploy:
-    name: Pull latest code on cPanel
+    name: Deploy to novixaretail.com
     runs-on: ubuntu-latest
 
     steps:
-      - name: Trigger cPanel Git Pull via SSH
+      - name: Deploy via SSH to cPanel
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.CPANEL_HOST }}
           username: ${{ secrets.CPANEL_USERNAME }}
-          password: ${{ secrets.CPANEL_PASSWORD }}
+          key: ${{ secrets.CPANEL_SSH_KEY }}
           port: ${{ secrets.CPANEL_SSH_PORT }}
           script: |
             set -e
             echo "=== Pulling latest code from GitHub ==="
-            cd ~/novixa
+            cd /home/noviqzwh/novixa
             git pull origin main
 
             echo "=== Installing dependencies ==="
@@ -40,4 +40,5 @@ jobs:
             mkdir -p tmp
             touch tmp/restart.txt
 
-            echo "=== Deploy complete! ==="
+            echo "✅ Deploy complete — novixaretail.com is live!"
+
