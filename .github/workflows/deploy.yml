@@ -1,0 +1,43 @@
+name: Deploy to cPanel
+
+on:
+  push:
+    branches:
+      - main   # Triggers on every push to main
+
+jobs:
+  deploy:
+    name: Pull latest code on cPanel
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger cPanel Git Pull via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.CPANEL_HOST }}
+          username: ${{ secrets.CPANEL_USERNAME }}
+          password: ${{ secrets.CPANEL_PASSWORD }}
+          port: ${{ secrets.CPANEL_SSH_PORT }}
+          script: |
+            set -e
+            echo "=== Pulling latest code from GitHub ==="
+            cd ~/novixa
+            git pull origin main
+
+            echo "=== Installing dependencies ==="
+            npm install --omit=dev --legacy-peer-deps
+
+            echo "=== Generating Prisma client ==="
+            npm run db:generate
+
+            echo "=== Building Next.js ==="
+            npm run build
+
+            echo "=== Running database migrations ==="
+            node_modules/.bin/prisma migrate deploy
+
+            echo "=== Restarting Passenger app ==="
+            mkdir -p tmp
+            touch tmp/restart.txt
+
+            echo "=== Deploy complete! ==="
