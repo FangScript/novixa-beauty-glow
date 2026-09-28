@@ -20,6 +20,10 @@ jobs:
           port: ${{ secrets.CPANEL_SSH_PORT }}
           script: |
             set -e
+            # Load Node.js 22 (CloudLinux alt-nodejs)
+            export PATH=/opt/alt/alt-nodejs22/root/usr/bin:$PATH
+
+            echo "=== Node version: $(node --version) ==="
             echo "=== Pulling latest code from GitHub ==="
             cd /home/noviqzwh/novixa
             git pull origin main
