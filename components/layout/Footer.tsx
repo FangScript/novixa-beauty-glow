@@ -52,21 +52,36 @@ export function Footer() {
             <Link href="/contact" className="hover:text-white transition-colors">
               Concierge & Consultations
             </Link>
-            <Link href="/account/orders" className="hover:text-white transition-colors">
-              Track Order Status
+            <Link href="/privacy" className="hover:text-white transition-colors">
+              Privacy & Data Policy (UK GDPR)
+            </Link>
+            <Link href="/terms" className="hover:text-white transition-colors">
+              Terms & Conditions
             </Link>
           </div>
           <p className="mt-4 text-[11px] text-primary-foreground/60">
             Concierge:{" "}
-            <a href="mailto:concierge@novixa.co.uk" className="text-champagne hover:underline">
-              concierge@novixa.co.uk
+            <a href="mailto:novixaretail@gmail.com" className="text-champagne hover:underline">
+              novixaretail@gmail.com
             </a>
           </p>
         </div>
       </div>
       <div className="page-shell mt-12 border-t border-primary-foreground/10 pt-6 text-[10px] uppercase tracking-wider text-primary-foreground/45 flex flex-col sm:flex-row justify-between items-center gap-3">
-        <p>© 2026 NOVIXA. All rights reserved.</p>
-        <p>Luxury Perfumes & Beauty Essentials</p>
+        <p>© 2026 NOVIXA Retail Ltd. Registered in the United Kingdom.</p>
+        <div className="flex items-center gap-4 lowercase tracking-normal text-xs text-primary-foreground/50">
+          <Link href="/privacy" className="hover:text-champagne transition-colors">
+            privacy
+          </Link>
+          <span>·</span>
+          <Link href="/terms" className="hover:text-champagne transition-colors">
+            terms
+          </Link>
+          <span>·</span>
+          <Link href="/shipping" className="hover:text-champagne transition-colors">
+            shipping
+          </Link>
+        </div>
       </div>
     </footer>
   );
