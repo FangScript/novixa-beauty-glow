@@ -59,7 +59,7 @@ services:
       - .env.production
     environment:
       - NODE_ENV=production
-    command: ["npx", "prisma", "migrate", "deploy"]
+    command: ["npx", "prisma@6.19.0", "migrate", "deploy"]
     depends_on:
       db:
         condition: service_healthy
