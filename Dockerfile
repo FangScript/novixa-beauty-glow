@@ -28,7 +28,7 @@ COPY . .
 
 # Build arguments for env vars needed at build time
 # These are baked into the static pages / client bundle
-ARG NEXT_PUBLIC_PAYPAL_CLIENT_ID=""
+ARG NEXT_PUBLIC_PAYPAL_CLIENT_ID="BAAi8QOljyA26-sCFX-3M0WIYmJk_qm16xSH4wVblfWVIv_-NFY7GvGAIw9f6D5-A8CtcHPlUOhDpXXxGs"
 ARG NEXT_PUBLIC_SUPABASE_URL="https://placeholder-novixa.supabase.co"
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.placeholder"
 ARG NODE_ENV=production

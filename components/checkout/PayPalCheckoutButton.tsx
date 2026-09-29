@@ -37,7 +37,7 @@ export function PayPalCheckoutButton({
 
   const clientId =
     process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID ||
-    "AbwQhpax7GQDFjlF1xNlZVYQCPY10_5YW-EFo09_35nZiOMQkviu2Dr-xsM5GT_gDGRECdSCutJMw_4x";
+    "BAAi8QOljyA26-sCFX-3M0WIYmJk_qm16xSH4wVblfWVIv_-NFY7GvGAIw9f6D5-A8CtcHPlUOhDpXXxGs";
 
   const handleCreateOrder = async (): Promise<string> => {
     if (!validateBeforePayment()) {
