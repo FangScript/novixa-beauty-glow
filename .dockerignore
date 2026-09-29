@@ -1,0 +1,54 @@
+# ── Dependencies ──
+node_modules
+.pnp
+.pnp.js
+
+# ── Build outputs ──
+.next
+.output
+.vinxi
+.tanstack
+.nitro
+dist
+dist-ssr
+dist-cpanel
+
+# ── Version control ──
+.git
+.gitignore
+
+# ── Environment / secrets ──
+.env
+.env.*
+!.env.example
+
+# ── IDE / editor ──
+.vscode
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ── CI/CD ──
+.github
+Jenkinsfile
+docker-compose*.yml
+
+# ── Platform / deploy ──
+.vercel
+.vercelignore
+.wrangler
+.cpanel.yml
+*.zip
+
+# ── Misc ──
+.DS_Store
+*.log
+logs
+README.md
+NOVIXA-IMPLEMENTATION-PLAN.md
+AGENTS.md
+.lovable
+.agents

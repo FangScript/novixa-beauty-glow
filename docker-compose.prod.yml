@@ -1,0 +1,78 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Novixa Beauty Glow — Docker Compose (Production)
+# Usage: docker compose -f docker-compose.prod.yml up -d
+# ──────────────────────────────────────────────────────────────────────────────
+
+services:
+  # ── Next.js Application ───────────────────────────────────────────────────
+  app:
+    image: novixa-beauty-glow:${IMAGE_TAG:-latest}
+    container_name: novixa-app
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:8080"
+    env_file:
+      - .env.production
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      - HOSTNAME=0.0.0.0
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - novixa-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ── PostgreSQL Database ───────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: novixa-db
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-novixa}
+      POSTGRES_USER: ${POSTGRES_USER:-novixa_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - novixa-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-novixa_user} -d ${POSTGRES_DB:-novixa}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ── Prisma Migrations (run once, then exit) ───────────────────────────────
+  migrate:
+    image: novixa-beauty-glow:${IMAGE_TAG:-latest}
+    container_name: novixa-migrate
+    env_file:
+      - .env.production
+    environment:
+      - NODE_ENV=production
+    command: ["npx", "prisma", "migrate", "deploy"]
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - novixa-network
+    restart: "no"
+    profiles:
+      - migration
+
+volumes:
+  postgres-data:
+    driver: local
+
+networks:
+  novixa-network:
+    driver: bridge
