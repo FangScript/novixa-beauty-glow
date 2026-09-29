@@ -108,6 +108,9 @@ export const metadata: Metadata = {
     ICBM: "51.5074, -0.1278",
     "content-language": "en-GB",
   },
+  verification: {
+    google: "googlee0fc743357390d7b",
+  },
 };
 
 // Global Schema.org JSON-LD structured data for Google UK Knowledge Graph
