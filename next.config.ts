@@ -18,11 +18,15 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // Limit to 1 CPU worker — prevents Rust/rayon thread crash on shared hosting
-  experimental: {
-    cpus: 1,
-  },
   poweredByHeader: false,
+  async rewrites() {
+    return [
+      {
+        source: "/.well-known/apple-developer-merchantid-domain-association",
+        destination: "/api/apple-developer-merchantid-domain-association",
+      },
+    ];
+  },
 };
 
 export default nextConfig;
