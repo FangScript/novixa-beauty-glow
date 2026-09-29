@@ -170,32 +170,7 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
     async (email: string, password: string) => {
       const cleanEmail = email.trim().toLowerCase();
       try {
-        // 1. Authenticate with direct backend database session
-        const res = await fetch("/api/auth/customer/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: cleanEmail, password }),
-        });
-
-        const data = await res.json().catch(() => ({ ok: false }));
-
-        if (res.ok && data.ok && data.user) {
-          const formatted: Customer = {
-            id: data.user.id,
-            name: data.user.name || cleanEmail.split("@")[0] || "Member",
-            email: data.user.email,
-            role: data.user.role || "CUSTOMER",
-          };
-          setUser(formatted);
-          if (typeof window !== "undefined") {
-            localStorage.setItem("novixa_customer_email", data.user.email);
-          }
-          // Optionally sync with Supabase in background
-          supabase.auth.signInWithPassword({ email: cleanEmail, password }).catch(() => {});
-          return { ok: true };
-        }
-
-        // 2. Fallback to Supabase Auth if database auth didn't match (e.g. Supabase-created user)
+        // 1. Supabase Auth (primary)
         const { data: sbData, error: sbError } = await supabase.auth.signInWithPassword({
           email: cleanEmail,
           password,
@@ -220,9 +195,32 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
           return { ok: true };
         }
 
+        // 2. Database fallback
+        const res = await fetch("/api/auth/customer/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: cleanEmail, password }),
+        });
+
+        const data = await res.json().catch(() => ({ ok: false }));
+
+        if (res.ok && data.ok && data.user) {
+          const formatted: Customer = {
+            id: data.user.id,
+            name: data.user.name || cleanEmail.split("@")[0] || "Member",
+            email: data.user.email,
+            role: data.user.role || "CUSTOMER",
+          };
+          setUser(formatted);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("novixa_customer_email", data.user.email);
+          }
+          return { ok: true };
+        }
+
         return {
           ok: false,
-          error: data.error || sbError?.message || "Invalid email or password.",
+          error: sbError?.message || data.error || "Invalid email or password.",
         };
       } catch (err: any) {
         return { ok: false, error: err.message || "An unexpected error occurred." };
@@ -236,7 +234,29 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
       const cleanEmail = email.trim().toLowerCase();
       const cleanName = name.trim();
       try {
-        // 1. Direct database registration
+        // 1. Supabase Auth signup (primary)
+        const { data: sbData, error: sbError } = await supabase.auth.signUp({
+          email: cleanEmail,
+          password,
+          options: { data: { full_name: cleanName, role: "CUSTOMER" } },
+        });
+
+        if (!sbError && sbData?.user?.email) {
+          const formatted: Customer = {
+            id: sbData.user.id,
+            name: cleanName,
+            email: sbData.user.email,
+            role: "CUSTOMER",
+          };
+          setUser(formatted);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("novixa_customer_email", sbData.user.email);
+          }
+          syncPrismaUser({ ...sbData.user, user_metadata: { full_name: cleanName } });
+          return { ok: true };
+        }
+
+        // 2. Database fallback
         const res = await fetch("/api/auth/customer/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -256,33 +276,13 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
           if (typeof window !== "undefined") {
             localStorage.setItem("novixa_customer_email", data.user.email);
           }
-          // Also register in Supabase in background
-          supabase.auth
-            .signUp({
-              email: cleanEmail,
-              password,
-              options: { data: { full_name: cleanName, role: "CUSTOMER" } },
-            })
-            .catch(() => {});
           return { ok: true };
         }
 
-        if (data.error) {
-          return { ok: false, error: data.error };
-        }
-
-        // Fallback to Supabase Auth
-        const { data: sbData, error: sbError } = await supabase.auth.signUp({
-          email: cleanEmail,
-          password,
-          options: { data: { full_name: cleanName, role: "CUSTOMER" } },
-        });
-
-        if (sbError) {
-          return { ok: false, error: sbError.message };
-        }
-
-        return { ok: true };
+        return {
+          ok: false,
+          error: sbError?.message || data.error || "Registration failed.",
+        };
       } catch (err: any) {
         return { ok: false, error: err.message || "Registration failed." };
       }
@@ -293,16 +293,29 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = useCallback(
     async (next = "/account") => {
       try {
-        if (typeof window !== "undefined") {
-          window.location.href = `/api/auth/customer/google?next=${encodeURIComponent(next)}`;
-          return { ok: true };
+        const origin = typeof window !== "undefined" ? window.location.origin : "";
+        const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(next)}`;
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo,
+            queryParams: {
+              access_type: "offline",
+              prompt: "consent",
+            },
+          },
+        });
+
+        if (error) {
+          return { ok: false, error: error.message };
         }
-        return { ok: false, error: "Window is not available" };
+
+        return { ok: true };
       } catch (err: any) {
         return { ok: false, error: err.message || "Google sign-in failed." };
       }
     },
-    [],
+    [supabase],
   );
 
   const resetPassword = useCallback(
