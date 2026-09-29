@@ -56,7 +56,19 @@ docker build \
 echo "=== 3. Recreating Container with New Image & Live Env ==="
 docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml up -d --force-recreate app
 
-echo "=== 4. Verifying Application Health ==="
+# Configure Nginx proxy buffers for large OAuth headers
+if [ -d "/etc/nginx/conf.d" ]; then
+    echo "=== 4. Configuring Host Nginx Proxy Buffers for OAuth ==="
+    cat <<'NGINX_BUF' > /etc/nginx/conf.d/proxy_buffers.conf
+proxy_buffer_size 128k;
+proxy_buffers 4 256k;
+proxy_busy_buffers_size 256k;
+NGINX_BUF
+    nginx -t && systemctl reload nginx || true
+    echo "   ✅ Nginx proxy buffers configured (128k/256k)."
+fi
+
+echo "=== 5. Verifying Application Health ==="
 sleep 3
 curl -sI http://127.0.0.1:3000 | head -n 5
 

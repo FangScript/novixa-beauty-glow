@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import prisma from "@/lib/db/client";
 
@@ -30,17 +31,13 @@ export async function GET(request: Request) {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
       "sb_publishable_nOsrXBUwXTnAC-jZv_sa6g_BcwTK0QY";
 
+    const cookieStore = await cookies();
     const response = NextResponse.redirect(`${publicBaseUrl}${next}`);
 
     const supabase = createServerClient(supabaseUrl, supabaseKey, {
       cookies: {
         getAll() {
-          const cookieHeader = request.headers.get("cookie") ?? "";
-          if (!cookieHeader) return [];
-          return cookieHeader.split("; ").map((cookie) => {
-            const [name, ...rest] = cookie.split("=");
-            return { name, value: rest.join("=") };
-          });
+          return cookieStore.getAll();
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => {
