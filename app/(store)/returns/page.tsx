@@ -10,10 +10,26 @@ import {
 import { PageShell } from "@/components/layout/PageShell";
 import { Button } from "@/components/ui/button";
 
+const baseUrl = "https://www.novixaretail.com";
+
 export const metadata = {
-  title: "UK Returns & Exchanges Policy",
+  title: "UK Returns, Exchanges & Satisfaction Guarantee | NOVIXA",
   description:
-    "Review our 14-day hassle-free British return and exchange guarantee on luxury fragrances and beauty formulations.",
+    "Review our 30-day hassle-free British return and exchange guarantee on luxury perfumes and cosmetic formulations across the UK.",
+  alternates: {
+    canonical: `${baseUrl}/returns`,
+    languages: {
+      "en-GB": `${baseUrl}/returns`,
+    },
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_GB",
+    url: `${baseUrl}/returns`,
+    siteName: "NOVIXA UK",
+    title: "UK Returns & Exchanges Policy | NOVIXA",
+    description: "30-day hassle-free UK returns and exchanges on luxury perfumes and cosmetics.",
+  },
 };
 
 export default function ReturnsPage() {

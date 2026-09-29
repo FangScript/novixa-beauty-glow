@@ -3,10 +3,26 @@ import { Truck, ShieldCheck, Clock, Gift, ArrowRight } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
 import { Button } from "@/components/ui/button";
 
+const baseUrl = "https://www.novixaretail.com";
+
 export const metadata = {
-  title: "UK Shipping & Delivery Policy",
+  title: "UK Shipping, Royal Mail Tracked & Express Delivery | NOVIXA",
   description:
-    "Learn about NOVIXA luxury British packaging standards, Royal Mail Tracked delivery timelines, and complimentary shipping across the United Kingdom.",
+    "Learn about NOVIXA luxury British packaging standards, Royal Mail Tracked 24/48 delivery timelines, and complimentary UK shipping on orders over £70.",
+  alternates: {
+    canonical: `${baseUrl}/shipping`,
+    languages: {
+      "en-GB": `${baseUrl}/shipping`,
+    },
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_GB",
+    url: `${baseUrl}/shipping`,
+    siteName: "NOVIXA UK",
+    title: "UK Shipping & Royal Mail Delivery Policy | NOVIXA",
+    description: "Complimentary UK tracked delivery over £70 with same-day London dispatch.",
+  },
 };
 
 export default function ShippingPage() {

@@ -7,9 +7,28 @@ import { BundleCard, type DynamicBundle } from "@/components/bundles/BundleCard"
 import { getLiveProducts } from "@/lib/products/get-products";
 import { prisma } from "@/lib/db/client";
 
-export const metadata = {
-  title: "Curated Bundle Offers",
-  description: "Complete beauty rituals, signature pairing sets, and luxury value bundles.",
+import type { Metadata } from "next";
+
+const baseUrl = "https://www.novixaretail.com";
+
+export const metadata: Metadata = {
+  title: "Luxury Beauty Bundles & Perfume Gift Sets UK",
+  description:
+    "Shop curated luxury fragrance pairing sets, makeup bundles, and skincare gift boxes by NOVIXA UK. Save up to 30% with complimentary UK delivery over £70.",
+  alternates: {
+    canonical: `${baseUrl}/bundles`,
+    languages: {
+      "en-GB": `${baseUrl}/bundles`,
+    },
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_GB",
+    url: `${baseUrl}/bundles`,
+    siteName: "NOVIXA UK",
+    title: "Luxury Beauty Bundles & Gift Sets | NOVIXA UK",
+    description: "Curated perfume pairing sets and couture makeup value boxes in the UK.",
+  },
 };
 
 async function getDynamicBundles(): Promise<DynamicBundle[]> {

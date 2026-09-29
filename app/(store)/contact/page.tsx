@@ -2,10 +2,26 @@ import { Suspense } from "react";
 import { PageShell } from "@/components/layout/PageShell";
 import { ContactClient } from "./ContactClient";
 
+const baseUrl = "https://www.novixaretail.com";
+
 export const metadata = {
-  title: "Concierge & Fragrance Consultation",
+  title: "Contact Our London Concierge & Customer Care | NOVIXA UK",
   description:
-    "Connect with the NOVIXA private concierge for fragrance consultations, order inquiries, and custom luxury gifting.",
+    "Connect with the NOVIXA private concierge in London for bespoke fragrance consultations, UK order tracking, and custom luxury gifting.",
+  alternates: {
+    canonical: `${baseUrl}/contact`,
+    languages: {
+      "en-GB": `${baseUrl}/contact`,
+    },
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_GB",
+    url: `${baseUrl}/contact`,
+    siteName: "NOVIXA UK",
+    title: "Contact NOVIXA London Concierge",
+    description: "Personalized fragrance consultations and UK client support.",
+  },
 };
 
 export default function ContactPage() {
