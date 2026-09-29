@@ -59,6 +59,25 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
     let mounted = true;
 
     async function getInitialUser() {
+      // 1. Check local session cookie first (/api/auth/customer/me)
+      try {
+        const res = await fetch("/api/auth/customer/me");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.ok && data.user && mounted) {
+            setUser({
+              id: data.user.id,
+              name: data.user.name || data.user.email?.split("@")[0] || "Member",
+              email: data.user.email,
+              role: data.user.role || "CUSTOMER",
+            });
+            setIsLoading(false);
+            return;
+          }
+        }
+      } catch {}
+
+      // 2. Check Supabase session
       try {
         const {
           data: { user: sbUser },
@@ -78,14 +97,17 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
             };
             setUser(formatted);
             syncPrismaUser(sbUser);
-          } else {
-            setUser(null);
+            setIsLoading(false);
+            return;
           }
         }
       } catch (err) {
         console.error("Failed to load Supabase auth session:", err);
-      } finally {
-        if (mounted) setIsLoading(false);
+      }
+
+      if (mounted) {
+        setUser(null);
+        setIsLoading(false);
       }
     }
 
@@ -113,10 +135,27 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
           syncPrismaUser(session.user);
         }
       } else {
-        setUser(null);
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("novixa_customer_email");
-        }
+        // If Supabase signed out, verify if local session still exists before setting null
+        fetch("/api/auth/customer/me")
+          .then((r) => r.json())
+          .then((data) => {
+            if (data?.ok && data?.user && mounted) {
+              setUser({
+                id: data.user.id,
+                name: data.user.name || data.user.email?.split("@")[0] || "Member",
+                email: data.user.email,
+                role: data.user.role || "CUSTOMER",
+              });
+            } else if (mounted) {
+              setUser(null);
+              if (typeof window !== "undefined") {
+                localStorage.removeItem("novixa_customer_email");
+              }
+            }
+          })
+          .catch(() => {
+            if (mounted) setUser(null);
+          });
       }
       setIsLoading(false);
     });
@@ -129,35 +168,62 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string) => {
+      const cleanEmail = email.trim().toLowerCase();
       try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
+        // 1. Authenticate with direct backend database session
+        const res = await fetch("/api/auth/customer/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: cleanEmail, password }),
         });
 
-        if (error) {
-          return { ok: false, error: error.message };
-        }
+        const data = await res.json().catch(() => ({ ok: false }));
 
-        if (data.user?.email) {
+        if (res.ok && data.ok && data.user) {
           const formatted: Customer = {
             id: data.user.id,
-            name:
-              data.user.user_metadata?.full_name ||
-              data.user.user_metadata?.name ||
-              data.user.email.split("@")[0] ||
-              "Member",
+            name: data.user.name || cleanEmail.split("@")[0] || "Member",
             email: data.user.email,
-            role: (data.user.user_metadata?.role as string) || "CUSTOMER",
+            role: data.user.role || "CUSTOMER",
           };
           setUser(formatted);
           if (typeof window !== "undefined") {
             localStorage.setItem("novixa_customer_email", data.user.email);
           }
-          syncPrismaUser(data.user);
+          // Optionally sync with Supabase in background
+          supabase.auth.signInWithPassword({ email: cleanEmail, password }).catch(() => {});
           return { ok: true };
         }
-        return { ok: false, error: "Sign in failed. Please check credentials." };
+
+        // 2. Fallback to Supabase Auth if database auth didn't match (e.g. Supabase-created user)
+        const { data: sbData, error: sbError } = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password,
+        });
+
+        if (!sbError && sbData?.user?.email) {
+          const formatted: Customer = {
+            id: sbData.user.id,
+            name:
+              sbData.user.user_metadata?.full_name ||
+              sbData.user.user_metadata?.name ||
+              sbData.user.email.split("@")[0] ||
+              "Member",
+            email: sbData.user.email,
+            role: (sbData.user.user_metadata?.role as string) || "CUSTOMER",
+          };
+          setUser(formatted);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("novixa_customer_email", sbData.user.email);
+          }
+          syncPrismaUser(sbData.user);
+          return { ok: true };
+        }
+
+        return {
+          ok: false,
+          error: data.error || sbError?.message || "Invalid email or password.",
+        };
       } catch (err: any) {
         return { ok: false, error: err.message || "An unexpected error occurred." };
       }
@@ -167,26 +233,22 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback(
     async (name: string, email: string, password: string) => {
+      const cleanEmail = email.trim().toLowerCase();
+      const cleanName = name.trim();
       try {
-        const { data, error } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: {
-            data: {
-              full_name: name.trim(),
-              role: "CUSTOMER",
-            },
-          },
+        // 1. Direct database registration
+        const res = await fetch("/api/auth/customer/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: cleanName, email: cleanEmail, password }),
         });
 
-        if (error) {
-          return { ok: false, error: error.message };
-        }
+        const data = await res.json().catch(() => ({ ok: false }));
 
-        if (data.user?.email) {
+        if (res.ok && data.ok && data.user) {
           const formatted: Customer = {
             id: data.user.id,
-            name: name.trim(),
+            name: data.user.name || cleanName,
             email: data.user.email,
             role: "CUSTOMER",
           };
@@ -194,16 +256,35 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
           if (typeof window !== "undefined") {
             localStorage.setItem("novixa_customer_email", data.user.email);
           }
-          syncPrismaUser({ ...data.user, user_metadata: { full_name: name } });
+          // Also register in Supabase in background
+          supabase.auth
+            .signUp({
+              email: cleanEmail,
+              password,
+              options: { data: { full_name: cleanName, role: "CUSTOMER" } },
+            })
+            .catch(() => {});
           return { ok: true };
         }
 
-        return {
-          ok: true,
-          error: "Account created! Please check your email to confirm your account.",
-        };
+        if (data.error) {
+          return { ok: false, error: data.error };
+        }
+
+        // Fallback to Supabase Auth
+        const { data: sbData, error: sbError } = await supabase.auth.signUp({
+          email: cleanEmail,
+          password,
+          options: { data: { full_name: cleanName, role: "CUSTOMER" } },
+        });
+
+        if (sbError) {
+          return { ok: false, error: sbError.message };
+        }
+
+        return { ok: true };
       } catch (err: any) {
-        return { ok: false, error: err.message || "An unexpected error occurred." };
+        return { ok: false, error: err.message || "Registration failed." };
       }
     },
     [supabase, syncPrismaUser],
@@ -212,29 +293,16 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = useCallback(
     async (next = "/account") => {
       try {
-        const origin = typeof window !== "undefined" ? window.location.origin : "";
-        const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(next)}`;
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: "google",
-          options: {
-            redirectTo,
-            queryParams: {
-              access_type: "offline",
-              prompt: "consent",
-            },
-          },
-        });
-
-        if (error) {
-          return { ok: false, error: error.message };
+        if (typeof window !== "undefined") {
+          window.location.href = `/api/auth/customer/google?next=${encodeURIComponent(next)}`;
+          return { ok: true };
         }
-
-        return { ok: true };
+        return { ok: false, error: "Window is not available" };
       } catch (err: any) {
         return { ok: false, error: err.message || "Google sign-in failed." };
       }
     },
-    [supabase],
+    [],
   );
 
   const resetPassword = useCallback(

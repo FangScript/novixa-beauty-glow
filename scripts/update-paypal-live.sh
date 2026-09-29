@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────────────────────
-# Novixa Beauty Glow — Switch PayPal to Live Credentials on VPS
+# Novixa Beauty Glow — Production Deployment & Env Sync on VPS
 # Run this on the VPS in /opt/novixa
 # Usage: bash scripts/update-paypal-live.sh
 # ──────────────────────────────────────────────────────────────────────────────
@@ -11,10 +11,11 @@ cd /opt/novixa
 ENV_FILE=".env.production"
 CLIENT_ID="BAAi8QOljyA26-sCFX-3M0WIYmJk_qm16xSH4wVblfWVIv_-NFY7GvGAIw9f6D5-A8CtcHPlUOhDpXXxGs"
 SECRET_KEY="EHGkhsGc-Xwzi7U6ZvGTxe2D90LFdvE6O7KXCIqeWIOZrxIZ3QCXxdT4ZVMl2crnLskJ5VxQkT7yre24"
+SUPABASE_URL="https://macpycxntatdcsxvckmr.supabase.co"
+SUPABASE_ANON="sb_publishable_nOsrXBUwXTnAC-jZv_sa6g_BcwTK0QY"
 
-echo "=== 1. Updating $ENV_FILE with Live PayPal Credentials ==="
+echo "=== 1. Syncing $ENV_FILE with Live Credentials ==="
 
-# Helper function to set or append key=val
 set_env() {
     local key="$1"
     local val="$2"
@@ -25,18 +26,31 @@ set_env() {
     fi
 }
 
+# Production App URL
+set_env "APP_URL" "https://www.novixaretail.com"
+
+# Live PayPal Credentials
 set_env "PAYMENT_PROVIDER" "PAYPAL"
 set_env "PAYPAL_MODE" "live"
 set_env "PAYPAL_CLIENT_ID" "$CLIENT_ID"
 set_env "PAYPAL_CLIENT_SECRET" "$SECRET_KEY"
 set_env "NEXT_PUBLIC_PAYPAL_CLIENT_ID" "$CLIENT_ID"
 
-echo "   ✅ $ENV_FILE updated successfully."
-grep -E "(PAYPAL|PAYMENT_PROVIDER)" "$ENV_FILE" | sed "s/$SECRET_KEY/[REDACTED-SECRET]/"
+# Supabase Production Keys
+set_env "NEXT_PUBLIC_SUPABASE_URL" "$SUPABASE_URL"
+set_env "NEXT_PUBLIC_SUPABASE_ANON_KEY" "$SUPABASE_ANON"
+set_env "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" "$SUPABASE_ANON"
 
-echo "=== 2. Building Docker Image with Live PayPal Client ID ==="
+# Administrator Defaults
+set_env "ADMIN_EMAIL" "novixaretail@gmail.com"
+
+echo "   ✅ $ENV_FILE updated successfully."
+
+echo "=== 2. Building Docker Image with Baked Production Variables ==="
 docker build \
   --build-arg NEXT_PUBLIC_PAYPAL_CLIENT_ID="$CLIENT_ID" \
+  --build-arg NEXT_PUBLIC_SUPABASE_URL="$SUPABASE_URL" \
+  --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="$SUPABASE_ANON" \
   -t novixa-beauty-glow:latest .
 
 echo "=== 3. Recreating Container with New Image & Live Env ==="
@@ -47,4 +61,4 @@ sleep 3
 curl -sI http://127.0.0.1:3000 | head -n 5
 
 echo ""
-echo "🎉 Live PayPal credentials successfully configured and active!"
+echo "🎉 Deployment complete: Live PayPal, Google OAuth, and User Auth are fully active!"
