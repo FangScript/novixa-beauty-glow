@@ -34,8 +34,6 @@ services:
     image: postgres:16-alpine
     container_name: novixa-db
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-novixa}
       POSTGRES_USER: ${POSTGRES_USER:-novixa_user}
@@ -59,7 +57,7 @@ services:
       - .env.production
     environment:
       - NODE_ENV=production
-    command: ["npx", "prisma@6.19.0", "migrate", "deploy"]
+    command: ["npx", "-y", "prisma@6.19.0", "migrate", "deploy"]
     depends_on:
       db:
         condition: service_healthy
