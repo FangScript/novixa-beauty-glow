@@ -110,8 +110,8 @@ export default function CheckoutPage() {
     country: "United Kingdom",
   });
 
-  // Payment Selection
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>("CARD");
+  // Payment Selection (Unified Real-Time Payment Engine)
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>("PAYPAL");
   const [cardData, setCardData] = useState({
     name: "",
     number: "",
@@ -379,40 +379,9 @@ export default function CheckoutPage() {
     }
     if (!validateAddressForm()) return;
 
-    if (paymentMethod === "PAYPAL") {
-      toast.info("Please use the PayPal button below to complete checkout.");
-      const paypalOption = document.getElementById("method-paypal");
-      paypalOption?.scrollIntoView({ behavior: "smooth", block: "center" });
-      return;
-    }
-
-    // Client-side quick card validation
-    if (paymentMethod === "CARD") {
-      const cleanNum = cardData.number.replace(/\s+/g, "");
-      if (cleanNum.length < 13 || cleanNum.length > 19) {
-        setErrorMessage("Please enter a valid card number (13-19 digits).");
-        toast.error("Please enter a valid card number.");
-        return;
-      }
-      if (!cardData.expMonth || !cardData.expYear || cardData.expMonth.length < 2 || cardData.expYear.length < 2) {
-        setErrorMessage("Please enter valid card expiration date (MM / YY).");
-        toast.error("Valid card expiration date (MM / YY) required.");
-        return;
-      }
-      const m = parseInt(cardData.expMonth, 10);
-      if (isNaN(m) || m < 1 || m > 12) {
-        setErrorMessage("Please enter a valid expiration month (01-12).");
-        toast.error("Invalid expiration month.");
-        return;
-      }
-      if (!cardData.cvc || cardData.cvc.length < 3) {
-        setErrorMessage("Please enter a valid security code (3-4 digits).");
-        toast.error("Security code required.");
-        return;
-      }
-    }
-
-    await submitOrderWithDetails(paymentMethod);
+    const paymentBox = document.getElementById("paypal-smart-buttons-container");
+    paymentBox?.scrollIntoView({ behavior: "smooth", block: "center" });
+    toast.info("Please select your payment option above (Card, PayPal, Apple Pay, or Google Pay).");
   };
 
   const methodDisplayNames: Record<PaymentMethodType, string> = {
@@ -809,313 +778,76 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            <div className="mt-4 space-y-3">
-              {/* Option 1: Credit / Debit Card */}
+            <div className="mt-4">
               <div
-                onClick={() => setPaymentMethod("CARD")}
-                className={`cursor-pointer rounded-xl border transition-all ${
-                  paymentMethod === "CARD"
-                    ? "border-blue-600 ring-1 ring-blue-600 bg-white shadow-xs"
-                    : "border-border bg-white/60 hover:bg-stone-50/50"
-                }`}
+                id="paypal-smart-buttons-container"
+                className="rounded-xl border border-stone-200 bg-white p-5 sm:p-6 shadow-xs space-y-4"
               >
-                {/* Header matching reference screenshot */}
-                <div className="flex items-center justify-between p-4">
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      id="method-card"
-                      name="payment_choice"
-                      checked={paymentMethod === "CARD"}
-                      onChange={() => setPaymentMethod("CARD")}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-600"
-                    />
-                    <label
-                      htmlFor="method-card"
-                      className="font-medium text-foreground cursor-pointer text-sm sm:text-base select-none"
-                    >
-                      Credit card
-                    </label>
-                  </div>
-
-                  {/* All Accepted Card Brands directly visible */}
-                  <CardBrandBadges detectedBrand={detectedCardBrand} />
-                </div>
-
-                {paymentMethod === "CARD" && (
-                  <div
-                    className="border-t border-stone-200 bg-[#f8fafc] p-4 sm:p-5 space-y-3.5 rounded-b-xl"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {/* Row 1: Card Number */}
-                    <div>
-                      <div className="relative">
-                        <input
-                          required={paymentMethod === "CARD"}
-                          type="text"
-                          placeholder="Card number"
-                          maxLength={19}
-                          value={cardData.number}
-                          onChange={(e) => handleCardNumberChange(e.target.value)}
-                          className="h-11 w-full rounded-lg border border-stone-300 bg-white px-3.5 pr-10 text-sm text-stone-900 placeholder:text-stone-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none transition-all font-mono"
-                        />
-                        <div className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center">
-                          {detectedCardBrand === "Visa" ? (
-                            <VisaLogo className="h-4 w-7" />
-                          ) : detectedCardBrand === "Mastercard" ? (
-                            <MastercardLightLogo className="h-4 w-7" />
-                          ) : detectedCardBrand === "American Express" ? (
-                            <AmexLogo className="h-4 w-7" />
-                          ) : detectedCardBrand === "Discover" ? (
-                            <DiscoverLogo className="h-4 w-7" />
-                          ) : detectedCardBrand === "Diners Club" ? (
-                            <DinersClubLogo className="h-4 w-7" />
-                          ) : detectedCardBrand === "JCB" ? (
-                            <JcbLogo className="h-4 w-7" />
-                          ) : detectedCardBrand === "UnionPay" ? (
-                            <UnionPayLogo className="h-4 w-7" />
-                          ) : detectedCardBrand === "Elo" ? (
-                            <EloLogo className="h-4 w-7" />
-                          ) : detectedCardBrand === "Maestro" ? (
-                            <MaestroLogo className="h-4 w-7" />
-                          ) : (
-                            <Lock className="h-4 w-4 text-stone-400" />
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Row 2: Expiration Date & Security Code in 2 columns */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <input
-                          required={paymentMethod === "CARD"}
-                          type="text"
-                          placeholder="Expiration date (MM / YY)"
-                          maxLength={7}
-                          value={expiryInput}
-                          onChange={(e) => handleExpiryChange(e.target.value)}
-                          className="h-11 w-full rounded-lg border border-stone-300 bg-white px-3.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none transition-all font-mono"
-                        />
-                      </div>
-                      <div className="relative">
-                        <input
-                          required={paymentMethod === "CARD"}
-                          type="password"
-                          placeholder="Security code"
-                          maxLength={4}
-                          value={cardData.cvc}
-                          onChange={(e) => handleCvcChange(e.target.value)}
-                          className="h-11 w-full rounded-lg border border-stone-300 bg-white px-3.5 pr-10 text-sm text-stone-900 placeholder:text-stone-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none transition-all font-mono"
-                        />
-                        <div
-                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400"
-                          title="3-digit CVV on back (or 4 digits on front for Amex)"
-                        >
-                          <HelpCircle className="h-4 w-4 cursor-help hover:text-stone-600 transition-colors" />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Row 3: Name on card */}
-                    <div>
-                      <input
-                        required={paymentMethod === "CARD"}
-                        type="text"
-                        placeholder="Name on card"
-                        value={cardData.name}
-                        onChange={(e) => setCardData({ ...cardData, name: e.target.value })}
-                        className="h-11 w-full rounded-lg border border-stone-300 bg-white px-3.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none transition-all"
-                      />
-                    </div>
-
-                    {/* Row 4: Use shipping address as billing address checkbox */}
-                    <div className="pt-1">
-                      <label className="flex items-center gap-2.5 text-xs text-stone-700 cursor-pointer select-none">
-                        <div
-                          className={`h-4.5 w-4.5 rounded-full flex items-center justify-center transition-colors ${
-                            useShippingAsBilling
-                              ? "bg-blue-600 text-white"
-                              : "border border-stone-300 bg-white"
-                          }`}
-                        >
-                          {useShippingAsBilling && <Check className="h-3 w-3 stroke-[3]" />}
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={useShippingAsBilling}
-                          onChange={(e) => setUseShippingAsBilling(e.target.checked)}
-                          className="sr-only"
-                        />
-                        <span className="font-normal text-stone-700 text-xs sm:text-[13px]">
-                          Use shipping address as billing address
-                        </span>
-                      </label>
-                    </div>
-
-                    <p className="text-[11px] text-muted-foreground flex items-center gap-1.5 pt-1 border-t border-stone-200/60">
-                      <ShieldCheck size={13} className="text-emerald-700 shrink-0" />
-                      Encrypted directly with merchant gateway. Card credentials are never stored.
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Option 2: PayPal */}
-              <div
-                onClick={() => setPaymentMethod("PAYPAL")}
-                className={`cursor-pointer rounded-xl border p-4 transition-all ${
-                  paymentMethod === "PAYPAL"
-                    ? "border-blue-600 ring-1 ring-blue-600 bg-white shadow-xs"
-                    : "border-border bg-white/60 hover:bg-stone-50/50"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      id="method-paypal"
-                      name="payment_choice"
-                      checked={paymentMethod === "PAYPAL"}
-                      onChange={() => setPaymentMethod("PAYPAL")}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-600"
-                    />
-                    <label
-                      htmlFor="method-paypal"
-                      className="font-medium text-foreground cursor-pointer text-sm sm:text-base flex items-center gap-2 select-none"
-                    >
-                      <span>PayPal</span>
-                      <span className="rounded bg-sky-100 text-sky-800 text-[10px] px-1.5 py-0.5 font-semibold">
-                        Express
+                {/* Header showing supported payment options */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-stone-200">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck size={18} className="text-emerald-700 shrink-0" />
+                      <h3 className="font-medium text-foreground text-sm sm:text-base">
+                        Express Live Payment Gateway
+                      </h3>
+                      <span className="rounded bg-emerald-100 text-emerald-800 text-[10px] px-1.5 py-0.5 font-semibold">
+                        Instant Live Gateway
                       </span>
-                    </label>
-                  </div>
-                  <PayPalBadge className="h-5 w-16" />
-                </div>
-                {paymentMethod === "PAYPAL" && (
-                  <div className="mt-4 border-t border-stone-200 bg-[#f8fafc] -mx-4 -mb-4 p-4 sm:p-5 rounded-b-xl space-y-3">
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      Authorize your purchase securely with your PayPal balance, linked bank account,
-                      debit or credit card, or PayPal Pay in 3 installments.
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Pay instantly with Debit or Credit Card, PayPal, Pay in 3, Apple Pay, or Google Pay.
                     </p>
-                    {!user ? (
-                      <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg text-xs text-amber-900 flex flex-col sm:flex-row items-center justify-between gap-3">
-                        <span>Please sign in to your account before authorizing PayPal payment.</span>
-                        <Button
-                          type="button"
-                          onClick={() => router.push("/login?next=/checkout")}
-                          className="text-[10px] bg-[#211b18] text-white hover:bg-black rounded-none py-1.5 px-4 h-8 uppercase font-semibold shrink-0"
-                        >
-                          Sign In / Register
-                        </Button>
-                      </div>
-                    ) : (
-                      <PayPalCheckoutButton
-                        amount={orderTotal}
-                        currency="GBP"
-                        items={cart.map((c) => ({
-                          productId: c.productId,
-                          quantity: c.quantity,
-                        }))}
-                        couponCode={appliedCoupon?.code}
-                        shippingMethodId={selectedShippingMethod?.id}
-                        validateBeforePayment={validateAddressForm}
-                        disabled={isSubmitting}
-                        onSuccess={async (res) => {
-                          await submitOrderWithDetails("PAYPAL", {
-                            paypalOrderId: res.paypalOrderId,
-                            captureId: res.captureId,
-                            payerEmail: res.payerEmail || formData.email.trim(),
-                          });
-                        }}
-                        onError={(err) => {
-                          setErrorMessage(err);
-                        }}
-                      />
-                    )}
                   </div>
-                )}
-              </div>
 
-              {/* Option 3: Google Pay */}
-              <div
-                onClick={() => setPaymentMethod("GOOGLE_PAY")}
-                className={`cursor-pointer rounded-xl border p-4 transition-all ${
-                  paymentMethod === "GOOGLE_PAY"
-                    ? "border-blue-600 ring-1 ring-blue-600 bg-white shadow-xs"
-                    : "border-border bg-white/60 hover:bg-stone-50/50"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      id="method-gpay"
-                      name="payment_choice"
-                      checked={paymentMethod === "GOOGLE_PAY"}
-                      onChange={() => setPaymentMethod("GOOGLE_PAY")}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-600"
-                    />
-                    <label
-                      htmlFor="method-gpay"
-                      className="font-medium text-foreground cursor-pointer text-sm sm:text-base flex items-center gap-2 select-none"
-                    >
-                      <Smartphone size={16} />
-                      Google Pay
-                    </label>
+                  <div className="flex items-center flex-wrap gap-1.5 opacity-90">
+                    <VisaLogo className="h-4.5 w-7" />
+                    <MastercardLightLogo className="h-4.5 w-7" />
+                    <AmexLogo className="h-4.5 w-7" />
+                    <PayPalBadge className="h-4.5 w-12" />
+                    <ApplePayBadge className="h-4.5 w-8" />
+                    <GooglePayBadge className="h-4.5 w-8" />
                   </div>
-                  <GooglePayBadge className="h-5 w-12" />
                 </div>
-                {paymentMethod === "GOOGLE_PAY" && (
-                  <div className="mt-3 text-xs text-muted-foreground pl-7 leading-relaxed">
-                    Check out quickly using payment cards saved in your Google Account. Fast and
-                    biometrically protected.
-                  </div>
-                )}
-              </div>
 
-              {/* Option 4: Apple Pay */}
-              <div
-                onClick={() => setPaymentMethod("APPLE_PAY")}
-                className={`cursor-pointer rounded-xl border p-4 transition-all ${
-                  paymentMethod === "APPLE_PAY"
-                    ? "border-blue-600 ring-1 ring-blue-600 bg-white shadow-xs"
-                    : "border-border bg-white/60 hover:bg-stone-50/50"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      id="method-applepay"
-                      name="payment_choice"
-                      checked={paymentMethod === "APPLE_PAY"}
-                      onChange={() => setPaymentMethod("APPLE_PAY")}
-                      className="h-4 w-4 text-rosewood"
-                    />
-                    <label
-                      htmlFor="method-applepay"
-                      className="font-medium text-foreground cursor-pointer text-sm sm:text-base flex items-center gap-2 select-none"
+                {!user ? (
+                  <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg text-xs text-amber-900 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <span>Please sign in to your account before authorizing payment.</span>
+                    <Button
+                      type="button"
+                      onClick={() => router.push("/login?next=/checkout")}
+                      className="text-[10px] bg-[#211b18] text-white hover:bg-black rounded-none py-1.5 px-4 h-8 uppercase font-semibold shrink-0"
                     >
-                      Apple Pay
-                      {hasApplePay && (
-                        <span className="rounded bg-emerald-100 text-emerald-800 text-[10px] px-1.5 py-0.2 font-semibold">
-                          Device Ready
-                        </span>
-                      )}
-                    </label>
+                      Sign In / Register
+                    </Button>
                   </div>
-                  <ApplePayBadge className="h-5 w-12" />
-                </div>
-                {paymentMethod === "APPLE_PAY" && (
-                  <div className="mt-3 text-xs text-muted-foreground pl-7 leading-relaxed">
-                    {hasApplePay
-                      ? "Seamless one-touch checkout via Safari on iOS or macOS with Face ID / Touch ID."
-                      : "Apple Pay is supported on Safari browsers running on compatible iOS and macOS devices."}
+                ) : (
+                  <div className="pt-2">
+                    <PayPalCheckoutButton
+                      amount={orderTotal}
+                      currency="GBP"
+                      items={cart.map((c) => ({
+                        productId: c.productId,
+                        quantity: c.quantity,
+                      }))}
+                      couponCode={appliedCoupon?.code}
+                      shippingMethodId={selectedShippingMethod?.id}
+                      validateBeforePayment={validateAddressForm}
+                      disabled={isSubmitting}
+                      onSuccess={async (res) => {
+                        await submitOrderWithDetails("PAYPAL", {
+                          paypalOrderId: res.paypalOrderId,
+                          captureId: res.captureId,
+                          payerEmail: res.payerEmail || formData.email.trim(),
+                        });
+                      }}
+                      onError={(err) => {
+                        setErrorMessage(err);
+                      }}
+                    />
                   </div>
                 )}
               </div>
-
             </div>
           </section>
         </div>
@@ -1220,35 +952,20 @@ export default function CheckoutPage() {
             >
               SIGN IN TO PLACE ORDER — {formatPrice(orderTotal)}
             </Button>
-          ) : paymentMethod === "PAYPAL" ? (
+          ) : (
             <Button
               type="button"
               onClick={() => {
                 if (validateAddressForm()) {
-                  const paypalOption = document.getElementById("method-paypal");
-                  paypalOption?.scrollIntoView({ behavior: "smooth", block: "center" });
-                  toast.info("Please complete authorization using the PayPal button under Payment Options.");
+                  const paymentBox = document.getElementById("paypal-smart-buttons-container");
+                  paymentBox?.scrollIntoView({ behavior: "smooth", block: "center" });
+                  toast.info("Please select your payment method above (Card, PayPal, Apple Pay, or Google Pay).");
                 }
               }}
               disabled={isSubmitting}
-              className="mt-8 w-full rounded-none bg-[#0070ba] text-white hover:bg-[#005ea6] py-6 text-[10px] font-semibold tracking-[0.14em]"
-            >
-              PAY WITH PAYPAL — {formatPrice(orderTotal)}
-            </Button>
-          ) : (
-            <Button
-              type="submit"
-              disabled={isSubmitting}
               className="mt-8 w-full rounded-none bg-ink text-white hover:bg-black py-6 text-[10px] font-semibold tracking-[0.14em]"
             >
-              {isSubmitting ? (
-                <span className="inline-flex items-center gap-2">
-                  <Loader2 size={14} className="animate-spin" />
-                  VERIFYING & PROCESSING ORDER...
-                </span>
-              ) : (
-                `CONFIRM ORDER — ${formatPrice(orderTotal)}`
-              )}
+              SELECT PAYMENT METHOD ABOVE — {formatPrice(orderTotal)}
             </Button>
           )}
           <div className="mt-3 flex items-center justify-center gap-2 text-[10px] text-muted-foreground">

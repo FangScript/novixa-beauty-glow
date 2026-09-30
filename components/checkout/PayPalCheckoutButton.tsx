@@ -127,7 +127,7 @@ export function PayPalCheckoutButton({
             currency,
             intent: "capture",
             components: "buttons",
-            enableFunding: "venmo,paylater",
+            enableFunding: "card,paylater,venmo",
           }}
         >
           <PayPalButtons
