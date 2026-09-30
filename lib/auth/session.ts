@@ -167,37 +167,52 @@ export async function registerCustomer(name: string, email: string, password: st
     return { ok: false as const, error: "Database is not configured." };
   }
 
-  const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
-  if (existing) {
-    return { ok: false as const, error: "An account with this email already exists." };
-  }
-
+  const cleanEmail = email.toLowerCase().trim();
+  const cleanName = name.trim();
   const passwordHash = hashPassword(password);
-  const user = await prisma.user.create({
-    data: {
-      name: name.trim(),
-      email: email.toLowerCase().trim(),
-      passwordHash,
-      role: "CUSTOMER",
-    },
-  });
-
   const rawSession = randomBytes(32).toString("base64url");
   const sessionId = hashSession(rawSession);
   const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000);
 
-  await prisma.session.create({ data: { id: sessionId, userId: user.id, expiresAt } });
+  try {
+    // Single atomic roundtrip: create user and session in one query
+    const user = await prisma.user.create({
+      data: {
+        name: cleanName,
+        email: cleanEmail,
+        passwordHash,
+        role: "CUSTOMER",
+        sessions: {
+          create: {
+            id: sessionId,
+            expiresAt,
+          },
+        },
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+      },
+    });
 
-  const cookieStore = await cookies();
-  cookieStore.set(CUSTOMER_SESSION_COOKIE, rawSession, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: SESSION_TTL_SECONDS,
-    path: "/",
-  });
+    const cookieStore = await cookies();
+    cookieStore.set(CUSTOMER_SESSION_COOKIE, rawSession, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: SESSION_TTL_SECONDS,
+      path: "/",
+    });
 
-  return { ok: true as const, user: { id: user.id, email: user.email, name: user.name } };
+    return { ok: true as const, user };
+  } catch (error: any) {
+    if (error?.code === "P2002") {
+      return { ok: false as const, error: "An account with this email already exists." };
+    }
+    console.error("registerCustomer error:", error);
+    return { ok: false as const, error: "Registration failed. Please try again." };
+  }
 }
 
 export async function loginCustomer(email: string, password: string) {
@@ -205,7 +220,8 @@ export async function loginCustomer(email: string, password: string) {
     return { ok: false as const, error: "Database is not configured." };
   }
 
-  const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+  const cleanEmail = email.toLowerCase().trim();
+  const user = await prisma.user.findUnique({ where: { email: cleanEmail } });
 
   if (!user || (user.role !== "CUSTOMER" && user.role !== "ADMIN") || !verifyPassword(password, user.passwordHash)) {
     return { ok: false as const, error: "Invalid email or password." };
@@ -215,8 +231,11 @@ export async function loginCustomer(email: string, password: string) {
   const sessionId = hashSession(rawSession);
   const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000);
 
-  await prisma.session.create({ data: { id: sessionId, userId: user.id, expiresAt } });
-  await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+  // Parallelize session creation and lastLogin update
+  await Promise.all([
+    prisma.session.create({ data: { id: sessionId, userId: user.id, expiresAt } }),
+    prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }).catch(() => null),
+  ]);
 
   const cookieStore = await cookies();
   cookieStore.set(CUSTOMER_SESSION_COOKIE, rawSession, {

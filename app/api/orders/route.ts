@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db/client";
 import { OrderStatus, PaymentStatus } from "@prisma/client";
 import { verifyPaymentServerSide, type PaymentMethod } from "@/lib/payments/processor";
 import { getAuthenticatedAdmin, getAuthenticatedCustomer } from "@/lib/auth/session";
-import { sendOrderConfirmationEmail } from "@/lib/email/service";
+import { sendOrderConfirmationEmail, sendOrderStatusEmail } from "@/lib/email/service";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -447,8 +447,34 @@ export async function PUT(request: Request) {
       },
       include: {
         items: true,
+        user: { select: { name: true, email: true } },
       },
     });
+
+    // Trigger customer status email for key status transitions
+    const emailableStatuses: OrderStatus[] = [
+      OrderStatus.PROCESSING,
+      OrderStatus.SHIPPED,
+      OrderStatus.DELIVERED,
+      OrderStatus.CANCELLED,
+    ];
+
+    if (status && emailableStatuses.includes(status as OrderStatus)) {
+      const snap = updated.shippingAddressSnapshot as Record<string, string> | null;
+      const customerEmail = snap?.email || (updated as any).user?.email;
+      const customerName = snap?.fullName || (updated as any).user?.name || "Valued Patron";
+
+      if (customerEmail) {
+        sendOrderStatusEmail({
+          status: status as "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED",
+          orderNumber: updated.orderNumber,
+          customerName,
+          customerEmail,
+          trackingNumber: updated.trackingNumber ?? undefined,
+          cancellationReason: body.cancellationReason ?? undefined,
+        }).catch((err) => console.warn(`Order status email [${status}] failed:`, err));
+      }
+    }
 
     return NextResponse.json({ ok: true, order: updated });
   } catch (error: any) {

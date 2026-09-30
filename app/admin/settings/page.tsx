@@ -5,6 +5,18 @@ import { AdminShell, AdminStatus } from "@/components/admin";
 
 export default function AdminSettingsPage() {
   const [admin, setAdmin] = useState<{ name: string; email: string } | null>(null);
+  const [services, setServices] = useState<{
+    database?: boolean;
+    payments?: boolean;
+    email?: boolean;
+    emailProvider?: string | null;
+    media?: boolean;
+  }>({
+    database: true,
+    payments: true,
+    email: false,
+    media: false,
+  });
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -13,13 +25,23 @@ export default function AdminSettingsPage() {
         if (data?.admin) setAdmin(data.admin);
       })
       .catch(() => undefined);
+
+    fetch("/api/admin/settings")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setServices(data);
+      })
+      .catch(() => undefined);
   }, []);
 
   const items = [
-    { label: "PostgreSQL database (Supabase)", connected: true },
-    { label: "Payment provider (PayPal REST API / Express)", connected: true },
-    { label: "Transactional email (Resend/SMTP)", connected: false },
-    { label: "Cloud media storage (S3/R2)", connected: false },
+    { label: "PostgreSQL database (Supabase)", connected: Boolean(services.database) },
+    { label: "Payment provider (PayPal REST API / Express)", connected: Boolean(services.payments) },
+    {
+      label: `Transactional email (${services.emailProvider || "Gmail SMTP / Resend"})`,
+      connected: Boolean(services.email),
+    },
+    { label: "Cloud media storage (S3/R2)", connected: Boolean(services.media) },
   ];
 
   return (

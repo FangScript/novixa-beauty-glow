@@ -84,7 +84,7 @@ function formatCartItem(item: any) {
   return {
     id: item.id,
     productId: p.id,
-    quantity: item.quantity,
+    quantity: Math.max(1, Math.round(Number(item.quantity) || 1)),
     product: {
       id: p.id,
       name: p.name,
@@ -154,7 +154,7 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    const cleanQuantity = Math.round(rawQuantity * 100) / 100;
+    const cleanQuantity = Math.max(1, Math.round(rawQuantity));
 
     // Validate product + stock
     const product = await prisma.product.findUnique({
@@ -178,7 +178,7 @@ export async function POST(request: Request) {
       where: { cartId_productId: { cartId: cart.id, productId } },
     });
 
-    const newQuantity = Math.round(((existing?.quantity ?? 0) + cleanQuantity) * 100) / 100;
+    const newQuantity = Math.round((existing?.quantity ?? 0) + cleanQuantity);
     if (newQuantity > product.stock) {
       return NextResponse.json(
         { ok: false, error: `Only ${product.stock} units of "${product.name}" available.` },
@@ -254,7 +254,7 @@ export async function PUT(request: Request) {
         { status: 400 },
       );
     }
-    const cleanQuantity = Math.round(rawQuantity * 100) / 100;
+    const cleanQuantity = Math.max(0, Math.round(rawQuantity));
 
     // quantity === 0 means remove
     if (cleanQuantity === 0) {

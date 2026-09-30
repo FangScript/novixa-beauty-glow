@@ -27,9 +27,6 @@ export function StoreHeader() {
   };
   return (
     <>
-      <div className="bg-ink py-2 text-center text-[9px] font-medium uppercase tracking-[0.14em] text-primary-foreground">
-        Complimentary UK Royal Mail delivery on orders above £70
-      </div>
       <header className="sticky top-0 z-50 border-b border-primary-foreground/10 bg-ink/95 text-primary-foreground backdrop-blur-md">
         <div className="page-shell flex h-18 items-center justify-between gap-4">
           <Link to="/" className="font-display text-2xl">

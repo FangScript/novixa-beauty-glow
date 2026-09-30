@@ -260,10 +260,10 @@ export function ContactClient() {
               <div>
                 <p className="font-semibold text-foreground">Email Concierge</p>
                 <a
-                  href="mailto:concierge@novixa.co.uk"
+                  href="mailto:novixaretail@gmail.com"
                   className="text-rosewood hover:underline font-mono text-[11px]"
                 >
-                  concierge@novixa.co.uk
+                  novixaretail@gmail.com
                 </a>
                 <p className="text-[10px] text-muted-foreground mt-0.5">Response within 24 hours</p>
               </div>

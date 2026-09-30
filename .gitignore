@@ -2,9 +2,6 @@
 logs
 *.log
 public/test-artifacts/
-# Test & QA scripts (not for production)
-qa/
-scripts/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -43,3 +40,10 @@ dist-ssr
 .env*
 public/uploads/reviews/*
 !public/uploads/reviews/.gitkeep
+
+# Docker / Deployment
+certbot/
+*.tar.gz
+*.zip
+dist-cpanel/
+.env.production

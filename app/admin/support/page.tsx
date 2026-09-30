@@ -10,11 +10,12 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  ExternalLink,
   Trash2,
   RefreshCw,
   Loader2,
   Package,
+  Send,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -87,6 +88,11 @@ export default function AdminSupportPage() {
   const [subjectFilter, setSubjectFilter] = useState("ALL");
   const [selectedInquiry, setSelectedInquiry] = useState<Inquiry | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+
+  // Reply modal state
+  const [showReplyModal, setShowReplyModal] = useState(false);
+  const [replyMessage, setReplyMessage] = useState("");
+  const [isSendingReply, setIsSendingReply] = useState(false);
 
   const fetchInquiries = async () => {
     setIsLoading(true);
@@ -168,6 +174,51 @@ export default function AdminSupportPage() {
       toast.success("Inquiry archived.");
     } catch (err: any) {
       toast.error("Failed to archive inquiry.");
+    }
+  };
+
+  const openReplyModal = (inq: Inquiry) => {
+    setSelectedInquiry(inq);
+    setReplyMessage("");
+    setShowReplyModal(true);
+  };
+
+  const sendReply = async () => {
+    if (!selectedInquiry || !replyMessage.trim()) return;
+    setIsSendingReply(true);
+    try {
+      const res = await fetch("/api/admin/support/reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          inquiryId: selectedInquiry.id,
+          toEmail: selectedInquiry.email,
+          toName: selectedInquiry.name,
+          originalSubject: selectedInquiry.subject,
+          replyMessage: replyMessage.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || "Failed to send reply.");
+
+      toast.success(`Reply sent to ${selectedInquiry.email}`);
+
+      // Update inquiry status to IN_REVIEW after first reply
+      if (selectedInquiry.status === "PENDING") {
+        setInquiries((prev) =>
+          prev.map((item) =>
+            item.id === selectedInquiry.id ? { ...item, status: "IN_REVIEW" } : item,
+          ),
+        );
+        setSelectedInquiry({ ...selectedInquiry, status: "IN_REVIEW" });
+      }
+
+      setShowReplyModal(false);
+      setReplyMessage("");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to send reply email.");
+    } finally {
+      setIsSendingReply(false);
     }
   };
 
@@ -331,15 +382,16 @@ export default function AdminSupportPage() {
                     >
                       Open
                     </button>
-                    <a
-                      href={`mailto:${inq.email}?subject=Re: [NOVIXA Concierge] ${encodeURIComponent(
-                        inq.subject,
-                      )}`}
-                      onClick={(e) => e.stopPropagation()}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openReplyModal(inq);
+                      }}
                       className="text-[11px] text-[#211b18] hover:underline mr-3 inline-flex items-center gap-0.5"
                     >
-                      Reply <ExternalLink size={10} />
-                    </a>
+                      <Mail size={10} /> Reply
+                    </button>
                     <button
                       type="button"
                       onClick={(e) => {
@@ -359,7 +411,7 @@ export default function AdminSupportPage() {
       </div>
 
       {/* Inquiry Detail Modal */}
-      {selectedInquiry && (
+      {selectedInquiry && !showReplyModal && (
         <AdminDialog
           title={`Inquiry from ${selectedInquiry.name}`}
           description={`Topic: ${selectedInquiry.subject}`}
@@ -401,7 +453,7 @@ export default function AdminSupportPage() {
               </div>
             </div>
 
-            {/* Status Selector */}
+            {/* Status Selector + Actions */}
             <div className="flex items-center justify-between border-t border-[#e8dfd8] pt-4">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] uppercase text-[#776a61] tracking-wider font-semibold">
@@ -423,15 +475,14 @@ export default function AdminSupportPage() {
 
               {/* Action Buttons */}
               <div className="flex gap-2">
-                <a
-                  href={`mailto:${selectedInquiry.email}?subject=Re: [NOVIXA Concierge] ${encodeURIComponent(
-                    selectedInquiry.subject,
-                  )}`}
-                  className="inline-flex items-center gap-1.5 bg-[#8f5d48] text-white hover:bg-[#724837] text-[10px] uppercase tracking-wider px-3.5 py-2 font-semibold"
+                <button
+                  type="button"
+                  onClick={() => openReplyModal(selectedInquiry)}
+                  className="inline-flex items-center gap-1.5 bg-[#8f5d48] text-white hover:bg-[#724837] text-[10px] uppercase tracking-wider px-3.5 py-2 font-semibold transition-colors"
                 >
-                  <Mail size={12} />
-                  Send Email Reply
-                </a>
+                  <Send size={12} />
+                  Reply via Email
+                </button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -440,6 +491,77 @@ export default function AdminSupportPage() {
                 >
                   Close
                 </Button>
+              </div>
+            </div>
+          </div>
+        </AdminDialog>
+      )}
+
+      {/* Reply Modal */}
+      {showReplyModal && selectedInquiry && (
+        <AdminDialog
+          title={`Reply to ${selectedInquiry.name}`}
+          description={`Composing email to ${selectedInquiry.email}`}
+          onClose={() => { setShowReplyModal(false); setReplyMessage(""); }}
+        >
+          <div className="space-y-4 text-xs text-[#211b18]">
+            {/* Original inquiry recap */}
+            <div className="bg-[#faf7f4] border border-[#e8dfd8] p-3.5 rounded-sm">
+              <p className="text-[10px] uppercase tracking-wider text-[#776a61] mb-1 font-semibold">
+                Original Inquiry — {selectedInquiry.subject}
+              </p>
+              <p className="text-[11px] text-[#665b53] line-clamp-3 leading-relaxed italic">
+                "{selectedInquiry.message.slice(0, 240)}{selectedInquiry.message.length > 240 ? "…" : ""}"
+              </p>
+            </div>
+
+            {/* Reply composer */}
+            <div>
+              <label className="block text-[10px] uppercase tracking-wider text-[#776a61] font-semibold mb-2">
+                Your Reply *
+              </label>
+              <textarea
+                id="concierge-reply-message"
+                rows={8}
+                value={replyMessage}
+                onChange={(e) => setReplyMessage(e.target.value)}
+                placeholder={`Dear ${selectedInquiry.name},\n\nThank you for reaching out to NOVIXA…`}
+                className="w-full border border-[#d9cec5] bg-white p-3.5 text-sm leading-relaxed text-[#211b18] outline-none focus:border-[#8f5d48] transition-colors resize-none font-sans"
+              />
+              <p className="mt-1 text-[10px] text-[#a1958b]">
+                This email will be sent from <strong>novixaretail@gmail.com</strong> to <strong>{selectedInquiry.email}</strong>.
+                Your reply will be signed as the NOVIXA Concierge Team.
+              </p>
+            </div>
+
+            {/* Action row */}
+            <div className="flex items-center justify-between pt-2 border-t border-[#e8dfd8]">
+              <p className="text-[10px] text-[#a1958b]">
+                Sending will update inquiry status to <strong>IN REVIEW</strong>.
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setShowReplyModal(false); setReplyMessage(""); }}
+                  className="rounded-none text-[10px] uppercase tracking-wider"
+                >
+                  <X size={12} className="mr-1" />
+                  Cancel
+                </Button>
+                <button
+                  type="button"
+                  id="send-concierge-reply-btn"
+                  onClick={sendReply}
+                  disabled={isSendingReply || !replyMessage.trim()}
+                  className="inline-flex items-center gap-1.5 bg-[#8f5d48] text-white hover:bg-[#724837] disabled:opacity-50 disabled:cursor-not-allowed text-[10px] uppercase tracking-wider px-4 py-2 font-semibold transition-colors"
+                >
+                  {isSendingReply ? (
+                    <><Loader2 size={12} className="animate-spin" /> Sending…</>
+                  ) : (
+                    <><Send size={12} /> Send Reply</>
+                  )}
+                </button>
               </div>
             </div>
           </div>

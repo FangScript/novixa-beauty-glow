@@ -19,8 +19,6 @@ import {
   Clock,
   Lock,
   HelpCircle,
-  Building2,
-  Banknote,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/layout/PageShell";
@@ -1153,101 +1151,6 @@ export default function CheckoutPage() {
                   <div className="mt-3 text-xs text-muted-foreground pl-7 leading-relaxed">
                     Split your purchase into <strong>3 interest-free payments</strong> of{" "}
                     <strong>{formatPrice(orderTotal / 3)}</strong>. No added fees when paid on time.
-                  </div>
-                )}
-              </div>
-
-              {/* Option 6: Direct BACS Bank Transfer */}
-              <div
-                onClick={() => setPaymentMethod("BANK_TRANSFER")}
-                className={`cursor-pointer rounded-xl border p-4 transition-all ${
-                  paymentMethod === "BANK_TRANSFER"
-                    ? "border-blue-600 ring-1 ring-blue-600 bg-white shadow-xs"
-                    : "border-border bg-white/60 hover:bg-stone-50/50"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      id="method-bank"
-                      name="payment_choice"
-                      checked={paymentMethod === "BANK_TRANSFER"}
-                      onChange={() => setPaymentMethod("BANK_TRANSFER")}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-600"
-                    />
-                    <label
-                      htmlFor="method-bank"
-                      className="font-medium text-foreground cursor-pointer text-sm sm:text-base flex items-center gap-2 select-none"
-                    >
-                      <Building2 size={16} />
-                      Direct Bank Transfer
-                    </label>
-                  </div>
-                  <BankTransferBadges />
-                </div>
-                {paymentMethod === "BANK_TRANSFER" && (
-                  <div className="mt-4 border-t border-stone-200 bg-[#f8fafc] -mx-4 -mb-4 p-4 sm:p-5 rounded-b-xl space-y-2.5 text-xs text-stone-700 leading-relaxed">
-                    <p className="font-semibold text-foreground">Pay via direct online or mobile banking:</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono bg-white p-3 rounded-lg border border-stone-200">
-                      <div>
-                        <span className="text-muted-foreground block text-[10px] uppercase font-sans">Bank:</span>
-                        Barclays Bank UK
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground block text-[10px] uppercase font-sans">Account Name:</span>
-                        Novixa Beauty Glow Ltd
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground block text-[10px] uppercase font-sans">Sort Code:</span>
-                        20-00-00
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground block text-[10px] uppercase font-sans">Account No:</span>
-                        83920194
-                      </div>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground">
-                      Use your order reference as the payment description. Your order will be confirmed upon funds receipt.
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Option 7: Cash on Delivery */}
-              <div
-                onClick={() => setPaymentMethod("COD")}
-                className={`cursor-pointer rounded-xl border p-4 transition-all ${
-                  paymentMethod === "COD"
-                    ? "border-blue-600 ring-1 ring-blue-600 bg-white shadow-xs"
-                    : "border-border bg-white/60 hover:bg-stone-50/50"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      id="method-cod"
-                      name="payment_choice"
-                      checked={paymentMethod === "COD"}
-                      onChange={() => setPaymentMethod("COD")}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-600"
-                    />
-                    <label
-                      htmlFor="method-cod"
-                      className="font-medium text-foreground cursor-pointer text-sm sm:text-base flex items-center gap-2 select-none"
-                    >
-                      <Banknote size={16} />
-                      Cash on Delivery
-                    </label>
-                  </div>
-                  <span className="flex h-5 items-center justify-center rounded-[3px] bg-stone-800 px-2 text-[10px] font-bold text-white shadow-xs">
-                    COD
-                  </span>
-                </div>
-                {paymentMethod === "COD" && (
-                  <div className="mt-3 text-xs text-muted-foreground pl-7 leading-relaxed">
-                    Pay securely in cash directly to the courier upon delivery at your doorstep.
                   </div>
                 )}
               </div>

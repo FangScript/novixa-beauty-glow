@@ -83,9 +83,6 @@ function Index() {
 
   return (
     <main className="min-h-screen bg-background text-foreground">
-      <div className="bg-ink py-2 text-center text-[9px] font-medium uppercase text-primary-foreground">
-        Complimentary UK Royal Mail delivery on orders above £70
-      </div>
       <header className="sticky top-0 z-50 border-b border-primary-foreground/10 bg-ink/95 text-primary-foreground backdrop-blur-md">
         <div className="page-shell flex h-18 items-center justify-between">
           <Link to="/" className="font-display text-2xl">

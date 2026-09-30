@@ -1,0 +1,126 @@
+name: Build & Deploy to cPanel
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ── 2. Node.js 22 ──────────────────────────────────────────
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      # ── 3. Install all dependencies ────────────────────────────
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      # ── 4. Generate Prisma client (Linux binaries) ─────────────
+      - name: Generate Prisma Client
+        run: npx prisma generate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      # ── 5. Build Next.js (Linux standalone) ────────────────────
+      - name: Build Next.js
+        run: npm run build
+        env:
+          NODE_OPTIONS: '--max-old-space-size=4096'
+          NODE_ENV: production
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+          AUTH_URL: ${{ secrets.AUTH_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          PAYMENT_PROVIDER: ${{ secrets.PAYMENT_PROVIDER }}
+          PAYPAL_CLIENT_ID: ${{ secrets.PAYPAL_CLIENT_ID }}
+          PAYPAL_CLIENT_SECRET: ${{ secrets.PAYPAL_CLIENT_SECRET }}
+          PAYPAL_MODE: ${{ secrets.PAYPAL_MODE }}
+          NEXT_PUBLIC_PAYPAL_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_PAYPAL_CLIENT_ID }}
+          EMAIL_PROVIDER: ${{ secrets.EMAIL_PROVIDER }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          SUPPORT_EMAIL: ${{ secrets.SUPPORT_EMAIL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          APP_URL: ${{ secrets.APP_URL }}
+
+      # ── 6. Assemble deployment package ─────────────────────────
+      - name: Assemble deployment package
+        run: |
+          # Start with standalone output
+          cp -r .next/standalone ./deploy
+
+          # Copy static assets (not included in standalone by default)
+          mkdir -p ./deploy/.next/static
+          cp -r .next/static/. ./deploy/.next/static/
+
+          # Copy public assets
+          mkdir -p ./deploy/public
+          cp -r public/. ./deploy/public/
+
+          # Copy Prisma schema + migrations
+          cp -r prisma ./deploy/prisma
+
+          # Add CJS wrapper for LiteSpeed/Passenger compatibility
+          cp server.cjs ./deploy/server.cjs
+
+          # Write production .env
+          cat > ./deploy/.env << 'ENVEOF'
+          ${{ secrets.PRODUCTION_ENV_FILE }}
+          ENVEOF
+
+          echo "=== Deployment package contents ==="
+          ls -la ./deploy/
+
+      # ── 7. Deploy via SSH ──────────────────────────────────────
+      - name: Deploy to cPanel via SSH
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          source: 'deploy/*'
+          target: '/home/${{ secrets.DEPLOY_USER }}/novixa/'
+          strip_components: 1
+          rm: false
+
+      # ── 8. Run post-deploy commands via SSH ───────────────────
+      - name: Post-deploy (migrate + restart)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          script: |
+            cd /home/${{ secrets.DEPLOY_USER }}/novixa
+
+            # Ensure tmp dir exists for Passenger restart
+            mkdir -p tmp
+
+            # Apply any pending DB migrations
+            export PATH=/opt/alt/alt-nodejs22/root/usr/bin:$PATH
+            /opt/alt/alt-nodejs22/root/usr/bin/node node_modules/.bin/prisma migrate deploy || echo "Prisma not in standalone, skipping..."
+
+            # Restart the Passenger app
+            touch /home/${{ secrets.DEPLOY_USER }}/novixa/tmp/restart.txt
+
+            echo "Deployment complete!"

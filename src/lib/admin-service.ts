@@ -348,8 +348,12 @@ export const getAdminSettings = createServerFn({ method: "GET" }).handler(async 
   return {
     admin: { id: admin.id, name: admin.name, email: admin.email },
     database: Boolean(process.env["DATABASE_URL"]),
-    payments: Boolean(process.env["STRIPE_SECRET_KEY"]),
-    email: Boolean(process.env["SMTP_HOST"]),
-    media: Boolean(process.env["S3_BUCKET"]),
+    payments: Boolean(process.env["PAYPAL_CLIENT_ID"] || process.env["STRIPE_SECRET_KEY"]),
+    email: Boolean(
+      (process.env["SMTP_HOST"] && process.env["SMTP_USER"]) ||
+        process.env["RESEND_API_KEY"] ||
+        process.env["EMAIL_API_KEY"]
+    ),
+    media: Boolean(process.env["MEDIA_BUCKET"] || process.env["S3_BUCKET"]),
   };
 });

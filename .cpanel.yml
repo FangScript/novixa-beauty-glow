@@ -1,20 +1,8 @@
 ---
+# PRE-BUILT DEPLOYMENT — build runs locally, not on the server.
+# Run `npx prisma migrate deploy` locally BEFORE uploading the ZIP.
+# Upload novixa-cpanel-deploy.zip, extract to app root, then trigger this hook.
 deployment:
   tasks:
-    # Set Node.js 22 (CloudLinux alt-nodejs) in PATH
-    - export PATH=/opt/alt/alt-nodejs22/root/usr/bin:$PATH
-
-    # 1. Install production dependencies
-    - /opt/alt/alt-nodejs22/root/usr/bin/npm install --omit=dev --legacy-peer-deps
-
-    # 2. Generate Prisma client
-    - /opt/alt/alt-nodejs22/root/usr/bin/npm run db:generate
-
-    # 3. Build the Next.js app
-    - /opt/alt/alt-nodejs22/root/usr/bin/npm run build
-
-    # 4. Run database migrations (safe - only applies pending)
-    - /opt/alt/alt-nodejs22/root/usr/bin/node node_modules/.bin/prisma migrate deploy
-
-    # 5. Restart the Node.js Passenger app
+    # Restart the Node.js Passenger app (migrations are applied locally)
     - touch /home/noviqzwh/novixa/tmp/restart.txt

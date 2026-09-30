@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 export function QuantityControl({
   quantity,
   onChange,
-  min = 0,
+  min = 1,
   max,
   step = 1,
 }: {
@@ -17,23 +17,25 @@ export function QuantityControl({
   max?: number;
   step?: number;
 }) {
-  const [val, setVal] = useState<string>(String(quantity));
+  const currentInt = Math.max(min, Math.round(quantity || 1));
+  const [val, setVal] = useState<string>(String(currentInt));
 
   useEffect(() => {
-    setVal(String(quantity));
-  }, [quantity]);
+    setVal(String(Math.max(min, Math.round(quantity || 1))));
+  }, [quantity, min]);
 
   const commitChange = (num: number) => {
-    let next = Math.round(num * 100) / 100;
-    if (next < min) next = min;
+    let next = Math.round(num);
+    if (min !== undefined && next < min) next = min;
     if (max !== undefined && next > max) next = max;
+    setVal(String(next));
     onChange(next);
   };
 
   const handleBlur = () => {
-    const parsed = parseFloat(val);
-    if (isNaN(parsed) || parsed < min) {
-      commitChange(min > 0 ? min : 1);
+    const parsed = parseInt(val, 10);
+    if (isNaN(parsed) || (min !== undefined && parsed < min)) {
+      commitChange(min !== undefined ? min : 1);
     } else {
       commitChange(parsed);
     }
@@ -52,14 +54,15 @@ export function QuantityControl({
         size="icon"
         type="button"
         aria-label="Decrease quantity"
-        className="h-8 w-8 rounded-none hover:bg-black/5 text-foreground"
-        onClick={() => commitChange(quantity - (quantity <= 1 && quantity > 0.5 ? 0.5 : step))}
+        disabled={min !== undefined && currentInt <= min}
+        className="h-8 w-8 rounded-none hover:bg-black/5 text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
+        onClick={() => commitChange(currentInt - step)}
       >
         <Minus size={13} />
       </Button>
       <input
         type="number"
-        step="any"
+        step="1"
         min={min}
         max={max}
         value={val}
@@ -74,8 +77,9 @@ export function QuantityControl({
         size="icon"
         type="button"
         aria-label="Increase quantity"
-        className="h-8 w-8 rounded-none hover:bg-black/5 text-foreground"
-        onClick={() => commitChange(quantity + (quantity < 1 ? 0.5 : step))}
+        disabled={max !== undefined && currentInt >= max}
+        className="h-8 w-8 rounded-none hover:bg-black/5 text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
+        onClick={() => commitChange(currentInt + step)}
       >
         <Plus size={13} />
       </Button>

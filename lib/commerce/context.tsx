@@ -115,11 +115,15 @@ export function CommerceProvider({
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data.items) && data.items.length > 0) {
+            const sanitizedItems = data.items.map((i: CartItem) => ({
+              ...i,
+              quantity: Math.max(1, Math.round(Number(i.quantity) || 1)),
+            }));
             if (data.source === "db") {
-              setCart(data.items);
+              setCart(sanitizedItems);
               writeLS(
                 "novixa-cart",
-                data.items.map((i: CartItem) => ({ productId: i.productId, quantity: i.quantity })),
+                sanitizedItems.map((i: CartItem) => ({ productId: i.productId, quantity: i.quantity })),
               );
               hasHydratedRef.current = true;
               setIsCartLoading(false);
@@ -131,7 +135,12 @@ export function CommerceProvider({
         // fall through to localStorage
       }
       // Fallback: localStorage
-      setCart(readLS<CartItem[]>("novixa-cart", []));
+      const localCart = readLS<CartItem[]>("novixa-cart", []);
+      const sanitizedLocalCart = localCart.map((i) => ({
+        ...i,
+        quantity: Math.max(1, Math.round(Number(i.quantity) || 1)),
+      }));
+      setCart(sanitizedLocalCart);
       hasHydratedRef.current = true;
       setIsCartLoading(false);
     }
@@ -180,7 +189,7 @@ export function CommerceProvider({
   const addToCart = useCallback(async (productId: string, quantity = 1) => {
     const localProduct = getProduct(productId);
     const stock = localProduct?.stock ?? Infinity;
-    const cleanQty = Math.round(quantity * 100) / 100;
+    const cleanQty = Math.max(1, Math.round(Number(quantity) || 1));
     if (cleanQty <= 0) return;
 
     const pName = localProduct?.name || "Product";
@@ -191,7 +200,7 @@ export function CommerceProvider({
       if (existing) {
         return prev.map((i) =>
           i.productId === productId
-            ? { ...i, quantity: Math.min(Math.round((i.quantity + cleanQty) * 100) / 100, stock) }
+            ? { ...i, quantity: Math.min(i.quantity + cleanQty, stock) }
             : i,
         );
       }
@@ -220,7 +229,7 @@ export function CommerceProvider({
             if (!existing) return prev.filter((i) => i.productId !== productId);
             return prev.map((i) =>
               i.productId === productId
-                ? { ...i, quantity: Math.round((i.quantity - cleanQty) * 100) / 100 }
+                ? { ...i, quantity: Math.max(1, i.quantity - cleanQty) }
                 : i,
             );
           });
@@ -235,7 +244,7 @@ export function CommerceProvider({
   const updateQuantity = useCallback(
     async (productId: string, quantity: number) => {
       const prev = [...cart];
-      const cleanQty = Math.round(quantity * 100) / 100;
+      const cleanQty = Math.round(Number(quantity));
 
       if (cleanQty <= 0) {
         setCart((c) => c.filter((i) => i.productId !== productId));
@@ -334,7 +343,7 @@ export function CommerceProvider({
   // ── Derived values ─────────────────────────────────────────────────────────
 
   const cartCount = useMemo(
-    () => Math.round(cart.reduce((sum, i) => sum + i.quantity, 0) * 100) / 100,
+    () => cart.reduce((sum, i) => sum + Math.round(Number(i.quantity) || 0), 0),
     [cart],
   );
 
