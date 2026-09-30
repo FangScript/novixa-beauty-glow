@@ -4,7 +4,8 @@ import { cookies } from "next/headers";
 
 export async function GET(request: Request) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
-  const appUrl = process.env.APP_URL || "http://localhost:8080";
+  const url = new URL(request.url);
+  const appUrl = (process.env.APP_URL || url.origin).replace(/\/+$/, "");
 
   if (!clientId) {
     return NextResponse.json(

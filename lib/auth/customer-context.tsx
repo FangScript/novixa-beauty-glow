@@ -274,29 +274,15 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = useCallback(
     async (next = "/account") => {
       try {
-        const origin = typeof window !== "undefined" ? window.location.origin : "";
-        const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(next)}`;
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: "google",
-          options: {
-            redirectTo,
-            queryParams: {
-              access_type: "offline",
-              prompt: "consent",
-            },
-          },
-        });
-
-        if (error) {
-          return { ok: false, error: error.message };
+        if (typeof window !== "undefined") {
+          window.location.href = `/api/auth/customer/google?next=${encodeURIComponent(next)}`;
         }
-
         return { ok: true };
       } catch (err: any) {
         return { ok: false, error: err.message || "Google sign-in failed." };
       }
     },
-    [supabase],
+    [],
   );
 
   const resetPassword = useCallback(

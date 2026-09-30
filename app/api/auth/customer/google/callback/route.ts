@@ -3,8 +3,9 @@ import { cookies } from "next/headers";
 import { loginWithGoogle } from "@/lib/auth/session";
 
 export async function GET(request: Request) {
-  const appUrl = process.env.APP_URL || "http://localhost:8080";
-  const { searchParams } = new URL(request.url);
+  const url = new URL(request.url);
+  const appUrl = (process.env.APP_URL || url.origin).replace(/\/+$/, "");
+  const { searchParams } = url;
 
   const code = searchParams.get("code");
   const returnedState = searchParams.get("state");
@@ -83,8 +84,8 @@ export async function GET(request: Request) {
     }
 
     // 4. Sync email to localStorage via a redirect with a cookie hint
-    // (The context will pick up the session on next /api/auth/customer/me call)
-    const response = NextResponse.redirect(`${appUrl}${next}`);
+    const dest = next.startsWith("/") ? next : `/${next}`;
+    const response = NextResponse.redirect(`${appUrl}${dest}`);
     return response;
   } catch (error) {
     console.error("Google OAuth callback error:", error);
