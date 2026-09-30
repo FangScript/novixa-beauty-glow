@@ -24,6 +24,7 @@ export async function POST(request: Request) {
         email: cleanEmail,
         name: cleanName,
         role: "CUSTOMER",
+        emailVerifiedAt: new Date(),
         lastLoginAt: new Date(),
       },
     });

@@ -70,7 +70,8 @@ function LoginForm() {
   // Redirect if already logged in
   useEffect(() => {
     if (!authLoading && user) {
-      router.replace(nextPath);
+      const destination = nextPath && nextPath !== "/login" ? nextPath : "/account";
+      router.replace(destination);
     }
   }, [user, authLoading, router, nextPath]);
 
@@ -104,10 +105,6 @@ function LoginForm() {
     const result = await register(registerForm.name, registerForm.email, registerForm.password);
     if (!result.ok) {
       setError(result.error || "Registration failed.");
-      setIsSubmitting(false);
-    } else if (result.error) {
-      // Info note from supabase (e.g. check email)
-      setSuccessMsg(result.error);
       setIsSubmitting(false);
     } else {
       router.push(nextPath);

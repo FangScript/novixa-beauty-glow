@@ -7,6 +7,10 @@ export const SESSION_TTL_SECONDS = 60 * 60 * 8; // 8 hours
 
 export const databaseConfigured = () => Boolean(process.env.DATABASE_URL);
 
+export const isSecureCookie = () =>
+  process.env.NODE_ENV === "production" &&
+  Boolean(process.env.APP_URL ? process.env.APP_URL.startsWith("https://") : false);
+
 export function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const hash = scryptSync(password, salt, 64).toString("hex");
@@ -122,7 +126,7 @@ export async function loginAdmin(email: string, password: string) {
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE, rawSession, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isSecureCookie(),
     sameSite: "lax",
     maxAge: SESSION_TTL_SECONDS,
     path: "/",
@@ -182,6 +186,7 @@ export async function registerCustomer(name: string, email: string, password: st
         email: cleanEmail,
         passwordHash,
         role: "CUSTOMER",
+        emailVerifiedAt: new Date(),
         sessions: {
           create: {
             id: sessionId,
@@ -199,7 +204,7 @@ export async function registerCustomer(name: string, email: string, password: st
     const cookieStore = await cookies();
     cookieStore.set(CUSTOMER_SESSION_COOKIE, rawSession, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: isSecureCookie(),
       sameSite: "lax",
       maxAge: SESSION_TTL_SECONDS,
       path: "/",
@@ -240,7 +245,7 @@ export async function loginCustomer(email: string, password: string) {
   const cookieStore = await cookies();
   cookieStore.set(CUSTOMER_SESSION_COOKIE, rawSession, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isSecureCookie(),
     sameSite: "lax",
     maxAge: SESSION_TTL_SECONDS,
     path: "/",

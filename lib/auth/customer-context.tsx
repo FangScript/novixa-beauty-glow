@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, type ReactNode } from "react";
 import { createClient } from "@/utils/supabase/client";
 
 export type Customer = {
@@ -29,7 +29,7 @@ const CustomerAuthContext = createContext<CustomerAuthContextType | null>(null);
 export function CustomerAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Customer | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const syncPrismaUser = useCallback(
     async (supabaseUser: { id: string; email?: string; user_metadata?: Record<string, any> }) => {
@@ -236,7 +236,7 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
       const cleanEmail = email.trim().toLowerCase();
       const cleanName = name.trim();
       try {
-        // 1. Direct database registration (fast single-query & sets session cookie)
+        // Direct database registration (creates user, session cookie, and logs in immediately without confirmation email)
         const res = await fetch("/api/auth/customer/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -256,15 +256,6 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
           if (typeof window !== "undefined") {
             localStorage.setItem("novixa_customer_email", data.user.email);
           }
-          // Non-blocking sync with Supabase Auth in background (does not block user)
-          supabase.auth
-            .signUp({
-              email: cleanEmail,
-              password,
-              options: { data: { full_name: cleanName, role: "CUSTOMER" } },
-            })
-            .catch(() => {});
-
           return { ok: true };
         }
 
@@ -272,38 +263,12 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
           return { ok: false, error: data.error };
         }
 
-        // 2. Fallback to Supabase Auth if database registration was not reachable
-        const { data: sbData, error: sbError } = await supabase.auth.signUp({
-          email: cleanEmail,
-          password,
-          options: { data: { full_name: cleanName, role: "CUSTOMER" } },
-        });
-
-        if (sbError) {
-          return { ok: false, error: sbError.message };
-        }
-
-        if (sbData?.user?.email) {
-          const formatted: Customer = {
-            id: sbData.user.id,
-            name: cleanName,
-            email: sbData.user.email,
-            role: "CUSTOMER",
-          };
-          setUser(formatted);
-          if (typeof window !== "undefined") {
-            localStorage.setItem("novixa_customer_email", sbData.user.email);
-          }
-          syncPrismaUser({ ...sbData.user, user_metadata: { full_name: cleanName } });
-          return { ok: true };
-        }
-
-        return { ok: true };
+        return { ok: false, error: "Registration failed. Please try again." };
       } catch (err: any) {
         return { ok: false, error: err.message || "Registration failed." };
       }
     },
-    [supabase, syncPrismaUser],
+    [],
   );
 
   const signInWithGoogle = useCallback(
