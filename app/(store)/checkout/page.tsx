@@ -110,8 +110,8 @@ export default function CheckoutPage() {
     country: "United Kingdom",
   });
 
-  // Payment Selection (Unified Real-Time Payment Engine)
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>("PAYPAL");
+  // Payment Selection (Individual Real-Time Payment Methods)
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>("CARD");
   const [cardData, setCardData] = useState({
     name: "",
     number: "",
@@ -379,9 +379,11 @@ export default function CheckoutPage() {
     }
     if (!validateAddressForm()) return;
 
-    const paymentBox = document.getElementById("paypal-smart-buttons-container");
+    const paymentBox =
+      document.getElementById(`method-${paymentMethod.toLowerCase()}`) ||
+      document.getElementById("method-card");
     paymentBox?.scrollIntoView({ behavior: "smooth", block: "center" });
-    toast.info("Please select your payment option above (Card, PayPal, Apple Pay, or Google Pay).");
+    toast.info(`Please complete authorization under ${methodDisplayNames[paymentMethod]}.`);
   };
 
   const methodDisplayNames: Record<PaymentMethodType, string> = {
@@ -778,73 +780,324 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            <div className="mt-4">
+            <div className="mt-4 space-y-3">
+              {/* Option 1: Credit or Debit Card */}
               <div
-                id="paypal-smart-buttons-container"
-                className="rounded-xl border border-stone-200 bg-white p-5 sm:p-6 shadow-xs space-y-4"
+                id="method-card"
+                onClick={() => setPaymentMethod("CARD")}
+                className={`cursor-pointer rounded-xl border p-4 transition-all ${
+                  paymentMethod === "CARD"
+                    ? "border-blue-600 ring-1 ring-blue-600 bg-white shadow-xs"
+                    : "border-border bg-white/60 hover:bg-stone-50/50"
+                }`}
               >
-                {/* Header showing supported payment options */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-stone-200">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <ShieldCheck size={18} className="text-emerald-700 shrink-0" />
-                      <h3 className="font-medium text-foreground text-sm sm:text-base">
-                        Express Live Payment Gateway
-                      </h3>
-                      <span className="rounded bg-emerald-100 text-emerald-800 text-[10px] px-1.5 py-0.5 font-semibold">
-                        Instant Live Gateway
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Pay instantly with Debit or Credit Card, PayPal, Pay in 3, Apple Pay, or Google Pay.
-                    </p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      id="radio-card"
+                      name="payment_choice"
+                      checked={paymentMethod === "CARD"}
+                      onChange={() => setPaymentMethod("CARD")}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-600"
+                    />
+                    <label
+                      htmlFor="radio-card"
+                      className="font-medium text-foreground cursor-pointer text-sm sm:text-base select-none"
+                    >
+                      Credit or Debit Card
+                    </label>
                   </div>
-
-                  <div className="flex items-center flex-wrap gap-1.5 opacity-90">
+                  <div className="flex items-center gap-1.5 opacity-90">
                     <VisaLogo className="h-4.5 w-7" />
                     <MastercardLightLogo className="h-4.5 w-7" />
                     <AmexLogo className="h-4.5 w-7" />
-                    <PayPalBadge className="h-4.5 w-12" />
-                    <ApplePayBadge className="h-4.5 w-8" />
-                    <GooglePayBadge className="h-4.5 w-8" />
                   </div>
                 </div>
 
-                {!user ? (
-                  <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg text-xs text-amber-900 flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <span>Please sign in to your account before authorizing payment.</span>
-                    <Button
-                      type="button"
-                      onClick={() => router.push("/login?next=/checkout")}
-                      className="text-[10px] bg-[#211b18] text-white hover:bg-black rounded-none py-1.5 px-4 h-8 uppercase font-semibold shrink-0"
-                    >
-                      Sign In / Register
-                    </Button>
+                {paymentMethod === "CARD" && (
+                  <div
+                    className="mt-4 border-t border-stone-200 bg-[#f8fafc] -mx-4 -mb-4 p-4 sm:p-5 rounded-b-xl space-y-3"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Pay securely with Visa, Mastercard, or American Express. Direct real-time processing powered by PayPal.
+                    </p>
+                    {!user ? (
+                      <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg text-xs text-amber-900 flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <span>Please sign in to your account before entering payment.</span>
+                        <Button
+                          type="button"
+                          onClick={() => router.push("/login?next=/checkout")}
+                          className="text-[10px] bg-[#211b18] text-white hover:bg-black rounded-none py-1.5 px-4 h-8 uppercase font-semibold shrink-0"
+                        >
+                          Sign In / Register
+                        </Button>
+                      </div>
+                    ) : (
+                      <PayPalCheckoutButton
+                        fundingSource="card"
+                        amount={orderTotal}
+                        currency="GBP"
+                        items={cart.map((c) => ({
+                          productId: c.productId,
+                          quantity: c.quantity,
+                        }))}
+                        couponCode={appliedCoupon?.code}
+                        shippingMethodId={selectedShippingMethod?.id}
+                        validateBeforePayment={validateAddressForm}
+                        disabled={isSubmitting}
+                        onSuccess={async (res) => {
+                          await submitOrderWithDetails("CARD", {
+                            paypalOrderId: res.paypalOrderId,
+                            captureId: res.captureId,
+                            payerEmail: res.payerEmail || formData.email.trim(),
+                          });
+                        }}
+                        onError={(err) => {
+                          setErrorMessage(err);
+                        }}
+                      />
+                    )}
                   </div>
-                ) : (
-                  <div className="pt-2">
-                    <PayPalCheckoutButton
-                      amount={orderTotal}
-                      currency="GBP"
-                      items={cart.map((c) => ({
-                        productId: c.productId,
-                        quantity: c.quantity,
-                      }))}
-                      couponCode={appliedCoupon?.code}
-                      shippingMethodId={selectedShippingMethod?.id}
-                      validateBeforePayment={validateAddressForm}
-                      disabled={isSubmitting}
-                      onSuccess={async (res) => {
-                        await submitOrderWithDetails("PAYPAL", {
-                          paypalOrderId: res.paypalOrderId,
-                          captureId: res.captureId,
-                          payerEmail: res.payerEmail || formData.email.trim(),
-                        });
-                      }}
-                      onError={(err) => {
-                        setErrorMessage(err);
-                      }}
+                )}
+              </div>
+
+              {/* Option 2: PayPal */}
+              <div
+                id="method-paypal"
+                onClick={() => setPaymentMethod("PAYPAL")}
+                className={`cursor-pointer rounded-xl border p-4 transition-all ${
+                  paymentMethod === "PAYPAL"
+                    ? "border-blue-600 ring-1 ring-blue-600 bg-white shadow-xs"
+                    : "border-border bg-white/60 hover:bg-stone-50/50"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      id="radio-paypal"
+                      name="payment_choice"
+                      checked={paymentMethod === "PAYPAL"}
+                      onChange={() => setPaymentMethod("PAYPAL")}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-600"
                     />
+                    <label
+                      htmlFor="radio-paypal"
+                      className="font-medium text-foreground cursor-pointer text-sm sm:text-base flex items-center gap-2 select-none"
+                    >
+                      <span>PayPal</span>
+                      <span className="rounded bg-sky-100 text-sky-800 text-[10px] px-1.5 py-0.5 font-semibold">
+                        Express
+                      </span>
+                    </label>
+                  </div>
+                  <PayPalBadge className="h-5 w-16" />
+                </div>
+
+                {paymentMethod === "PAYPAL" && (
+                  <div
+                    className="mt-4 border-t border-stone-200 bg-[#f8fafc] -mx-4 -mb-4 p-4 sm:p-5 rounded-b-xl space-y-3"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Authorize your purchase securely with your PayPal balance, linked bank account, or PayPal Pay in 3 installments.
+                    </p>
+                    {!user ? (
+                      <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg text-xs text-amber-900 flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <span>Please sign in to your account before authorizing PayPal payment.</span>
+                        <Button
+                          type="button"
+                          onClick={() => router.push("/login?next=/checkout")}
+                          className="text-[10px] bg-[#211b18] text-white hover:bg-black rounded-none py-1.5 px-4 h-8 uppercase font-semibold shrink-0"
+                        >
+                          Sign In / Register
+                        </Button>
+                      </div>
+                    ) : (
+                      <PayPalCheckoutButton
+                        fundingSource="paypal"
+                        amount={orderTotal}
+                        currency="GBP"
+                        items={cart.map((c) => ({
+                          productId: c.productId,
+                          quantity: c.quantity,
+                        }))}
+                        couponCode={appliedCoupon?.code}
+                        shippingMethodId={selectedShippingMethod?.id}
+                        validateBeforePayment={validateAddressForm}
+                        disabled={isSubmitting}
+                        onSuccess={async (res) => {
+                          await submitOrderWithDetails("PAYPAL", {
+                            paypalOrderId: res.paypalOrderId,
+                            captureId: res.captureId,
+                            payerEmail: res.payerEmail || formData.email.trim(),
+                          });
+                        }}
+                        onError={(err) => {
+                          setErrorMessage(err);
+                        }}
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Option 3: Google Pay */}
+              <div
+                id="method-google-pay"
+                onClick={() => setPaymentMethod("GOOGLE_PAY")}
+                className={`cursor-pointer rounded-xl border p-4 transition-all ${
+                  paymentMethod === "GOOGLE_PAY"
+                    ? "border-blue-600 ring-1 ring-blue-600 bg-white shadow-xs"
+                    : "border-border bg-white/60 hover:bg-stone-50/50"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      id="radio-gpay"
+                      name="payment_choice"
+                      checked={paymentMethod === "GOOGLE_PAY"}
+                      onChange={() => setPaymentMethod("GOOGLE_PAY")}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-600"
+                    />
+                    <label
+                      htmlFor="radio-gpay"
+                      className="font-medium text-foreground cursor-pointer text-sm sm:text-base flex items-center gap-2 select-none"
+                    >
+                      <Smartphone size={16} />
+                      Google Pay
+                    </label>
+                  </div>
+                  <GooglePayBadge className="h-5 w-12" />
+                </div>
+                {paymentMethod === "GOOGLE_PAY" && (
+                  <div
+                    className="mt-4 border-t border-stone-200 bg-[#f8fafc] -mx-4 -mb-4 p-4 sm:p-5 rounded-b-xl space-y-3"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Check out quickly using payment cards saved in your Google Account. Biometrically protected and fast.
+                    </p>
+                    {!user ? (
+                      <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg text-xs text-amber-900 flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <span>Please sign in to your account before authorizing Google Pay.</span>
+                        <Button
+                          type="button"
+                          onClick={() => router.push("/login?next=/checkout")}
+                          className="text-[10px] bg-[#211b18] text-white hover:bg-black rounded-none py-1.5 px-4 h-8 uppercase font-semibold shrink-0"
+                        >
+                          Sign In / Register
+                        </Button>
+                      </div>
+                    ) : (
+                      <PayPalCheckoutButton
+                        amount={orderTotal}
+                        currency="GBP"
+                        items={cart.map((c) => ({
+                          productId: c.productId,
+                          quantity: c.quantity,
+                        }))}
+                        couponCode={appliedCoupon?.code}
+                        shippingMethodId={selectedShippingMethod?.id}
+                        validateBeforePayment={validateAddressForm}
+                        disabled={isSubmitting}
+                        onSuccess={async (res) => {
+                          await submitOrderWithDetails("GOOGLE_PAY", {
+                            paypalOrderId: res.paypalOrderId,
+                            captureId: res.captureId,
+                            payerEmail: res.payerEmail || formData.email.trim(),
+                          });
+                        }}
+                        onError={(err) => {
+                          setErrorMessage(err);
+                        }}
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Option 4: Apple Pay */}
+              <div
+                id="method-apple-pay"
+                onClick={() => setPaymentMethod("APPLE_PAY")}
+                className={`cursor-pointer rounded-xl border p-4 transition-all ${
+                  paymentMethod === "APPLE_PAY"
+                    ? "border-blue-600 ring-1 ring-blue-600 bg-white shadow-xs"
+                    : "border-border bg-white/60 hover:bg-stone-50/50"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      id="radio-applepay"
+                      name="payment_choice"
+                      checked={paymentMethod === "APPLE_PAY"}
+                      onChange={() => setPaymentMethod("APPLE_PAY")}
+                      className="h-4 w-4 text-rosewood"
+                    />
+                    <label
+                      htmlFor="radio-applepay"
+                      className="font-medium text-foreground cursor-pointer text-sm sm:text-base flex items-center gap-2 select-none"
+                    >
+                      Apple Pay
+                      {hasApplePay && (
+                        <span className="rounded bg-emerald-100 text-emerald-800 text-[10px] px-1.5 py-0.2 font-semibold">
+                          Device Ready
+                        </span>
+                      )}
+                    </label>
+                  </div>
+                  <ApplePayBadge className="h-5 w-12" />
+                </div>
+                {paymentMethod === "APPLE_PAY" && (
+                  <div
+                    className="mt-4 border-t border-stone-200 bg-[#f8fafc] -mx-4 -mb-4 p-4 sm:p-5 rounded-b-xl space-y-3"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Seamless one-touch checkout via Safari on iOS or macOS with Face ID / Touch ID.
+                    </p>
+                    {!user ? (
+                      <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg text-xs text-amber-900 flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <span>Please sign in to your account before authorizing Apple Pay.</span>
+                        <Button
+                          type="button"
+                          onClick={() => router.push("/login?next=/checkout")}
+                          className="text-[10px] bg-[#211b18] text-white hover:bg-black rounded-none py-1.5 px-4 h-8 uppercase font-semibold shrink-0"
+                        >
+                          Sign In / Register
+                        </Button>
+                      </div>
+                    ) : (
+                      <PayPalCheckoutButton
+                        amount={orderTotal}
+                        currency="GBP"
+                        items={cart.map((c) => ({
+                          productId: c.productId,
+                          quantity: c.quantity,
+                        }))}
+                        couponCode={appliedCoupon?.code}
+                        shippingMethodId={selectedShippingMethod?.id}
+                        validateBeforePayment={validateAddressForm}
+                        disabled={isSubmitting}
+                        onSuccess={async (res) => {
+                          await submitOrderWithDetails("APPLE_PAY", {
+                            paypalOrderId: res.paypalOrderId,
+                            captureId: res.captureId,
+                            payerEmail: res.payerEmail || formData.email.trim(),
+                          });
+                        }}
+                        onError={(err) => {
+                          setErrorMessage(err);
+                        }}
+                      />
+                    )}
                   </div>
                 )}
               </div>
@@ -957,15 +1210,17 @@ export default function CheckoutPage() {
               type="button"
               onClick={() => {
                 if (validateAddressForm()) {
-                  const paymentBox = document.getElementById("paypal-smart-buttons-container");
+                  const paymentBox =
+                    document.getElementById(`method-${paymentMethod.toLowerCase()}`) ||
+                    document.getElementById("method-card");
                   paymentBox?.scrollIntoView({ behavior: "smooth", block: "center" });
-                  toast.info("Please select your payment method above (Card, PayPal, Apple Pay, or Google Pay).");
+                  toast.info(`Please complete authorization under ${methodDisplayNames[paymentMethod]}.`);
                 }
               }}
               disabled={isSubmitting}
               className="mt-8 w-full rounded-none bg-ink text-white hover:bg-black py-6 text-[10px] font-semibold tracking-[0.14em]"
             >
-              SELECT PAYMENT METHOD ABOVE — {formatPrice(orderTotal)}
+              PAY WITH {methodDisplayNames[paymentMethod].toUpperCase()} — {formatPrice(orderTotal)}
             </Button>
           )}
           <div className="mt-3 flex items-center justify-center gap-2 text-[10px] text-muted-foreground">

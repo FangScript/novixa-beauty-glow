@@ -12,6 +12,7 @@ interface PayPalCheckoutButtonProps {
   couponCode?: string;
   shippingMethodId?: string;
   validateBeforePayment: () => boolean;
+  fundingSource?: "paypal" | "card" | "paylater" | "venmo";
   onSuccess: (paymentResult: {
     paypalOrderId: string;
     captureId?: string;
@@ -28,6 +29,7 @@ export function PayPalCheckoutButton({
   couponCode,
   shippingMethodId,
   validateBeforePayment,
+  fundingSource,
   onSuccess,
   onError,
   disabled = false,
@@ -40,8 +42,9 @@ export function PayPalCheckoutButton({
     "BAAi8QOljyA26-sCFX-3M0WIYmJk_qm16xSH4wVblfWVIv_-NFY7GvGAIw9f6D5-A8CtcHPlUOhDpXXxGs";
 
   const handleCreateOrder = async (): Promise<string> => {
+    setInitError(null);
     if (!validateBeforePayment()) {
-      throw new Error("Validation failed. Please review your address details.");
+      throw new Error("ADDRESS_VALIDATION_FAILED");
     }
 
     try {
@@ -131,25 +134,32 @@ export function PayPalCheckoutButton({
           }}
         >
           <PayPalButtons
+            fundingSource={fundingSource}
             style={{
               layout: "vertical",
-              color: "gold",
+              color: fundingSource === "card" ? "black" : "gold",
               shape: "rect",
-              label: "paypal",
-              height: 46,
+              label: fundingSource === "card" ? undefined : "paypal",
+              height: 48,
             }}
             disabled={disabled || isProcessing}
             createOrder={handleCreateOrder}
             onApprove={handleApprove}
             onError={(err: any) => {
               console.error("PayPal SDK Button Error:", err);
-              const errMsg = "PayPal authorization encountered an issue. Please try again.";
+              if (
+                err?.message?.includes("ADDRESS_VALIDATION_FAILED") ||
+                err?.message?.includes("Validation failed")
+              ) {
+                return;
+              }
+              const errMsg = "Payment authorization encountered an issue. Please try again.";
               setInitError(errMsg);
               toast.error(errMsg);
               onError?.(errMsg);
             }}
             onCancel={() => {
-              toast.info("PayPal payment was cancelled. Your shopping bag is preserved.");
+              toast.info("Payment was cancelled. Your shopping bag is preserved.");
             }}
           />
         </PayPalScriptProvider>
