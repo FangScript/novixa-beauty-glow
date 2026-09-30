@@ -1116,44 +1116,6 @@ export default function CheckoutPage() {
                 )}
               </div>
 
-              {/* Option 5: Klarna */}
-              <div
-                onClick={() => setPaymentMethod("KLARNA")}
-                className={`cursor-pointer rounded-xl border p-4 transition-all ${
-                  paymentMethod === "KLARNA"
-                    ? "border-blue-600 ring-1 ring-blue-600 bg-white shadow-xs"
-                    : "border-border bg-white/60 hover:bg-stone-50/50"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      id="method-klarna"
-                      name="payment_choice"
-                      checked={paymentMethod === "KLARNA"}
-                      onChange={() => setPaymentMethod("KLARNA")}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-600"
-                    />
-                    <label
-                      htmlFor="method-klarna"
-                      className="font-medium text-foreground cursor-pointer text-sm sm:text-base flex items-center gap-2 select-none"
-                    >
-                      Klarna
-                      <span className="rounded bg-pink-100 text-pink-800 text-[10px] px-1.5 py-0.5 font-semibold">
-                        Pay in 3
-                      </span>
-                    </label>
-                  </div>
-                  <KlarnaBadge className="h-5 w-12" />
-                </div>
-                {paymentMethod === "KLARNA" && (
-                  <div className="mt-3 text-xs text-muted-foreground pl-7 leading-relaxed">
-                    Split your purchase into <strong>3 interest-free payments</strong> of{" "}
-                    <strong>{formatPrice(orderTotal / 3)}</strong>. No added fees when paid on time.
-                  </div>
-                )}
-              </div>
             </div>
           </section>
         </div>

@@ -174,7 +174,7 @@ const structuredData = {
       name: "NOVIXA Online Store",
       url: baseUrl,
       currenciesAccepted: "GBP",
-      paymentAccepted: "Credit Card, Debit Card, PayPal, Klarna",
+      paymentAccepted: "Credit Card, Debit Card, PayPal",
       priceRange: "££",
       parentOrganization: {
         "@id": `${baseUrl}/#organization`,
