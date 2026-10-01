@@ -11,6 +11,15 @@ interface PayPalCheckoutButtonProps {
   items: Array<{ productId: string; quantity: number; price?: number }>;
   couponCode?: string;
   shippingMethodId?: string;
+  shippingAddress?: {
+    name?: string;
+    addressLine1?: string;
+    addressLine2?: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+    countryCode?: string;
+  };
   validateBeforePayment: () => boolean;
   fundingSource?: "paypal" | "card" | "paylater" | "venmo";
   onSuccess: (paymentResult: {
@@ -28,6 +37,7 @@ export function PayPalCheckoutButton({
   items,
   couponCode,
   shippingMethodId,
+  shippingAddress,
   validateBeforePayment,
   fundingSource,
   onSuccess,
@@ -55,6 +65,7 @@ export function PayPalCheckoutButton({
           items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
           couponCode: couponCode || undefined,
           shippingMethodId: shippingMethodId || undefined,
+          shippingAddress: shippingAddress || undefined,
           currency,
         }),
       });
@@ -108,7 +119,7 @@ export function PayPalCheckoutButton({
   };
 
   return (
-    <div className="w-full space-y-3 pt-2">
+    <div className="w-full max-w-full overflow-hidden space-y-3 pt-2">
       {initError && (
         <div className="flex items-center gap-2 text-xs text-rose-700 bg-rose-50 p-3 border border-rose-200">
           <AlertCircle size={14} />
@@ -123,7 +134,7 @@ export function PayPalCheckoutButton({
         </div>
       )}
 
-      <div className={isProcessing || disabled ? "pointer-events-none opacity-50" : ""}>
+      <div className={`w-full max-w-full overflow-hidden ${isProcessing || disabled ? "pointer-events-none opacity-50" : ""}`}>
         <PayPalScriptProvider
           options={{
             clientId,

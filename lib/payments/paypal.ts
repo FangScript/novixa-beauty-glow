@@ -80,12 +80,49 @@ export interface CreateOrderParams {
   orderNumber?: string;
   customId?: string;
   description?: string;
+  shippingAddress?: {
+    name?: string;
+    addressLine1?: string;
+    addressLine2?: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+    countryCode?: string;
+  };
   items?: Array<{
     name: string;
     unitAmount: number;
     quantity: number;
     sku?: string;
   }>;
+}
+
+const COUNTRY_MAP: Record<string, string> = {
+  "united kingdom": "GB",
+  uk: "GB",
+  "great britain": "GB",
+  pakistan: "PK",
+  "united states": "US",
+  usa: "US",
+  canada: "CA",
+  australia: "AU",
+  germany: "DE",
+  france: "FR",
+  "united arab emirates": "AE",
+  uae: "AE",
+  "saudi arabia": "SA",
+  india: "IN",
+  ireland: "IE",
+  netherlands: "NL",
+  italy: "IT",
+  spain: "ES",
+};
+
+export function resolveCountryCode(countryStr?: string): string {
+  if (!countryStr) return "GB";
+  const trimmed = countryStr.trim().toLowerCase();
+  if (trimmed.length === 2) return trimmed.toUpperCase();
+  return COUNTRY_MAP[trimmed] || "GB";
 }
 
 /**
@@ -117,6 +154,24 @@ export async function createPayPalOrder(params: CreateOrderParams) {
       shipping_preference: "NO_SHIPPING",
     },
   };
+
+  if (params.shippingAddress) {
+    const countryCode = resolveCountryCode(params.shippingAddress.countryCode);
+    payload.purchase_units[0].shipping = {
+      name: {
+        full_name: params.shippingAddress.name || "Customer",
+      },
+      address: {
+        address_line_1: params.shippingAddress.addressLine1 || "1 High Street",
+        address_line_2: params.shippingAddress.addressLine2 || "",
+        admin_area_2: params.shippingAddress.city || "London",
+        admin_area_1: params.shippingAddress.state || "",
+        postal_code: params.shippingAddress.postalCode || "SW1A 1AA",
+        country_code: countryCode,
+      },
+    };
+    payload.application_context.shipping_preference = "SET_PROVIDED_ADDRESS";
+  }
 
   const response = await fetch(`${baseUrl}/v2/checkout/orders`, {
     method: "POST",

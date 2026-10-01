@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { items, couponCode, shippingMethodId } = body;
+    const { items, couponCode, shippingMethodId, shippingAddress } = body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: "Cart is empty." }, { status: 400 });
@@ -98,6 +98,7 @@ export async function POST(request: Request) {
       currency: "GBP",
       orderNumber: tempOrderRef,
       description: "Novixa Beauty & Glow Luxury Purchase",
+      shippingAddress,
     });
 
     return NextResponse.json({

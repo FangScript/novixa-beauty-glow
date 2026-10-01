@@ -215,6 +215,19 @@ export default function CheckoutPage() {
   const shippingCharge = selectedShippingMethod ? selectedShippingMethod.price : 0.20;
   const orderTotal = Math.max(0, Math.round((Math.max(0, subtotal - discount) + shippingCharge) * 100) / 100);
 
+  const currentShippingAddress = useMemo(
+    () => ({
+      name: formData.name.trim(),
+      addressLine1: formData.address.trim(),
+      addressLine2: "",
+      city: formData.city.trim(),
+      state: formData.state.trim(),
+      postalCode: formData.pinCode.trim(),
+      countryCode: formData.country.trim(),
+    }),
+    [formData],
+  );
+
   // Format card number with spaces (4 4 4 4)
   const handleCardNumberChange = (val: string) => {
     const raw = val.replace(/\D/g, "").slice(0, 16);
@@ -622,7 +635,7 @@ export default function CheckoutPage() {
       )}
 
       <form className="mt-8 grid gap-10 lg:grid-cols-[1fr_390px]" onSubmit={handleSubmit}>
-        <div className="space-y-8">
+        <div className="space-y-8 min-w-0 max-w-full">
           {errorMessage && (
             <div className="border border-[#b86d5a] bg-[#fbf2ef] p-4 text-xs text-[#8f2d18] flex items-start gap-2.5">
               <Info size={16} className="shrink-0 mt-0.5 text-[#b86d5a]" />
@@ -817,7 +830,7 @@ export default function CheckoutPage() {
 
                 {paymentMethod === "CARD" && (
                   <div
-                    className="mt-4 border-t border-stone-200 bg-[#f8fafc] -mx-4 -mb-4 p-4 sm:p-5 rounded-b-xl space-y-3"
+                    className="mt-4 border-t border-stone-200 bg-[#f8fafc] -mx-4 -mb-4 p-4 sm:p-5 rounded-b-xl space-y-3 max-w-full overflow-hidden"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <p className="text-xs text-muted-foreground leading-relaxed">
@@ -845,6 +858,7 @@ export default function CheckoutPage() {
                         }))}
                         couponCode={appliedCoupon?.code}
                         shippingMethodId={selectedShippingMethod?.id}
+                        shippingAddress={currentShippingAddress}
                         validateBeforePayment={validateAddressForm}
                         disabled={isSubmitting}
                         onSuccess={async (res) => {
@@ -898,7 +912,7 @@ export default function CheckoutPage() {
 
                 {paymentMethod === "PAYPAL" && (
                   <div
-                    className="mt-4 border-t border-stone-200 bg-[#f8fafc] -mx-4 -mb-4 p-4 sm:p-5 rounded-b-xl space-y-3"
+                    className="mt-4 border-t border-stone-200 bg-[#f8fafc] -mx-4 -mb-4 p-4 sm:p-5 rounded-b-xl space-y-3 max-w-full overflow-hidden"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <p className="text-xs text-muted-foreground leading-relaxed">
@@ -926,6 +940,7 @@ export default function CheckoutPage() {
                         }))}
                         couponCode={appliedCoupon?.code}
                         shippingMethodId={selectedShippingMethod?.id}
+                        shippingAddress={currentShippingAddress}
                         validateBeforePayment={validateAddressForm}
                         disabled={isSubmitting}
                         onSuccess={async (res) => {
@@ -976,7 +991,7 @@ export default function CheckoutPage() {
                 </div>
                 {paymentMethod === "GOOGLE_PAY" && (
                   <div
-                    className="mt-4 border-t border-stone-200 bg-[#f8fafc] -mx-4 -mb-4 p-4 sm:p-5 rounded-b-xl space-y-3"
+                    className="mt-4 border-t border-stone-200 bg-[#f8fafc] -mx-4 -mb-4 p-4 sm:p-5 rounded-b-xl space-y-3 max-w-full overflow-hidden"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <p className="text-xs text-muted-foreground leading-relaxed">
@@ -1003,6 +1018,7 @@ export default function CheckoutPage() {
                         }))}
                         couponCode={appliedCoupon?.code}
                         shippingMethodId={selectedShippingMethod?.id}
+                        shippingAddress={currentShippingAddress}
                         validateBeforePayment={validateAddressForm}
                         disabled={isSubmitting}
                         onSuccess={async (res) => {
@@ -1057,7 +1073,7 @@ export default function CheckoutPage() {
                 </div>
                 {paymentMethod === "APPLE_PAY" && (
                   <div
-                    className="mt-4 border-t border-stone-200 bg-[#f8fafc] -mx-4 -mb-4 p-4 sm:p-5 rounded-b-xl space-y-3"
+                    className="mt-4 border-t border-stone-200 bg-[#f8fafc] -mx-4 -mb-4 p-4 sm:p-5 rounded-b-xl space-y-3 max-w-full overflow-hidden"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <p className="text-xs text-muted-foreground leading-relaxed">
@@ -1084,6 +1100,7 @@ export default function CheckoutPage() {
                         }))}
                         couponCode={appliedCoupon?.code}
                         shippingMethodId={selectedShippingMethod?.id}
+                        shippingAddress={currentShippingAddress}
                         validateBeforePayment={validateAddressForm}
                         disabled={isSubmitting}
                         onSuccess={async (res) => {
