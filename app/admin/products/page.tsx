@@ -59,7 +59,10 @@ function toForm(product: Product): ProductForm {
     sku: product.sku,
     description: product.description,
     price: String(product.price),
-    salePrice: product.salePrice ? String(product.salePrice) : "",
+    salePrice:
+      product.salePrice !== undefined && product.salePrice !== null
+        ? String(product.salePrice)
+        : "",
     category: product.category,
     gender: product.gender,
     stock: String(product.stock),
@@ -131,19 +134,20 @@ export default function AdminProductsPage() {
     }
 
     const numPrice = Number(form.price);
-    if (!form.price || isNaN(numPrice) || numPrice <= 0) {
-      const msg = "Please enter a valid price greater than 0 (e.g. 1.99).";
+    if (form.price === "" || isNaN(numPrice) || numPrice < 0) {
+      const msg = "Please enter a valid price of 0.00 or greater.";
       setError(msg);
       toast.error(msg);
       return;
     }
 
-    const numSalePrice = form.salePrice ? Number(form.salePrice) : undefined;
+    const numSalePrice =
+      form.salePrice !== "" && form.salePrice !== undefined ? Number(form.salePrice) : undefined;
     if (
       numSalePrice !== undefined &&
-      (isNaN(numSalePrice) || numSalePrice <= 0 || numSalePrice >= numPrice)
+      (isNaN(numSalePrice) || numSalePrice < 0 || numSalePrice >= numPrice)
     ) {
-      const msg = "Sale price must be greater than 0 and lower than regular price.";
+      const msg = "Sale price must be 0 or greater and lower than regular price.";
       setError(msg);
       toast.error(msg);
       return;
@@ -225,8 +229,14 @@ export default function AdminProductsPage() {
             id: resData.product.id || savedProduct.id,
             sku: resData.product.sku || savedProduct.sku,
             slug: resData.product.slug || savedProduct.slug,
-            price: Number(resData.product.price) || savedProduct.price,
-            salePrice: resData.product.salePrice ? Number(resData.product.salePrice) : undefined,
+            price:
+              resData.product.price !== undefined && resData.product.price !== null
+                ? Number(resData.product.price)
+                : savedProduct.price,
+            salePrice:
+              resData.product.salePrice !== undefined && resData.product.salePrice !== null
+                ? Number(resData.product.salePrice)
+                : undefined,
             images: resData.product.images?.length ? resData.product.images : savedProduct.images,
           }
         : savedProduct;
@@ -457,7 +467,7 @@ export default function AdminProductsPage() {
                 <input
                   type="number"
                   step="0.01"
-                  min="0.01"
+                  min="0"
                   className={inputClass}
                   value={form.price}
                   onChange={(e) => setForm({ ...form, price: e.target.value })}
@@ -467,7 +477,7 @@ export default function AdminProductsPage() {
                 <input
                   type="number"
                   step="0.01"
-                  min="0.01"
+                  min="0"
                   className={inputClass}
                   value={form.salePrice}
                   onChange={(e) => setForm({ ...form, salePrice: e.target.value })}

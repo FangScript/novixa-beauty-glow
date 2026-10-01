@@ -31,7 +31,7 @@ export function ProductCard({ product }: { product: Product }) {
           </h3>
         </Link>
         <p className="mt-1 text-sm font-medium">
-          {product.salePrice ? (
+          {product.salePrice !== undefined && product.salePrice !== null ? (
             <>
               <span className="text-rosewood font-semibold">{formatPrice(product.salePrice)}</span>{" "}
               <del className="ml-1 text-xs font-normal text-muted-foreground">

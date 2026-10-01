@@ -80,7 +80,7 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
           </a>
 
           <p className="mt-5 text-2xl font-medium">
-            {product.salePrice ? (
+            {product.salePrice !== undefined && product.salePrice !== null ? (
               <>
                 <span className="text-rosewood font-semibold">
                   {formatPrice(product.salePrice)}

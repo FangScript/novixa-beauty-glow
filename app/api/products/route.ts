@@ -126,9 +126,24 @@ export async function POST(request: Request) {
       brand,
     } = body;
 
-    if (!name || !sku || !price || !category) {
+    if (
+      !name ||
+      !sku ||
+      price === undefined ||
+      price === null ||
+      price === "" ||
+      !category
+    ) {
       return NextResponse.json(
         { error: "Product name, SKU, price, and category are required." },
+        { status: 400 },
+      );
+    }
+
+    const numPrice = Number(price);
+    if (isNaN(numPrice) || numPrice < 0) {
+      return NextResponse.json(
+        { error: "Price must be a valid number (0.00 or greater)." },
         { status: 400 },
       );
     }
@@ -176,8 +191,11 @@ export async function POST(request: Request) {
             name,
             slug: safeSlug,
             description: description || "Luxury formulation crafted by NOVIXA.",
-            price: Number(price),
-            salePrice: salePrice ? Number(salePrice) : null,
+            price: numPrice,
+            salePrice:
+              salePrice !== undefined && salePrice !== null && salePrice !== ""
+                ? Number(salePrice)
+                : null,
             category: normalizedCategory,
             categoryId: catRecord.id,
             gender: normalizedGender,
@@ -214,8 +232,11 @@ export async function POST(request: Request) {
             slug: safeSlug,
             sku: upperSku,
             description: description || "Luxury formulation crafted by NOVIXA.",
-            price: Number(price),
-            salePrice: salePrice ? Number(salePrice) : null,
+            price: numPrice,
+            salePrice:
+              salePrice !== undefined && salePrice !== null && salePrice !== ""
+                ? Number(salePrice)
+                : null,
             category: normalizedCategory,
             categoryId: catRecord.id,
             gender: normalizedGender,
@@ -255,8 +276,11 @@ export async function POST(request: Request) {
         slug: safeSlug,
         sku: upperSku,
         description,
-        price,
-        salePrice,
+        price: numPrice,
+        salePrice:
+          salePrice !== undefined && salePrice !== null && salePrice !== ""
+            ? Number(salePrice)
+            : null,
         category,
         gender,
         stock,
@@ -335,11 +359,20 @@ export async function PUT(request: Request) {
       }
       if (sku !== undefined) updateData.sku = sku.toUpperCase();
       if (description !== undefined) updateData.description = description;
-      if (price !== undefined && price !== null && Number(price) > 0) {
+      if (
+        price !== undefined &&
+        price !== null &&
+        price !== "" &&
+        !isNaN(Number(price)) &&
+        Number(price) >= 0
+      ) {
         updateData.price = Number(price);
       }
       if (salePrice !== undefined) {
-        updateData.salePrice = salePrice ? Number(salePrice) : null;
+        updateData.salePrice =
+          salePrice !== null && salePrice !== "" && !isNaN(Number(salePrice))
+            ? Number(salePrice)
+            : null;
       }
       if (gender !== undefined) updateData.gender = toPrismaGender(gender);
       if (brand !== undefined) updateData.brand = brand;
@@ -379,8 +412,21 @@ export async function PUT(request: Request) {
             slug: updateData.slug || `prod-${Date.now()}`,
             sku: (sku || `SKU-${Date.now()}`).toUpperCase(),
             description: description || "Luxury formulation crafted by NOVIXA.",
-            price: Number(price) || 50,
-            salePrice: salePrice ? Number(salePrice) : null,
+            price:
+              price !== undefined &&
+              price !== null &&
+              price !== "" &&
+              !isNaN(Number(price)) &&
+              Number(price) >= 0
+                ? Number(price)
+                : 50,
+            salePrice:
+              salePrice !== null &&
+              salePrice !== undefined &&
+              salePrice !== "" &&
+              !isNaN(Number(salePrice))
+                ? Number(salePrice)
+                : null,
             category: toPrismaCategory(category || "perfume"),
             categoryId: catRecord.id,
             gender: toPrismaGender(gender || "unisex"),

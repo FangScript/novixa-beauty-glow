@@ -22,8 +22,8 @@ export const productSchema = z
     name: z.string().min(2),
     slug: z.string().regex(/^[a-z0-9-]+$/),
     description: z.string().min(10),
-    price: z.number().positive(),
-    salePrice: z.number().positive().optional(),
+    price: z.number().min(0),
+    salePrice: z.number().min(0).optional(),
     gender: genderSchema,
     category: productCategorySchema,
     brand: z.string().min(1),
@@ -47,10 +47,16 @@ export const productSchema = z
     badge: z.string().optional(),
     tags: z.array(z.string()),
   })
-  .refine((product) => !product.salePrice || product.salePrice < product.price, {
-    message: "Sale price must be lower than regular price",
-    path: ["salePrice"],
-  });
+  .refine(
+    (product) =>
+      product.salePrice === undefined ||
+      product.salePrice === null ||
+      product.salePrice < product.price,
+    {
+      message: "Sale price must be lower than regular price",
+      path: ["salePrice"],
+    },
+  );
 export type Gender = z.infer<typeof genderSchema>;
 export type ProductCategory = z.infer<typeof productCategorySchema>;
 export type Product = z.infer<typeof productSchema>;

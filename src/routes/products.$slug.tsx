@@ -58,7 +58,7 @@ function ProductDetail() {
             </span>
           </div>
           <p className="mt-5 text-2xl font-semibold">
-            {product.salePrice ? (
+            {product.salePrice !== undefined && product.salePrice !== null ? (
               <>
                 <span className="text-rosewood">{formatPrice(product.salePrice)}</span>{" "}
                 <del className="ml-2 text-base font-normal text-muted-foreground">

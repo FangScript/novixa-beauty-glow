@@ -55,7 +55,10 @@ function toForm(product: Product): ProductForm {
     sku: product.sku,
     description: product.description,
     price: String(product.price),
-    salePrice: product.salePrice ? String(product.salePrice) : "",
+    salePrice:
+      product.salePrice !== undefined && product.salePrice !== null
+        ? String(product.salePrice)
+        : "",
     category: product.category,
     gender: product.gender,
     stock: String(product.stock),
@@ -132,7 +135,10 @@ function AdminProducts() {
         .replace(/(^-|-$)/g, ""),
       description: form.description.trim() || "Luxury formulation crafted by NOVIXA.",
       price: Number(form.price),
-      salePrice: form.salePrice ? Number(form.salePrice) : undefined,
+      salePrice:
+        form.salePrice !== "" && form.salePrice !== undefined
+          ? Number(form.salePrice)
+          : undefined,
       gender: form.gender,
       category: form.category,
       brand: selected?.brand ?? "NOVIXA",
@@ -380,7 +386,7 @@ function ProductForm({
           <input
             type="number"
             step="0.01"
-            min="0.01"
+            min="0"
             value={form.price}
             onChange={(e) => update("price", e.target.value)}
             className={inputClass}
@@ -390,7 +396,7 @@ function ProductForm({
           <input
             type="number"
             step="0.01"
-            min="0.01"
+            min="0"
             value={form.salePrice}
             onChange={(e) => update("salePrice", e.target.value)}
             className={inputClass}
