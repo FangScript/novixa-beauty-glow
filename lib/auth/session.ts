@@ -266,7 +266,7 @@ export async function getAuthenticatedCustomer() {
       include: { user: true },
     });
 
-    if (!session || session.expiresAt <= new Date() || session.user.role !== "CUSTOMER") {
+    if (!session || session.expiresAt <= new Date()) {
       if (session) {
         await prisma.session.delete({ where: { id: session.id } }).catch(() => undefined);
       }
@@ -399,5 +399,9 @@ export async function loginWithGoogle(googleId: string, email: string, name: str
     path: "/",
   });
 
-  return { ok: true as const, user: { id: user.id, email: user.email, name: user.name } };
+  return {
+    ok: true as const,
+    rawSession,
+    user: { id: user.id, email: user.email, name: user.name, role: user.role },
+  };
 }

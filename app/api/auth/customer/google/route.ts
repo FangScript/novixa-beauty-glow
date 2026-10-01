@@ -1,37 +1,26 @@
 import { NextResponse } from "next/server";
-import { randomBytes } from "node:crypto";
-import { cookies } from "next/headers";
+import { createSignedState, getGoogleRedirectUri } from "@/lib/auth/google-oauth";
 
 export async function GET(request: Request) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
-  const url = new URL(request.url);
-  const appUrl = (process.env.APP_URL || url.origin).replace(/\/+$/, "");
 
   if (!clientId) {
+    console.error("Google OAuth error: GOOGLE_CLIENT_ID is not configured in .env");
     return NextResponse.json(
       { error: "Google OAuth is not configured. Add GOOGLE_CLIENT_ID to .env" },
       { status: 503 },
     );
   }
 
-  // Capture the ?next= param to preserve redirect destination through the OAuth flow
+  // Capture the ?next= param to preserve destination (e.g. /account, /checkout)
   const { searchParams } = new URL(request.url);
   const next = searchParams.get("next") || "/account";
 
-  // Generate a CSRF state token
-  const state = randomBytes(16).toString("hex") + "|" + encodeURIComponent(next);
+  // Create HMAC-signed state token containing nonce, timestamp, and destination
+  const state = createSignedState(next);
 
-  // Store state in a short-lived httpOnly cookie for validation in callback
-  const cookieStore = await cookies();
-  cookieStore.set("novixa_google_state", state, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 600, // 10 minutes
-    path: "/",
-  });
-
-  const redirectUri = `${appUrl}/api/auth/customer/google/callback`;
+  // Compute canonical redirect URI (must match Google Cloud Console and callback)
+  const redirectUri = getGoogleRedirectUri(request);
 
   const params = new URLSearchParams({
     client_id: clientId,
@@ -45,5 +34,16 @@ export async function GET(request: Request) {
 
   const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 
-  return NextResponse.redirect(googleAuthUrl);
+  const response = NextResponse.redirect(googleAuthUrl);
+
+  // Set the state cookie directly on the redirect response headers
+  response.cookies.set("novixa_google_state", state, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 900, // 15 minutes
+    path: "/",
+  });
+
+  return response;
 }
