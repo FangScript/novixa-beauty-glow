@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import {
   Heart,
   Search,
@@ -27,6 +27,8 @@ export function Navbar() {
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const [query, setQuery] = useState("");
   const router = useRouter();
+  const pathname = usePathname();
+  const isCheckout = pathname === "/checkout";
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const submit = (e: React.FormEvent) => {
@@ -67,7 +69,11 @@ export function Navbar() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 border-b border-primary-foreground/10 bg-ink/95 text-primary-foreground backdrop-blur-md">
+      <header
+        className={`${
+          isCheckout ? "relative z-20" : "sticky top-0 z-50"
+        } border-b border-primary-foreground/10 bg-ink/95 text-primary-foreground backdrop-blur-md`}
+      >
         <div className="page-shell flex h-18 items-center justify-between gap-4">
           <Link href="/" className="font-display text-2xl tracking-wide">
             NOVIXA
