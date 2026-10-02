@@ -51,6 +51,9 @@ docker build \
   --build-arg NEXT_PUBLIC_PAYPAL_CLIENT_ID="$CLIENT_ID" \
   --build-arg NEXT_PUBLIC_SUPABASE_URL="$SUPABASE_URL" \
   --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="$SUPABASE_ANON" \
+  --build-arg NEXT_PUBLIC_GOOGLE_PAY_MERCHANT_ID="BCR2DN6D5L703ZKP" \
+  --build-arg NEXT_PUBLIC_PAYPAL_MODE="live" \
+  --build-arg NEXT_PUBLIC_GOOGLE_PAY_ENV="${GOOGLE_PAY_ENV:-TEST}" \
   -t novixa-beauty-glow:latest .
 
 echo "=== 3. Recreating Container with New Image & Live Env ==="

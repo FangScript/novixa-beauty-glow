@@ -113,6 +113,7 @@ export function NativeGooglePayButton({
       });
       paymentsClientRef.current = client;
 
+      // Base card payment method for isReadyToPay check
       const isReadyToPayRequest = {
         apiVersion: 2,
         apiVersionMinor: 0,
@@ -126,7 +127,8 @@ export function NativeGooglePayButton({
             tokenizationSpecification: {
               type: "PAYMENT_GATEWAY",
               parameters: {
-                gateway: "paypal",
+                gateway: "paypalppcp",
+                gatewayMerchantId: clientId,
                 "paypal:clientId": clientId,
               },
             },
@@ -190,29 +192,47 @@ export function NativeGooglePayButton({
       const paypalOrderId = orderData.id;
 
       // 2. Request payment data via native Google Pay sheet
+      // Check if PayPal SDK provides dynamic Google Pay config
+      let allowedPaymentMethods: any[] = [
+        {
+          type: "CARD",
+          parameters: {
+            allowedAuthMethods: ["PAN_ONLY", "CRYPTOGRAM_3DS"],
+            allowedCardNetworks: ["MASTERCARD", "VISA", "AMEX", "DISCOVER"],
+            billingAddressRequired: true,
+            billingAddressParameters: {
+              format: "FULL",
+            },
+          },
+          tokenizationSpecification: {
+            type: "PAYMENT_GATEWAY",
+            parameters: {
+              gateway: "paypalppcp",
+              gatewayMerchantId: clientId,
+              "paypal:clientId": clientId,
+            },
+          },
+        },
+      ];
+
+      if (typeof window !== "undefined" && (window as any).paypal?.Googlepay) {
+        try {
+          const ppConfig = await (window as any).paypal.Googlepay().config();
+          if (ppConfig?.allowedPaymentMethods && ppConfig.allowedPaymentMethods.length > 0) {
+            allowedPaymentMethods = ppConfig.allowedPaymentMethods;
+          }
+        } catch (sdkConfigErr) {
+          console.warn("paypal.Googlepay().config() notice:", sdkConfigErr);
+        }
+      }
+
+      const origin = typeof window !== "undefined" ? window.location.origin : "https://www.novixaretail.com";
+      const gpayMerchantId = process.env.NEXT_PUBLIC_GOOGLE_PAY_MERCHANT_ID || "BCR2DN6D5L703ZKP";
+
       const paymentDataRequest = {
         apiVersion: 2,
         apiVersionMinor: 0,
-        allowedPaymentMethods: [
-          {
-            type: "CARD",
-            parameters: {
-              allowedAuthMethods: ["PAN_ONLY", "CRYPTOGRAM_3DS"],
-              allowedCardNetworks: ["MASTERCARD", "VISA", "AMEX", "DISCOVER"],
-              billingAddressRequired: true,
-              billingAddressParameters: {
-                format: "FULL",
-              },
-            },
-            tokenizationSpecification: {
-              type: "PAYMENT_GATEWAY",
-              parameters: {
-                gateway: "paypal",
-                "paypal:clientId": clientId,
-              },
-            },
-          },
-        ],
+        allowedPaymentMethods,
         transactionInfo: {
           totalPriceStatus: "FINAL",
           totalPrice: amount.toFixed(2),
@@ -220,11 +240,25 @@ export function NativeGooglePayButton({
           countryCode: "GB",
         },
         merchantInfo: {
+          merchantId: gpayMerchantId,
           merchantName: "NOVIXA UK",
+          merchantOrigin: origin,
         },
       };
 
       const paymentData = await paymentsClientRef.current.loadPaymentData(paymentDataRequest);
+
+      // Optional: Client-side SDK confirmation if available
+      if (typeof window !== "undefined" && (window as any).paypal?.Googlepay) {
+        try {
+          await (window as any).paypal.Googlepay().confirmOrder({
+            orderId: paypalOrderId,
+            paymentMethodData: paymentData.paymentMethodData,
+          });
+        } catch (sdkConfirmErr: any) {
+          console.warn("paypal.Googlepay().confirmOrder notice:", sdkConfirmErr?.message || sdkConfirmErr);
+        }
+      }
 
       // 3. Confirm payment source and capture through PayPal
       const confirmRes = await fetch("/api/wallets/googlepay-confirm", {
