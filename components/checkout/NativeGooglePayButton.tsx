@@ -68,9 +68,11 @@ export function NativeGooglePayButton({
     process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID ||
     "BAAi8QOljyA26-sCFX-3M0WIYmJk_qm16xSH4wVblfWVIv_-NFY7GvGAIw9f6D5-A8CtcHPlUOhDpXXxGs";
 
-  const googlePayEnv =
-    process.env.NEXT_PUBLIC_PAYPAL_MODE === "live" ||
-    process.env.PAYPAL_MODE === "live"
+  // Google Pay must run in TEST environment until Google approves the merchant profile
+  // in the Google Pay & Wallet Console. Setting environment to PRODUCTION before Google approval
+  // triggers [OR_BIBED_11] ("Merchant trouble accepting payments").
+  const googlePayEnv: "TEST" | "PRODUCTION" =
+    process.env.NEXT_PUBLIC_GOOGLE_PAY_ENV === "PRODUCTION"
       ? "PRODUCTION"
       : "TEST";
 
@@ -239,11 +241,16 @@ export function NativeGooglePayButton({
           currencyCode: currency,
           countryCode: "GB",
         },
-        merchantInfo: {
-          merchantId: gpayMerchantId,
-          merchantName: "NOVIXA UK",
-          merchantOrigin: origin,
-        },
+        merchantInfo:
+          googlePayEnv === "PRODUCTION"
+            ? {
+                merchantId: gpayMerchantId,
+                merchantName: "NOVIXA UK",
+                merchantOrigin: origin,
+              }
+            : {
+                merchantName: "NOVIXA UK",
+              },
       };
 
       const paymentData = await paymentsClientRef.current.loadPaymentData(paymentDataRequest);
