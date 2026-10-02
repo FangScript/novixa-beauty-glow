@@ -27,6 +27,11 @@ import { cartProducts, formatPrice, useCommerce } from "@/lib/commerce/context";
 import { AddressSelector } from "@/components/address/AddressSelector";
 import { useCustomerAuth } from "@/lib/auth/customer-context";
 import { PayPalCheckoutButton } from "@/components/checkout/PayPalCheckoutButton";
+import { NativeGooglePayButton } from "@/components/checkout/NativeGooglePayButton";
+import {
+  NativeApplePayButton,
+  checkApplePaySupport,
+} from "@/components/checkout/NativeApplePayButton";
 import {
   CardBrandBadges,
   PayPalBadge,
@@ -122,15 +127,10 @@ export default function CheckoutPage() {
   const [expiryInput, setExpiryInput] = useState("");
   const [useShippingAsBilling, setUseShippingAsBilling] = useState(true);
 
-  // Device Apple Pay capability detection
+  // Device Apple Pay capability detection (strictly Safari / iOS / macOS)
   const [hasApplePay, setHasApplePay] = useState(false);
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const isApplePayAvailable =
-        Boolean((window as any).ApplePaySession) &&
-        Boolean((window as any).ApplePaySession?.canMakePayments?.());
-      setHasApplePay(isApplePayAvailable);
-    }
+    setHasApplePay(checkApplePaySupport());
   }, []);
 
   // Pre-fill from authenticated user
@@ -1009,7 +1009,8 @@ export default function CheckoutPage() {
                         </Button>
                       </div>
                     ) : (
-                      <PayPalCheckoutButton
+                      <NativeGooglePayButton
+                        key="native-google-pay"
                         amount={orderTotal}
                         currency="GBP"
                         items={cart.map((c) => ({
@@ -1037,87 +1038,88 @@ export default function CheckoutPage() {
                 )}
               </div>
 
-              {/* Option 4: Apple Pay */}
-              <div
-                id="method-apple-pay"
-                onClick={() => setPaymentMethod("APPLE_PAY")}
-                className={`cursor-pointer rounded-xl border p-4 transition-all ${
-                  paymentMethod === "APPLE_PAY"
-                    ? "border-blue-600 ring-1 ring-blue-600 bg-white shadow-xs"
-                    : "border-border bg-white/60 hover:bg-stone-50/50"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      id="radio-applepay"
-                      name="payment_choice"
-                      checked={paymentMethod === "APPLE_PAY"}
-                      onChange={() => setPaymentMethod("APPLE_PAY")}
-                      className="h-4 w-4 text-rosewood"
-                    />
-                    <label
-                      htmlFor="radio-applepay"
-                      className="font-medium text-foreground cursor-pointer text-sm sm:text-base flex items-center gap-2 select-none"
-                    >
-                      Apple Pay
-                      {hasApplePay && (
+              {/* Option 4: Apple Pay (Strictly rendered ONLY on Apple Pay capable devices/Safari) */}
+              {hasApplePay && (
+                <div
+                  id="method-apple-pay"
+                  onClick={() => setPaymentMethod("APPLE_PAY")}
+                  className={`cursor-pointer rounded-xl border p-4 transition-all ${
+                    paymentMethod === "APPLE_PAY"
+                      ? "border-blue-600 ring-1 ring-blue-600 bg-white shadow-xs"
+                      : "border-border bg-white/60 hover:bg-stone-50/50"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="radio"
+                        id="radio-applepay"
+                        name="payment_choice"
+                        checked={paymentMethod === "APPLE_PAY"}
+                        onChange={() => setPaymentMethod("APPLE_PAY")}
+                        className="h-4 w-4 text-rosewood"
+                      />
+                      <label
+                        htmlFor="radio-applepay"
+                        className="font-medium text-foreground cursor-pointer text-sm sm:text-base flex items-center gap-2 select-none"
+                      >
+                        Apple Pay
                         <span className="rounded bg-emerald-100 text-emerald-800 text-[10px] px-1.5 py-0.2 font-semibold">
                           Device Ready
                         </span>
+                      </label>
+                    </div>
+                    <ApplePayBadge className="h-5 w-12" />
+                  </div>
+                  {paymentMethod === "APPLE_PAY" && (
+                    <div
+                      className="mt-4 border-t border-stone-200 bg-[#f8fafc] -mx-4 -mb-4 p-4 sm:p-5 rounded-b-xl space-y-3 max-w-full overflow-hidden"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Seamless one-touch checkout via Safari on iOS or macOS with Face ID / Touch ID.
+                      </p>
+                      {!user ? (
+                        <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg text-xs text-amber-900 flex flex-col sm:flex-row items-center justify-between gap-3">
+                          <span>Please sign in to your account before authorizing Apple Pay.</span>
+                          <Button
+                            type="button"
+                            onClick={() => router.push("/login?next=/checkout")}
+                            className="text-[10px] bg-[#211b18] text-white hover:bg-black rounded-none py-1.5 px-4 h-8 uppercase font-semibold shrink-0"
+                          >
+                            Sign In / Register
+                          </Button>
+                        </div>
+                      ) : (
+                        <NativeApplePayButton
+                          key="native-apple-pay"
+                          amount={orderTotal}
+                          currency="GBP"
+                          items={cart.map((c) => ({
+                            productId: c.productId,
+                            quantity: c.quantity,
+                          }))}
+                          couponCode={appliedCoupon?.code}
+                          shippingMethodId={selectedShippingMethod?.id}
+                          shippingAddress={currentShippingAddress}
+                          validateBeforePayment={validateAddressForm}
+                          disabled={isSubmitting}
+                          onSuccess={async (res) => {
+                            await submitOrderWithDetails("APPLE_PAY", {
+                              paypalOrderId: res.paypalOrderId,
+                              captureId: res.captureId,
+                              payerEmail: res.payerEmail || formData.email.trim(),
+                            });
+                          }}
+                          onError={(err) => {
+                            setErrorMessage(err);
+                          }}
+                        />
                       )}
-                    </label>
-                  </div>
-                  <ApplePayBadge className="h-5 w-12" />
+                    </div>
+                  )}
                 </div>
-                {paymentMethod === "APPLE_PAY" && (
-                  <div
-                    className="mt-4 border-t border-stone-200 bg-[#f8fafc] -mx-4 -mb-4 p-4 sm:p-5 rounded-b-xl space-y-3 max-w-full overflow-hidden"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      Seamless one-touch checkout via Safari on iOS or macOS with Face ID / Touch ID.
-                    </p>
-                    {!user ? (
-                      <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg text-xs text-amber-900 flex flex-col sm:flex-row items-center justify-between gap-3">
-                        <span>Please sign in to your account before authorizing Apple Pay.</span>
-                        <Button
-                          type="button"
-                          onClick={() => router.push("/login?next=/checkout")}
-                          className="text-[10px] bg-[#211b18] text-white hover:bg-black rounded-none py-1.5 px-4 h-8 uppercase font-semibold shrink-0"
-                        >
-                          Sign In / Register
-                        </Button>
-                      </div>
-                    ) : (
-                      <PayPalCheckoutButton
-                        amount={orderTotal}
-                        currency="GBP"
-                        items={cart.map((c) => ({
-                          productId: c.productId,
-                          quantity: c.quantity,
-                        }))}
-                        couponCode={appliedCoupon?.code}
-                        shippingMethodId={selectedShippingMethod?.id}
-                        shippingAddress={currentShippingAddress}
-                        validateBeforePayment={validateAddressForm}
-                        disabled={isSubmitting}
-                        onSuccess={async (res) => {
-                          await submitOrderWithDetails("APPLE_PAY", {
-                            paypalOrderId: res.paypalOrderId,
-                            captureId: res.captureId,
-                            payerEmail: res.payerEmail || formData.email.trim(),
-                          });
-                        }}
-                        onError={(err) => {
-                          setErrorMessage(err);
-                        }}
-                      />
-                    )}
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           </section>
         </div>

@@ -242,3 +242,98 @@ export async function getPayPalOrderDetails(paypalOrderId: string) {
 
   return data;
 }
+
+/**
+ * Confirms a payment source (e.g. Apple Pay, Google Pay) for an existing PayPal order.
+ */
+export async function confirmPayPalOrderPaymentSource(
+  orderId: string,
+  paymentSource: Record<string, any>,
+) {
+  const accessToken = await getPayPalAccessToken();
+  const baseUrl = getPayPalBaseUrl();
+
+  const response = await fetch(
+    `${baseUrl}/v2/checkout/orders/${orderId}/confirm-payment-source`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({ payment_source: paymentSource }),
+    },
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    console.error("PayPal Confirm Payment Source Error:", data);
+    throw new Error(
+      data.message || data.details?.[0]?.description || "Failed to confirm payment source with PayPal",
+    );
+  }
+
+  return data;
+}
+
+/**
+ * Validates Apple Pay merchant session using backend Apple Merchant Identity cert if configured,
+ * or returns sandbox/proxy response for testing.
+ */
+export async function validateApplePayMerchantSession(validationUrl: string, domainName?: string) {
+  // Validate that the validation URL belongs to Apple
+  try {
+    const parsed = new URL(validationUrl);
+    if (!parsed.hostname.endsWith(".apple.com")) {
+      throw new Error("Invalid Apple Pay validation URL domain.");
+    }
+  } catch (err: any) {
+    throw new Error(err.message || "Invalid validation URL.");
+  }
+
+  const cert = process.env.APPLE_PAY_CERTIFICATE;
+  const key = process.env.APPLE_PAY_PRIVATE_KEY;
+  const merchantIdentifier = process.env.APPLE_PAY_MERCHANT_IDENTIFIER || "merchant.com.novixaretail";
+  const displayName = "NOVIXA UK";
+  const domain = domainName || process.env.NEXT_PUBLIC_APP_DOMAIN || "www.novixaretail.com";
+
+  if (cert && key) {
+    const https = await import("node:https");
+    const agent = new https.Agent({ cert, key });
+
+    const response = await fetch(validationUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        merchantIdentifier,
+        displayName,
+        initiative: "web",
+        initiativeContext: domain,
+      }),
+      // @ts-expect-error agent is node:https Agent
+      agent,
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Apple Pay validation failed: ${response.status} ${errText}`);
+    }
+
+    return await response.json();
+  }
+
+  // If running in development/sandbox without an Apple cert installed,
+  // return a mock session object so sandbox client validation succeeds
+  return {
+    epochTimestamp: Date.now(),
+    expiresAt: Date.now() + 3600000,
+    merchantSessionIdentifier: `SSH_${Date.now()}`,
+    nonce: `NONCE_${Date.now()}`,
+    merchantIdentifier,
+    domainName: domain,
+    displayName,
+    signature: "NOVIXA_SANDBOX_MOCK_SIGNATURE",
+  };
+}

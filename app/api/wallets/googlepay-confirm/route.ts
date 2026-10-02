@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import {
-  capturePayPalOrder,
   confirmPayPalOrderPaymentSource,
+  capturePayPalOrder,
   getPayPalOrderDetails,
 } from "@/lib/payments/paypal";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { paypalOrderId, paymentSource, applePayPayment } = body;
+    const { paypalOrderId, paymentMethodData } = body;
 
     if (!paypalOrderId) {
       return NextResponse.json(
@@ -17,27 +17,23 @@ export async function POST(request: Request) {
       );
     }
 
-    // If an Apple Pay or wallet payment source is supplied, confirm it first
-    if (applePayPayment) {
+    // Step 1: If Google Pay payment method token is provided, confirm the payment source with PayPal
+    if (paymentMethodData?.tokenizationData?.token) {
       try {
+        const rawToken = paymentMethodData.tokenizationData.token;
         await confirmPayPalOrderPaymentSource(paypalOrderId, {
-          apple_pay: {
-            id: applePayPayment.id,
-            token: applePayPayment.token,
+          google_pay: {
+            name: paymentMethodData.description || "Google Pay User",
+            token: rawToken,
           },
         });
-      } catch (err: any) {
-        console.warn("Notice: Apple Pay confirmation before capture:", err.message);
-      }
-    } else if (paymentSource) {
-      try {
-        await confirmPayPalOrderPaymentSource(paypalOrderId, paymentSource);
-      } catch (err: any) {
-        console.warn("Notice: Payment source confirmation before capture:", err.message);
+      } catch (confirmError: any) {
+        console.warn("PayPal confirm-payment-source notice for Google Pay:", confirmError.message);
+        // Continue to capture in case it was already confirmed client-side via SDK
       }
     }
 
-    // Capture the payment via PayPal API
+    // Step 2: Capture the order via PayPal Orders v2 API
     const captureData = await capturePayPalOrder(paypalOrderId);
 
     const isCompleted =
@@ -55,13 +51,15 @@ export async function POST(request: Request) {
       captureId,
       paypalOrderId,
       payerEmail: payer.email_address,
-      payerName: payer.name ? `${payer.name.given_name || ""} ${payer.name.surname || ""}`.trim() : null,
+      payerName: payer.name
+        ? `${payer.name.given_name || ""} ${payer.name.surname || ""}`.trim()
+        : null,
       details: captureData,
     });
   } catch (error: any) {
-    console.error("PayPal Capture Order Error:", error);
+    console.error("Google Pay Confirmation & Capture Error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to capture PayPal payment" },
+      { error: error.message || "Failed to finalize Google Pay payment" },
       { status: 500 },
     );
   }

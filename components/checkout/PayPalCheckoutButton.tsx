@@ -140,18 +140,21 @@ export function PayPalCheckoutButton({
             clientId,
             currency,
             intent: "capture",
-            components: "buttons",
-            enableFunding: "card,paylater,venmo",
+            components: "buttons,googlepay,applepay",
+            enableFunding: fundingSource === "card" ? "card" : undefined,
+            disableFunding: fundingSource === "paypal" ? "card,credit,paylater,venmo" : undefined,
           }}
         >
           <PayPalButtons
-            fundingSource={fundingSource}
+            key={fundingSource || "paypal-default"}
+            fundingSource={fundingSource || "paypal"}
             style={{
               layout: "vertical",
               color: fundingSource === "card" ? "black" : "gold",
               shape: "rect",
               label: fundingSource === "card" ? undefined : "paypal",
               height: 48,
+              tagline: false,
             }}
             disabled={disabled || isProcessing}
             createOrder={handleCreateOrder}
