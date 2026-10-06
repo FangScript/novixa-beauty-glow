@@ -184,3 +184,16 @@ body:has(iframe[name^="__zoid__"]) header,
 body:has(.paypal-overlay-modal) header {
   z-index: 10 !important;
 }
+
+/* Official Apple Pay button styling for WebKit */
+@supports (-webkit-appearance: -apple-pay-button) {
+  .apple-pay-native-button {
+    -webkit-appearance: -apple-pay-button !important;
+    -apple-pay-button-type: buy !important;
+    -apple-pay-button-style: black !important;
+    border-radius: 8px !important;
+  }
+  .apple-pay-native-button .apple-pay-button-content {
+    display: none !important;
+  }
+}
