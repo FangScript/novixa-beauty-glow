@@ -205,13 +205,12 @@ export default function CheckoutPage() {
 
   const currentShippingAddress = useMemo(
     () => ({
-      name: formData.name.trim(),
-      addressLine1: formData.address.trim(),
-      addressLine2: "",
-      city: formData.city.trim(),
-      state: formData.state.trim(),
-      postalCode: formData.pinCode.trim(),
-      countryCode: formData.country.trim(),
+      name: formData.name.trim() || undefined,
+      addressLine1: formData.address.trim() || undefined,
+      city: formData.city.trim() || undefined,
+      state: formData.state.trim() || undefined,
+      postalCode: formData.pinCode.trim() || undefined,
+      countryCode: formData.country.trim() || "GB",
     }),
     [formData],
   );

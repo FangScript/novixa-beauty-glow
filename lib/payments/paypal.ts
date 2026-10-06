@@ -135,6 +135,13 @@ export async function createPayPalOrder(params: CreateOrderParams) {
   const currency = params.currency || "GBP";
   const formattedAmount = params.amount.toFixed(2);
 
+  const experienceContext: Record<string, any> = {
+    brand_name: "Novixa Beauty & Glow",
+    landing_page: "GUEST_CHECKOUT",
+    user_action: "PAY_NOW",
+    shipping_preference: "NO_SHIPPING",
+  };
+
   const payload: any = {
     intent: "CAPTURE",
     purchase_units: [
@@ -148,43 +155,51 @@ export async function createPayPalOrder(params: CreateOrderParams) {
         },
       },
     ],
-    application_context: {
-      brand_name: "Novixa Beauty & Glow",
-      landing_page: "GUEST_CHECKOUT",
-      user_action: "PAY_NOW",
-      shipping_preference: "NO_SHIPPING",
-    },
-    ...(params.paymentSourceType === "card"
-      ? {
-          payment_source: {
-            card: {
-              attributes: {
-                verification: {
-                  method: "SCA_WHEN_REQUIRED",
-                },
-              },
-            },
-          },
-        }
-      : {}),
   };
 
-  if (params.shippingAddress) {
+  // Only attach shipping address if addressLine1 is present and non-empty
+  if (params.shippingAddress && params.shippingAddress.addressLine1?.trim()) {
     const countryCode = resolveCountryCode(params.shippingAddress.countryCode);
+    const addressObj: Record<string, string> = {
+      address_line_1: params.shippingAddress.addressLine1.trim(),
+      admin_area_2: params.shippingAddress.city?.trim() || "London",
+      postal_code: params.shippingAddress.postalCode?.trim() || "SW1A 1AA",
+      country_code: countryCode,
+    };
+
+    // CRITICAL: PayPal schema strictly forbids empty strings ("") in optional fields.
+    // Only include address_line_2 and admin_area_1 if they contain actual text.
+    if (params.shippingAddress.addressLine2 && params.shippingAddress.addressLine2.trim().length > 0) {
+      addressObj.address_line_2 = params.shippingAddress.addressLine2.trim();
+    }
+    if (params.shippingAddress.state && params.shippingAddress.state.trim().length > 0) {
+      addressObj.admin_area_1 = params.shippingAddress.state.trim();
+    }
+
     payload.purchase_units[0].shipping = {
       name: {
-        full_name: params.shippingAddress.name || "Customer",
+        full_name: params.shippingAddress.name?.trim() || "Customer",
       },
-      address: {
-        address_line_1: params.shippingAddress.addressLine1 || "1 High Street",
-        address_line_2: params.shippingAddress.addressLine2 || "",
-        admin_area_2: params.shippingAddress.city || "London",
-        admin_area_1: params.shippingAddress.state || "",
-        postal_code: params.shippingAddress.postalCode || "SW1A 1AA",
-        country_code: countryCode,
+      address: addressObj,
+    };
+    experienceContext.shipping_preference = "SET_PROVIDED_ADDRESS";
+  }
+
+  // PayPal v2 API: If payment_source is present, experience_context must be inside payment_source.
+  // Otherwise, application_context is used at the root level.
+  if (params.paymentSourceType === "card") {
+    payload.payment_source = {
+      card: {
+        experience_context: experienceContext,
+        attributes: {
+          verification: {
+            method: "SCA_WHEN_REQUIRED",
+          },
+        },
       },
     };
-    payload.application_context.shipping_preference = "SET_PROVIDED_ADDRESS";
+  } else {
+    payload.application_context = experienceContext;
   }
 
   const response = await fetch(`${baseUrl}/v2/checkout/orders`, {
@@ -200,8 +215,12 @@ export async function createPayPalOrder(params: CreateOrderParams) {
   const data = await response.json();
 
   if (!response.ok) {
-    console.error("PayPal Create Order Error:", data);
-    throw new Error(data.message || data.details?.[0]?.description || "Failed to create PayPal order");
+    console.error("PayPal Create Order Error:", JSON.stringify(data, null, 2));
+    const detailMsg = data.details
+      ?.map((d: any) => `${d.description || d.issue || ""}${d.field ? ' (' + d.field + ')' : ''}`)
+      .filter(Boolean)
+      .join(". ");
+    throw new Error(detailMsg || data.message || "Failed to create PayPal order");
   }
 
   return data;

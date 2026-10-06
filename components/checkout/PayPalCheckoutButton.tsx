@@ -65,8 +65,9 @@ export function PayPalCheckoutButton({
           items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
           couponCode: couponCode || undefined,
           shippingMethodId: shippingMethodId || undefined,
-          shippingAddress: shippingAddress || undefined,
+          shippingAddress: shippingAddress?.addressLine1 ? shippingAddress : undefined,
           currency,
+          paymentSource: fundingSource === "card" ? "card" : "paypal",
         }),
       });
 
