@@ -137,7 +137,7 @@ export async function createPayPalOrder(params: CreateOrderParams) {
 
   const experienceContext: Record<string, any> = {
     brand_name: "Novixa Beauty & Glow",
-    landing_page: "GUEST_CHECKOUT",
+    landing_page: "NO_PREFERENCE",
     user_action: "PAY_NOW",
     shipping_preference: "NO_SHIPPING",
   };
