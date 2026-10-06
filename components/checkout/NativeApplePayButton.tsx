@@ -125,17 +125,32 @@ export function NativeApplePayButton({
 
       const session = new ApplePaySession(3, paymentRequest);
 
+      const getApplePayHelper = async (): Promise<any | null> => {
+        if (typeof window === "undefined") return null;
+        if ((window as any).paypal?.Applepay) {
+          return (window as any).paypal.Applepay();
+        }
+        for (let i = 0; i < 25; i++) {
+          await new Promise((r) => setTimeout(r, 100));
+          if ((window as any).paypal?.Applepay) {
+            return (window as any).paypal.Applepay();
+          }
+        }
+        return null;
+      };
+
       // 3. Handle Merchant Validation
       session.onvalidatemerchant = async (event: any) => {
         try {
           // If PayPal SDK exposes window.paypal.Applepay, use it; otherwise proxy to server
-          if (typeof (window as any).paypal?.Applepay !== "undefined") {
+          const applepayHelper = await getApplePayHelper();
+          if (applepayHelper) {
             try {
-              const applepayHelper = (window as any).paypal.Applepay();
-              const merchantSession = await applepayHelper.validateMerchant({
+              const res = await applepayHelper.validateMerchant({
                 validationUrl: event.validationURL,
-                displayName: "NOVIXA UK",
+                displayName: "Novixa Beauty & Glow",
               });
+              const merchantSession = res?.merchantSession || res;
               session.completeMerchantValidation(merchantSession);
               return;
             } catch (sdkErr) {
@@ -172,13 +187,14 @@ export function NativeApplePayButton({
           const payment = event.payment;
 
           // Attempt client-side PayPal confirmation if SDK helper is loaded
-          if (typeof (window as any).paypal?.Applepay !== "undefined") {
+          const applepayHelper = await getApplePayHelper();
+          if (applepayHelper) {
             try {
-              const applepayHelper = (window as any).paypal.Applepay();
               await applepayHelper.confirmOrder({
                 orderId: paypalOrderId,
                 token: payment.token,
                 billingContact: payment.billingContact,
+                shippingContact: payment.shippingContact,
               });
             } catch (sdkConfirmErr) {
               console.warn("Client confirmOrder notice, falling back to backend capture:", sdkConfirmErr);
