@@ -40,12 +40,16 @@ export async function POST(request: Request) {
     } catch (captureErr: any) {
       console.warn("PayPal live capture notice for Google Pay token:", captureErr.message);
 
-      // In TEST environment (e.g. Google Pay Console evaluation / sandbox cards),
-      // allow successful completion so merchant passes Google evaluation checklist
+      // Only allow test fallback if explicitly running in test mode
+      const isLive =
+        (process.env.PAYPAL_MODE?.toLowerCase() === "live" ||
+          process.env.NEXT_PUBLIC_PAYPAL_MODE?.toLowerCase() === "live") &&
+        process.env.NEXT_PUBLIC_GOOGLE_PAY_ENV === "PRODUCTION";
+
       const isTestToken =
-        paymentMethodData?.description?.includes("1111") ||
-        process.env.NEXT_PUBLIC_GOOGLE_PAY_ENV === "TEST" ||
-        process.env.PAYPAL_MODE !== "live";
+        !isLive &&
+        (Boolean(paymentMethodData?.description?.includes("1111")) ||
+          process.env.NEXT_PUBLIC_GOOGLE_PAY_ENV === "TEST");
 
       if (isTestToken) {
         return NextResponse.json({

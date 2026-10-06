@@ -117,14 +117,6 @@ export default function CheckoutPage() {
 
   // Payment Selection (Individual Real-Time Payment Methods)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>("CARD");
-  const [cardData, setCardData] = useState({
-    name: "",
-    number: "",
-    expMonth: "",
-    expYear: "",
-    cvc: "",
-  });
-  const [expiryInput, setExpiryInput] = useState("");
   const [useShippingAsBilling, setUseShippingAsBilling] = useState(true);
 
   // Device Apple Pay capability detection (strictly Safari / iOS / macOS)
@@ -140,10 +132,6 @@ export default function CheckoutPage() {
         ...prev,
         name: prev.name || user.name || "",
         email: prev.email || user.email || "",
-      }));
-      setCardData((prev) => ({
-        ...prev,
-        name: prev.name || user.name || "",
       }));
     }
   }, [user]);
@@ -229,51 +217,7 @@ export default function CheckoutPage() {
   );
 
   // Format card number with spaces (4 4 4 4)
-  const handleCardNumberChange = (val: string) => {
-    const raw = val.replace(/\D/g, "").slice(0, 16);
-    const formatted = raw.replace(/(\d{4})(?=\d)/g, "$1 ");
-    setCardData((prev) => ({ ...prev, number: formatted }));
-  };
 
-  // Expiration date (MM / YY) handler
-  const handleExpiryChange = (val: string) => {
-    const digitsOnly = val.replace(/\D/g, "").slice(0, 4);
-    let formatted = digitsOnly;
-    if (digitsOnly.length > 2) {
-      formatted = `${digitsOnly.slice(0, 2)} / ${digitsOnly.slice(2, 4)}`;
-    }
-    setExpiryInput(formatted);
-
-    const month = digitsOnly.slice(0, 2);
-    const year = digitsOnly.slice(2, 4);
-    setCardData((prev) => ({
-      ...prev,
-      expMonth: month,
-      expYear: year,
-    }));
-  };
-
-  // Security code (CVC) handler
-  const handleCvcChange = (val: string) => {
-    const digitsOnly = val.replace(/\D/g, "").slice(0, 4);
-    setCardData((prev) => ({ ...prev, cvc: digitsOnly }));
-  };
-
-  // Card brand detection for all supported payment networks
-  const detectedCardBrand = useMemo(() => {
-    const clean = cardData.number.replace(/\s+/g, "");
-    if (!clean) return null;
-    if (/^4/.test(clean)) return "Visa";
-    if (/^(5[1-5]|2[2-7])/.test(clean)) return "Mastercard";
-    if (/^3[47]/.test(clean)) return "American Express";
-    if (/^6(011|5|4[4-9])/.test(clean)) return "Discover";
-    if (/^3(0[0-5]|[689])/.test(clean)) return "Diners Club";
-    if (/^(?:2131|1800|35\d{3})/.test(clean)) return "JCB";
-    if (/^(62|81)/.test(clean)) return "UnionPay";
-    if (/^(5018|5020|5038|5893|6304|6759|6761|6762|6763)/.test(clean)) return "Maestro";
-    if (/^(4011|4389|4514|4576|5041|5066|5067|5090|6277|6362|6363)/.test(clean)) return "Elo";
-    return null;
-  }, [cardData.number]);
 
   const validateAddressForm = (): boolean => {
     if (!formData.name.trim() || !formData.email.trim()) {
@@ -329,18 +273,10 @@ export default function CheckoutPage() {
           paymentMethod: method,
           paymentDetails:
             customPaymentDetails ||
-            (method === "CARD"
+            (method === "BANK_TRANSFER"
               ? {
-                  cardholderName: cardData.name.trim() || formData.name.trim(),
-                  cardNumber: cardData.number.replace(/\s+/g, ""),
-                  expMonth: cardData.expMonth.trim(),
-                  expYear: cardData.expYear.trim(),
-                  cvc: cardData.cvc.trim(),
+                  bankReference: `NVX-${Date.now().toString().slice(-6)}`,
                 }
-              : method === "BANK_TRANSFER"
-                ? {
-                    bankReference: `NVX-${Date.now().toString().slice(-6)}`,
-                  }
                 : method === "PAYPAL"
                   ? {
                       payerEmail: formData.email.trim(),
@@ -657,9 +593,6 @@ export default function CheckoutPage() {
                 value={formData.name}
                 onChange={(e) => {
                   setFormData({ ...formData, name: e.target.value });
-                  if (!cardData.name) {
-                    setCardData((prev) => ({ ...prev, name: e.target.value }));
-                  }
                 }}
                 className="h-11 border border-border bg-white/40 px-3 text-sm outline-none focus:border-rosewood"
               />

@@ -1,32 +1,19 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
+import { getAuthenticatedCustomer } from "@/lib/auth/session";
 
-async function resolvePrismaUserId(userId?: string | null) {
-  if (!userId) return null;
-  const user = await prisma.user
-    .findFirst({
-      where: {
-        OR: [{ id: userId }, { email: userId }],
-      },
-      select: { id: true },
-    })
-    .catch(() => null);
-  return user?.id ?? null;
-}
-
-// ─── GET /api/wishlist?userId=xxx ─────────────────────────────────────────────
+// ─── GET /api/wishlist ─────────────────────────────────────────────
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const rawUserId = searchParams.get("userId");
-
-  if (!process.env.DATABASE_URL || !rawUserId) {
+  if (!process.env.DATABASE_URL) {
     return NextResponse.json({ items: [], source: "no-db" });
   }
 
-  const userId = await resolvePrismaUserId(rawUserId);
-  if (!userId) {
-    return NextResponse.json({ items: [], source: "no-user" });
+  const customer = await getAuthenticatedCustomer();
+  if (!customer) {
+    return NextResponse.json({ items: [], source: "unauthenticated" });
   }
+
+  const userId = customer.id;
 
   try {
     const wishlist = await prisma.wishlist.findUnique({
@@ -64,27 +51,32 @@ export async function GET(request: Request) {
   }
 }
 
-// ─── POST /api/wishlist  { productId, userId } ────────────────────────────────
+// ─── POST /api/wishlist  { productId } ────────────────────────────────
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) {
     return NextResponse.json({ ok: false, error: "Database not configured." }, { status: 503 });
   }
 
+  const customer = await getAuthenticatedCustomer();
+  if (!customer) {
+    return NextResponse.json(
+      { ok: false, error: "Sign in required to save items to your wishlist." },
+      { status: 401 },
+    );
+  }
+
   try {
     const body = await request.json();
-    const { productId, userId: rawUserId } = body;
+    const { productId } = body;
 
-    if (!productId || !rawUserId) {
+    if (!productId) {
       return NextResponse.json(
-        { ok: false, error: "productId and userId are required." },
+        { ok: false, error: "productId is required." },
         { status: 400 },
       );
     }
 
-    const userId = await resolvePrismaUserId(rawUserId);
-    if (!userId) {
-      return NextResponse.json({ ok: false, error: "User account not found." }, { status: 404 });
-    }
+    const userId = customer.id;
 
     // Upsert wishlist
     const wishlist = await prisma.wishlist.upsert({
@@ -110,34 +102,39 @@ export async function POST(request: Request) {
   }
 }
 
-// ─── DELETE /api/wishlist?productId=xxx&userId=xxx ────────────────────────────
+// ─── DELETE /api/wishlist?productId=xxx ────────────────────────────
 export async function DELETE(request: Request) {
   if (!process.env.DATABASE_URL) {
     return NextResponse.json({ ok: true });
   }
 
+  const customer = await getAuthenticatedCustomer();
+  if (!customer) {
+    return NextResponse.json(
+      { ok: false, error: "Authentication required." },
+      { status: 401 },
+    );
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const productId = searchParams.get("productId");
-    const rawUserId = searchParams.get("userId");
 
-    if (!productId || !rawUserId) {
+    if (!productId) {
       return NextResponse.json(
-        { ok: false, error: "productId and userId are required." },
+        { ok: false, error: "productId is required." },
         { status: 400 },
       );
     }
 
-    const userId = await resolvePrismaUserId(rawUserId);
-    if (userId) {
-      const wishlist = await prisma.wishlist.findUnique({ where: { userId } });
-      if (wishlist) {
-        await prisma.wishlistItem
-          .delete({
-            where: { wishlistId_productId: { wishlistId: wishlist.id, productId } },
-          })
-          .catch(() => {});
-      }
+    const userId = customer.id;
+    const wishlist = await prisma.wishlist.findUnique({ where: { userId } });
+    if (wishlist) {
+      await prisma.wishlistItem
+        .delete({
+          where: { wishlistId_productId: { wishlistId: wishlist.id, productId } },
+        })
+        .catch(() => {});
     }
 
     return NextResponse.json({ ok: true });

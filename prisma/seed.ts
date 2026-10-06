@@ -1,6 +1,6 @@
 import { PrismaClient, ProductCategory, Gender, ProductStatus } from "@prisma/client";
 import { randomBytes, scryptSync } from "node:crypto";
-import { products } from "../src/lib/commerce/catalogue";
+import { products } from "../lib/products/catalogue";
 
 const db = new PrismaClient();
 const categoryNames = ["perfume", "makeup", "grooming", "bundle", "accessories"] as const;

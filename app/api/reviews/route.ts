@@ -66,7 +66,16 @@ export async function GET(request: Request) {
 
       const where: any = {};
       if (targetProductId) where.productId = targetProductId;
-      if (!admin) where.status = "APPROVED";
+
+      let isVerifiedAdmin = false;
+      if (admin) {
+        const authAdmin = await getAuthenticatedAdmin();
+        if (authAdmin) isVerifiedAdmin = true;
+      }
+
+      if (!isVerifiedAdmin) {
+        where.status = "APPROVED";
+      }
 
       const dbReviews = await prisma.review.findMany({
         where,
@@ -299,24 +308,20 @@ export async function PUT(request: Request) {
         data: { status: prismaStatus },
       });
 
-      // If approved, update the product's aggregate rating and review count
-      if (prismaStatus === "APPROVED") {
-        const agg = await prisma.review.aggregate({
-          where: { productId: updated.productId, status: "APPROVED" },
-          _avg: { rating: true },
-          _count: { id: true },
-        });
+      // Recalculate the product's aggregate rating and review count based on all approved reviews
+      const agg = await prisma.review.aggregate({
+        where: { productId: updated.productId, status: "APPROVED" },
+        _avg: { rating: true },
+        _count: { id: true },
+      });
 
-        if (agg._count.id > 0) {
-          await prisma.product.update({
-            where: { id: updated.productId },
-            data: {
-              rating: Number(agg._avg.rating?.toFixed(1) ?? 5.0),
-              reviewCount: agg._count.id,
-            },
-          });
-        }
-      }
+      await prisma.product.update({
+        where: { id: updated.productId },
+        data: {
+          rating: agg._count.id > 0 ? Number(agg._avg.rating?.toFixed(1) ?? 5.0) : 5.0,
+          reviewCount: agg._count.id,
+        },
+      });
 
       return NextResponse.json({ success: true, review: updated });
     }

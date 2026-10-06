@@ -179,27 +179,58 @@ export async function registerCustomer(name: string, email: string, password: st
   const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000);
 
   try {
-    // Single atomic roundtrip: create user and session in one query
-    const user = await prisma.user.create({
-      data: {
-        name: cleanName,
-        email: cleanEmail,
-        passwordHash,
-        role: "CUSTOMER",
-        emailVerifiedAt: new Date(),
-        sessions: {
-          create: {
-            id: sessionId,
-            expiresAt,
+    // Check if user exists but has no password (e.g. from newsletter subscription)
+    const existingUser = await prisma.user.findUnique({ where: { email: cleanEmail } });
+
+    let user: { id: string; email: string; name: string };
+
+    if (existingUser) {
+      if (existingUser.passwordHash) {
+        return { ok: false as const, error: "An account with this email already exists." };
+      }
+      // Upgrade newsletter subscriber to full customer account
+      user = await prisma.user.update({
+        where: { id: existingUser.id },
+        data: {
+          name: cleanName || existingUser.name,
+          passwordHash,
+          emailVerifiedAt: new Date(),
+          sessions: {
+            create: {
+              id: sessionId,
+              expiresAt,
+            },
           },
         },
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-      },
-    });
+        select: {
+          id: true,
+          email: true,
+          name: true,
+        },
+      });
+    } else {
+      // Create fresh user
+      user = await prisma.user.create({
+        data: {
+          name: cleanName,
+          email: cleanEmail,
+          passwordHash,
+          role: "CUSTOMER",
+          emailVerifiedAt: new Date(),
+          sessions: {
+            create: {
+              id: sessionId,
+              expiresAt,
+            },
+          },
+        },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+        },
+      });
+    }
 
     const cookieStore = await cookies();
     cookieStore.set(CUSTOMER_SESSION_COOKIE, rawSession, {

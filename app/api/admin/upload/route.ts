@@ -18,7 +18,6 @@ const ALLOWED_MIME_TYPES = new Set([
   "image/webp",
   "image/avif",
   "image/gif",
-  "image/svg+xml",
   "image/heic",
   "image/heif",
 ]);
@@ -30,7 +29,6 @@ const ALLOWED_EXTENSIONS = new Set([
   ".webp",
   ".avif",
   ".gif",
-  ".svg",
   ".jfif",
   ".heic",
   ".heif",

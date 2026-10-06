@@ -149,9 +149,18 @@ export async function createPayPalOrder(params: CreateOrderParams) {
     ],
     application_context: {
       brand_name: "Novixa Beauty & Glow",
-      landing_page: "NO_PREFERENCE",
+      landing_page: "GUEST_CHECKOUT",
       user_action: "PAY_NOW",
       shipping_preference: "NO_SHIPPING",
+    },
+    payment_source: {
+      card: {
+        attributes: {
+          verification: {
+            method: "SCA_WHEN_REQUIRED",
+          },
+        },
+      },
     },
   };
 
@@ -325,7 +334,17 @@ export async function validateApplePayMerchantSession(validationUrl: string, dom
   }
 
   // If running in development/sandbox without an Apple cert installed,
-  // return a mock session object so sandbox client validation succeeds
+  // return a mock session object only in development/sandbox mode
+  const isProduction =
+    process.env.NODE_ENV === "production" ||
+    process.env.PAYPAL_MODE?.toLowerCase() === "live";
+
+  if (isProduction) {
+    throw new Error(
+      "Apple Pay production merchant certificates (APPLE_PAY_CERTIFICATE, APPLE_PAY_PRIVATE_KEY) are not configured.",
+    );
+  }
+
   return {
     epochTimestamp: Date.now(),
     expiresAt: Date.now() + 3600000,
@@ -336,4 +355,46 @@ export async function validateApplePayMerchantSession(validationUrl: string, dom
     displayName,
     signature: "NOVIXA_SANDBOX_MOCK_SIGNATURE",
   };
+}
+
+/**
+ * Validates PayPal webhook notification signature using PayPal's verify-webhook-signature API.
+ */
+export async function verifyPayPalWebhookSignature(params: {
+  transmissionId: string;
+  transmissionTime: string;
+  certUrl: string;
+  authAlgo: string;
+  transmissionSig: string;
+  webhookId: string;
+  webhookEvent: any;
+}): Promise<boolean> {
+  try {
+    const accessToken = await getPayPalAccessToken();
+    const baseUrl = getPayPalBaseUrl();
+
+    const response = await fetch(`${baseUrl}/v1/notifications/verify-webhook-signature`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        transmission_id: params.transmissionId,
+        transmission_time: params.transmissionTime,
+        cert_url: params.certUrl,
+        auth_algo: params.authAlgo,
+        transmission_sig: params.transmissionSig,
+        webhook_id: params.webhookId,
+        webhook_event: params.webhookEvent,
+      }),
+    });
+
+    if (!response.ok) return false;
+    const data = await response.json();
+    return data.verification_status === "SUCCESS";
+  } catch (err) {
+    console.error("PayPal webhook signature verification failed:", err);
+    return false;
+  }
 }

@@ -3,27 +3,18 @@ import { cookies } from "next/headers";
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/db/client";
 
+import { getAuthenticatedCustomer } from "@/lib/auth/session";
+
 const GUEST_COOKIE = "novixa_guest_cart";
 const COOKIE_TTL = 60 * 60 * 24 * 30; // 30 days
 
 /** Resolve or create a cart for the current request. */
-async function resolveCart(userId?: string | null) {
+async function resolveCart(_clientUserId?: string | null) {
   if (!process.env.DATABASE_URL) return null;
 
-  let resolvedUserId: string | null = null;
-  if (userId) {
-    const existingUser = await prisma.user
-      .findFirst({
-        where: {
-          OR: [{ id: userId }, { email: userId }],
-        },
-        select: { id: true },
-      })
-      .catch(() => null);
-    if (existingUser) {
-      resolvedUserId = existingUser.id;
-    }
-  }
+  // Derive authenticated identity strictly from server session
+  const authCustomer = await getAuthenticatedCustomer();
+  const resolvedUserId = authCustomer?.id || null;
 
   // Authenticated user with confirmed DB row
   if (resolvedUserId) {

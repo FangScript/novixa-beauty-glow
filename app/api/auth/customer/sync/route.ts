@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
+import { getAuthenticatedAdmin, getAuthenticatedCustomer } from "@/lib/auth/session";
 
 export async function POST(request: Request) {
   try {
+    const admin = await getAuthenticatedAdmin();
+    const customer = await getAuthenticatedCustomer();
+
+    if (!admin && !customer) {
+      return NextResponse.json({ ok: false, error: "Authentication required" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { id, email, name } = body;
 
@@ -11,6 +19,11 @@ export async function POST(request: Request) {
     }
 
     const cleanEmail = email.toLowerCase().trim();
+
+    // If not admin, can only sync own profile
+    if (!admin && customer && customer.email.toLowerCase() !== cleanEmail) {
+      return NextResponse.json({ ok: false, error: "Unauthorized profile sync" }, { status: 403 });
+    }
     const cleanName = name?.trim() || cleanEmail.split("@")[0] || "Customer";
 
     await prisma.user.upsert({

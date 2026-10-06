@@ -8,14 +8,15 @@ import tseslint from "typescript-eslint";
 export default tseslint.config(
   {
     ignores: [
-      "dist",
-      ".output",
-      ".vinxi",
-      ".next",
-      ".tanstack",
-      "node_modules",
-      "qa",
-      "src",
+      "dist/**",
+      ".output/**",
+      ".vinxi/**",
+      ".next/**",
+      ".tanstack/**",
+      "node_modules/**",
+      "qa/**",
+      "src/**",
+      "dist-cpanel/**",
       "next-env.d.ts",
     ],
   },

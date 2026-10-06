@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
 import { OrderStatus, PaymentStatus } from "@prisma/client";
 import { verifyPaymentServerSide, type PaymentMethod } from "@/lib/payments/processor";
+import { getPayPalOrderDetails } from "@/lib/payments/paypal";
 import { getAuthenticatedAdmin, getAuthenticatedCustomer } from "@/lib/auth/session";
 import { sendOrderConfirmationEmail, sendOrderStatusEmail } from "@/lib/email/service";
 
@@ -316,6 +317,68 @@ export async function POST(request: Request) {
         },
         { status: 400 },
       );
+    }
+
+    // For PayPal, Card, and digital wallet methods, verify the order details directly with PayPal API
+    if (
+      ["PAYPAL", "CARD", "GOOGLE_PAY", "APPLE_PAY"].includes(paymentMethod) &&
+      process.env.PAYPAL_CLIENT_ID &&
+      process.env.PAYPAL_CLIENT_SECRET
+    ) {
+      const paypalOrderId =
+        normalizedPaymentDetails.paypalOrderId ||
+        normalizedPaymentDetails.orderId ||
+        verification.metadata?.paypalOrderId;
+
+      if (!paypalOrderId) {
+        return NextResponse.json(
+          { error: "Payment authorization reference is missing." },
+          { status: 400 },
+        );
+      }
+
+      try {
+        const orderDetails = await getPayPalOrderDetails(paypalOrderId);
+        const orderStatus = orderDetails.status;
+        const purchaseUnit = orderDetails.purchase_units?.[0];
+        const capturedAmount = parseFloat(purchaseUnit?.amount?.value || "0");
+        const capturedCurrency = purchaseUnit?.amount?.currency_code || "";
+
+        // Verify status is COMPLETED or APPROVED
+        if (orderStatus !== "COMPLETED" && orderStatus !== "APPROVED") {
+          return NextResponse.json(
+            { error: `Payment is not in a completed state (status: ${orderStatus}).` },
+            { status: 400 },
+          );
+        }
+
+        // Verify currency
+        if (capturedCurrency && capturedCurrency !== "GBP") {
+          return NextResponse.json(
+            { error: `Payment currency mismatch: expected GBP, received ${capturedCurrency}.` },
+            { status: 400 },
+          );
+        }
+
+        // Verify amount within 1 penny tolerance for rounding
+        if (Math.abs(capturedAmount - total) > 0.05) {
+          console.error(
+            `Payment amount mismatch: captured=${capturedAmount}, expected=${total}`,
+          );
+          return NextResponse.json(
+            {
+              error: `Payment amount mismatch: captured £${capturedAmount.toFixed(2)}, expected £${total.toFixed(2)}.`,
+            },
+            { status: 400 },
+          );
+        }
+      } catch (paypalErr: any) {
+        console.error("Server-side PayPal verification failed:", paypalErr);
+        return NextResponse.json(
+          { error: "Could not verify payment with PayPal. Please try again." },
+          { status: 400 },
+        );
+      }
     }
 
     const orderStatus =

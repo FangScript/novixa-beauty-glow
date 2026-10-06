@@ -44,11 +44,13 @@ export async function POST(request: Request) {
     } catch (captureErr: any) {
       console.warn("PayPal capture notice:", captureErr.message);
 
-      // If this is an Apple Pay test/sandbox authorization
+      // Only permit simulated test capture if explicitly in sandbox/test mode
+      const isLive =
+        process.env.PAYPAL_MODE?.toLowerCase() === "live" ||
+        process.env.NEXT_PUBLIC_PAYPAL_MODE?.toLowerCase() === "live";
+
       const isTestToken =
-        applePayPayment?.id?.includes("test") ||
-        process.env.PAYPAL_MODE !== "live" ||
-        process.env.NEXT_PUBLIC_PAYPAL_MODE !== "live";
+        !isLive && Boolean(applePayPayment?.id?.includes("test"));
 
       if (isTestToken) {
         return NextResponse.json({

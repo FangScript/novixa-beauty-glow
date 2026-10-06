@@ -7,13 +7,6 @@ export type PaymentProvider = "PAYPAL" | "LOCAL_GATEWAY" | "BANK_TRANSFER" | "CO
 export type PaymentMethod =
   "CARD" | "PAYPAL" | "GOOGLE_PAY" | "APPLE_PAY" | "KLARNA" | "BANK_TRANSFER" | "COD";
 
-export interface CardPaymentInput {
-  nameOnCard: string;
-  cardNumber: string;
-  expiry: string; // MM/YY
-  cvc: string;
-}
-
 export interface PaymentVerificationResult {
   valid: boolean;
   error?: string;
@@ -26,28 +19,7 @@ export interface PaymentVerificationResult {
   metadata?: Record<string, any>;
 }
 
-/**
- * Validates a credit/debit card number using the Luhn checksum algorithm.
- */
-export function validateLuhn(cardNumber: string): boolean {
-  const digits = cardNumber.replace(/\D/g, "");
-  if (digits.length < 13 || digits.length > 19) return false;
 
-  let sum = 0;
-  let shouldDouble = false;
-
-  for (let i = digits.length - 1; i >= 0; i--) {
-    let digit = parseInt(digits.charAt(i), 10);
-    if (shouldDouble) {
-      digit *= 2;
-      if (digit > 9) digit -= 9;
-    }
-    sum += digit;
-    shouldDouble = !shouldDouble;
-  }
-
-  return sum % 10 === 0;
-}
 
 /**
  * Detects card brand from number prefix.
@@ -62,104 +34,35 @@ export function detectCardBrand(cardNumber: string): string {
 }
 
 /**
- * Verifies card inputs server-side without ever persisting raw card numbers or CVV.
+ * Verifies card payment. Card payments are securely captured via PayPal's payment system.
  */
-export function verifyCardPayment(input: CardPaymentInput): PaymentVerificationResult {
-  const { nameOnCard, cardNumber, expiry, cvc } = input;
+export function verifyCardPayment(input: any): PaymentVerificationResult {
+  const paypalOrderId = input.paypalOrderId || input.orderId || input.captureId;
+  const captureId = input.captureId || paypalOrderId;
 
-  if (!nameOnCard || nameOnCard.trim().length < 2) {
+  if (!paypalOrderId && !captureId) {
     return {
       valid: false,
-      error: "Cardholder name is required.",
-      provider: "LOCAL_GATEWAY",
+      error: "Missing payment authorization. Please complete payment via the card gateway.",
+      provider: "PAYPAL",
       method: "CARD",
       providerPaymentId: "",
       status: PaymentStatus.FAILED,
     };
   }
-
-  const cleanNum = cardNumber.replace(/\s+/g, "");
-  if (!validateLuhn(cleanNum)) {
-    return {
-      valid: false,
-      error: "Invalid card number. Please check the digits and try again.",
-      provider: "LOCAL_GATEWAY",
-      method: "CARD",
-      providerPaymentId: "",
-      status: PaymentStatus.FAILED,
-    };
-  }
-
-  // Verify expiry MM/YY
-  const match = expiry.match(/^(\d{2})\/(\d{2})$/);
-  if (!match) {
-    return {
-      valid: false,
-      error: "Invalid expiry date format. Use MM/YY.",
-      provider: "LOCAL_GATEWAY",
-      method: "CARD",
-      providerPaymentId: "",
-      status: PaymentStatus.FAILED,
-    };
-  }
-
-  const month = parseInt(match[1], 10);
-  const year = 2000 + parseInt(match[2], 10);
-  if (month < 1 || month > 12) {
-    return {
-      valid: false,
-      error: "Invalid expiration month.",
-      provider: "LOCAL_GATEWAY",
-      method: "CARD",
-      providerPaymentId: "",
-      status: PaymentStatus.FAILED,
-    };
-  }
-
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
-
-  if (year < currentYear || (year === currentYear && month < currentMonth)) {
-    return {
-      valid: false,
-      error: "This card has expired.",
-      provider: "LOCAL_GATEWAY",
-      method: "CARD",
-      providerPaymentId: "",
-      status: PaymentStatus.FAILED,
-    };
-  }
-
-  // Verify CVC
-  const cleanCvc = cvc.trim();
-  if (cleanCvc.length < 3 || cleanCvc.length > 4 || !/^\d+$/.test(cleanCvc)) {
-    return {
-      valid: false,
-      error: "Invalid CVV/CVC security code.",
-      provider: "LOCAL_GATEWAY",
-      method: "CARD",
-      providerPaymentId: "",
-      status: PaymentStatus.FAILED,
-    };
-  }
-
-  const brand = detectCardBrand(cleanNum);
-  const last4 = cleanNum.slice(-4);
-  const authCode = `AUTH-${Date.now().toString(36).toUpperCase()}-${last4}`;
 
   return {
     valid: true,
-    provider: "LOCAL_GATEWAY",
+    provider: "PAYPAL",
     method: "CARD",
-    providerPaymentId: authCode,
+    providerPaymentId: captureId || paypalOrderId,
     status: PaymentStatus.PAID,
-    cardLast4: last4,
-    cardBrand: brand,
+    cardLast4: input.last4 || input.cardLast4 || "CARD",
+    cardBrand: input.brand || input.cardBrand || "Card",
     metadata: {
-      cardholder: nameOnCard.trim(),
-      brand,
-      last4,
+      paypalOrderId,
+      captureId,
+      payerEmail: input.payerEmail || null,
       authorizedAt: new Date().toISOString(),
     },
   };
@@ -196,58 +99,99 @@ export function verifyPayPalPayment(details: {
 }
 
 /**
- * Verifies Google Pay payment token/authorization.
+ * Verifies Google Pay payment token/authorization via PayPal capture.
  */
-export function verifyGooglePayPayment(details: { token?: string }): PaymentVerificationResult {
-  const token = details.token || `GPAY-${Date.now()}`;
+export function verifyGooglePayPayment(details: any): PaymentVerificationResult {
+  const paypalOrderId = details.paypalOrderId || details.orderId || details.captureId;
+  const captureId = details.captureId || paypalOrderId;
+
+  if (!paypalOrderId && !captureId) {
+    return {
+      valid: false,
+      error: "Missing Google Pay authorization. Please complete payment via the Google Pay sheet.",
+      provider: "PAYPAL",
+      method: "GOOGLE_PAY",
+      providerPaymentId: "",
+      status: PaymentStatus.FAILED,
+    };
+  }
+
   return {
     valid: true,
-    provider: "LOCAL_GATEWAY",
+    provider: "PAYPAL",
     method: "GOOGLE_PAY",
-    providerPaymentId: token,
+    providerPaymentId: captureId || paypalOrderId,
     status: PaymentStatus.PAID,
     metadata: {
-      channel: "GOOGLE_PAY_WEB",
+      channel: "GOOGLE_PAY_PPCP",
+      paypalOrderId,
+      captureId,
       authorizedAt: new Date().toISOString(),
     },
   };
 }
 
 /**
- * Verifies Apple Pay payment token/authorization.
+ * Verifies Apple Pay payment token/authorization via PayPal capture.
  */
-export function verifyApplePayPayment(details: { token?: string }): PaymentVerificationResult {
-  const token = details.token || `APAY-${Date.now()}`;
+export function verifyApplePayPayment(details: any): PaymentVerificationResult {
+  const paypalOrderId = details.paypalOrderId || details.orderId || details.captureId;
+  const captureId = details.captureId || paypalOrderId;
+
+  if (!paypalOrderId && !captureId) {
+    return {
+      valid: false,
+      error: "Missing Apple Pay authorization. Please complete payment via the Apple Pay sheet.",
+      provider: "PAYPAL",
+      method: "APPLE_PAY",
+      providerPaymentId: "",
+      status: PaymentStatus.FAILED,
+    };
+  }
+
   return {
     valid: true,
-    provider: "LOCAL_GATEWAY",
+    provider: "PAYPAL",
     method: "APPLE_PAY",
-    providerPaymentId: token,
+    providerPaymentId: captureId || paypalOrderId,
     status: PaymentStatus.PAID,
     metadata: {
-      channel: "APPLE_PAY_WEB",
+      channel: "APPLE_PAY_PPCP",
+      paypalOrderId,
+      captureId,
       authorizedAt: new Date().toISOString(),
     },
   };
 }
 
 /**
- * Verifies Klarna Pay Later / Slice It installment selection.
+ * Verifies Klarna Pay Later installment selection.
  */
-export function verifyKlarnaPayment(details: {
-  plan?: string;
-  installmentAmount?: string;
-}): PaymentVerificationResult {
-  const token = `KLARNA-AUTH-${Date.now()}`;
+export function verifyKlarnaPayment(details: any): PaymentVerificationResult {
+  const paypalOrderId = details.paypalOrderId || details.orderId || details.captureId;
+  const captureId = details.captureId || paypalOrderId;
+
+  if (!paypalOrderId && !captureId) {
+    return {
+      valid: false,
+      error: "Missing Klarna authorization. Please complete payment via PayPal / Klarna.",
+      provider: "PAYPAL",
+      method: "KLARNA",
+      providerPaymentId: "",
+      status: PaymentStatus.FAILED,
+    };
+  }
+
   return {
     valid: true,
-    provider: "LOCAL_GATEWAY",
+    provider: "PAYPAL",
     method: "KLARNA",
-    providerPaymentId: token,
+    providerPaymentId: captureId || paypalOrderId,
     status: PaymentStatus.PAID,
     metadata: {
       plan: details.plan || "3_INSTALLMENTS",
-      installmentAmount: details.installmentAmount,
+      paypalOrderId,
+      captureId,
       authorizedAt: new Date().toISOString(),
     },
   };
@@ -308,12 +252,7 @@ export function verifyPaymentServerSide(
 ): PaymentVerificationResult {
   switch (method) {
     case "CARD":
-      return verifyCardPayment({
-        nameOnCard: details.nameOnCard || "",
-        cardNumber: details.cardNumber || "",
-        expiry: details.expiry || "",
-        cvc: details.cvc || "",
-      });
+      return verifyCardPayment(details);
 
     case "PAYPAL":
       return verifyPayPalPayment(details);

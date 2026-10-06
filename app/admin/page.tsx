@@ -4,11 +4,19 @@ import { AdminShell, MetricCard, TableCell, TableHeader, AdminTable } from "@/co
 import { products as seedProducts } from "@/lib/products/catalogue";
 import { prisma } from "@/lib/db/client";
 
+import { redirect } from "next/navigation";
+import { getAuthenticatedAdmin } from "@/lib/auth/session";
+
 export const metadata = {
   title: "Admin Overview",
 };
 
 export default async function AdminOverviewPage() {
+  const admin = await getAuthenticatedAdmin();
+  if (!admin) {
+    redirect("/admin/login");
+  }
+
   let grossSales = 18450;
   let ordersCount = 184;
   let pendingOrdersCount = 12;

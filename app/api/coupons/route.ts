@@ -41,6 +41,11 @@ const defaultCoupons = [
 // ─── GET /api/coupons ─────────────────────────────────────────────────────────
 export async function GET() {
   try {
+    const admin = await getAuthenticatedAdmin();
+    if (!admin) {
+      return NextResponse.json({ error: "Unauthorized. Admin session required." }, { status: 401 });
+    }
+
     if (process.env.DATABASE_URL) {
       const coupons = await prisma.coupon.findMany({
         orderBy: { createdAt: "desc" },

@@ -481,10 +481,8 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const admin = await getAuthenticatedAdmin();
-    const cookieStore = await cookies();
-    const hasAdminCookie = Boolean(cookieStore.get("novixa_admin_session")?.value);
 
-    if (!admin && !hasAdminCookie) {
+    if (!admin) {
       return NextResponse.json({ error: "Unauthorized. Admin session required." }, { status: 401 });
     }
 
