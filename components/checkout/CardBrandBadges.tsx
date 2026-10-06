@@ -441,34 +441,17 @@ export function PayPalBadge({ className = "h-5 w-16" }: { className?: string }) 
 
 /**
  * 12. Google Pay Badge
+ * Uses the official, unmodified Google Pay Acceptance Mark (see Google Pay brand guidelines).
  */
 export function GooglePayBadge({ className = "h-5 w-12" }: { className?: string }) {
   return (
-    <svg
-      viewBox="0 0 52 24"
-      className={`${className} shrink-0 select-none shadow-xs`}
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-label="Google Pay"
-    >
-      <rect width="52" height="24" rx="3.5" fill="#FFFFFF" stroke="#E5E7EB" strokeWidth="1" />
-      <g transform="translate(6, 4.5)">
-        <path
-          d="M7.4 7.5v-2.2H14c.1.4.1.7.1 1.2 0 1.5-.4 2.8-1.2 3.7-1 1.1-2.5 1.8-4.5 1.8-3.5 0-6.4-2.8-6.4-6.3 0-3.5 2.9-6.4 6.4-6.4 1.7 0 3.1.6 4.2 1.6l-1.6 1.6c-.7-.7-1.6-1.1-2.6-1.1-2.3 0-4.2 1.9-4.2 4.3s1.9 4.3 4.2 4.3c1.7 0 2.8-.7 3.4-1.4.5-.5.8-1.3.9-2.3H7.4z"
-          fill="#4285F4"
-        />
-        <text
-          x="26"
-          y="10.5"
-          fill="#5F6368"
-          fontSize="9.5"
-          fontWeight="600"
-          fontFamily="Roboto, Arial, sans-serif"
-        >
-          Pay
-        </text>
-      </g>
-    </svg>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/images/payments/google-pay-mark.svg"
+      alt="Google Pay"
+      className={`${className} shrink-0 select-none object-contain`}
+      draggable={false}
+    />
   );
 }
 
