@@ -43,6 +43,20 @@ export function checkApplePaySupport(): boolean {
   }
 }
 
+async function getApplePayHelper(): Promise<any | null> {
+  if (typeof window === "undefined") return null;
+  if ((window as any).paypal?.Applepay) {
+    return (window as any).paypal.Applepay();
+  }
+  for (let i = 0; i < 25; i++) {
+    await new Promise((r) => setTimeout(r, 100));
+    if ((window as any).paypal?.Applepay) {
+      return (window as any).paypal.Applepay();
+    }
+  }
+  return null;
+}
+
 export function NativeApplePayButton({
   amount,
   currency = "GBP",
@@ -71,7 +85,7 @@ export function NativeApplePayButton({
     }
   }, [currency]);
 
-  const handleApplePayClick = async () => {
+  const handleApplePayClick = () => {
     setErrorMessage(null);
 
     if (!validateBeforePayment()) {
@@ -89,28 +103,7 @@ export function NativeApplePayButton({
     setIsProcessing(true);
 
     try {
-      // 1. Create PayPal Order on our backend first
-      const orderRes = await fetch("/api/payments/paypal/create-order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
-          couponCode: couponCode || undefined,
-          shippingMethodId: shippingMethodId || undefined,
-          shippingAddress: shippingAddress?.addressLine1 ? shippingAddress : undefined,
-          currency,
-          paymentSource: "apple_pay",
-        }),
-      });
-
-      const orderData = await orderRes.json();
-      if (!orderRes.ok || !orderData.id) {
-        throw new Error(orderData.error || "Failed to initialize order for Apple Pay.");
-      }
-
-      const paypalOrderId = orderData.id;
-
-      // 2. Build Apple Pay Payment Request
+      // 1. Build Apple Pay Payment Request synchronously
       const paymentRequest = {
         countryCode: "GB",
         currencyCode: currency,
@@ -123,21 +116,28 @@ export function NativeApplePayButton({
         },
       };
 
+      // 2. MUST create ApplePaySession SYNCHRONOUSLY within the user gesture handler
       const session = new ApplePaySession(3, paymentRequest);
 
-      const getApplePayHelper = async (): Promise<any | null> => {
-        if (typeof window === "undefined") return null;
-        if ((window as any).paypal?.Applepay) {
-          return (window as any).paypal.Applepay();
+      // Start PayPal backend order creation promise in parallel
+      const orderPromise = fetch("/api/payments/paypal/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+          couponCode: couponCode || undefined,
+          shippingMethodId: shippingMethodId || undefined,
+          shippingAddress: shippingAddress?.addressLine1 ? shippingAddress : undefined,
+          currency,
+          paymentSource: "apple_pay",
+        }),
+      }).then(async (res) => {
+        const data = await res.json();
+        if (!res.ok || !data.id) {
+          throw new Error(data.error || "Failed to initialize order for Apple Pay.");
         }
-        for (let i = 0; i < 25; i++) {
-          await new Promise((r) => setTimeout(r, 100));
-          if ((window as any).paypal?.Applepay) {
-            return (window as any).paypal.Applepay();
-          }
-        }
-        return null;
-      };
+        return data.id as string;
+      });
 
       // 3. Handle Merchant Validation
       session.onvalidatemerchant = async (event: any) => {
@@ -185,6 +185,9 @@ export function NativeApplePayButton({
       session.onpaymentauthorized = async (event: any) => {
         try {
           const payment = event.payment;
+
+          // Resolve our PayPal order ID
+          const paypalOrderId = await orderPromise;
 
           // Attempt client-side PayPal confirmation if SDK helper is loaded
           const applepayHelper = await getApplePayHelper();
@@ -244,7 +247,7 @@ export function NativeApplePayButton({
         toast.info("Apple Pay authorization was cancelled.");
       };
 
-      // 5. Present native Apple Pay sheet
+      // 5. Present native Apple Pay sheet SYNCHRONOUSLY within user gesture
       session.begin();
     } catch (err: any) {
       setIsProcessing(false);
