@@ -190,11 +190,6 @@ export async function createPayPalOrder(params: CreateOrderParams) {
     payload.payment_source = {
       card: {
         experience_context: experienceContext,
-        attributes: {
-          verification: {
-            method: "SCA_WHEN_REQUIRED",
-          },
-        },
       },
     };
   } else if (params.paymentSourceType === "paypal") {
