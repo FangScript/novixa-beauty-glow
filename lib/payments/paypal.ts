@@ -137,7 +137,6 @@ export async function createPayPalOrder(params: CreateOrderParams) {
 
   const experienceContext: Record<string, any> = {
     brand_name: "Novixa Beauty & Glow",
-    landing_page: "NO_PREFERENCE",
     user_action: "PAY_NOW",
     shipping_preference: "NO_SHIPPING",
   };
@@ -196,6 +195,12 @@ export async function createPayPalOrder(params: CreateOrderParams) {
             method: "SCA_WHEN_REQUIRED",
           },
         },
+      },
+    };
+  } else if (params.paymentSourceType === "paypal") {
+    payload.payment_source = {
+      paypal: {
+        experience_context: experienceContext,
       },
     };
   } else {

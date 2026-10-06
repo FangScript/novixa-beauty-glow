@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Loader2, ShieldCheck, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
@@ -57,6 +57,19 @@ export function NativeApplePayButton({
 }: NativeApplePayButtonProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Proactively preload PayPal SDK with applepay component if not already present
+    if (typeof window !== "undefined" && !(window as any).paypal?.Applepay) {
+      const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
+      if (clientId && !document.querySelector('script[src*="paypal.com/sdk/js"][src*="applepay"]')) {
+        const script = document.createElement("script");
+        script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=${currency}&components=applepay,buttons`;
+        script.async = true;
+        document.head.appendChild(script);
+      }
+    }
+  }, [currency]);
 
   const handleApplePayClick = async () => {
     setErrorMessage(null);
