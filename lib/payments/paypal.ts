@@ -80,6 +80,7 @@ export interface CreateOrderParams {
   orderNumber?: string;
   customId?: string;
   description?: string;
+  paymentSourceType?: "card" | "paypal" | "apple_pay" | "google_pay";
   shippingAddress?: {
     name?: string;
     addressLine1?: string;
@@ -153,15 +154,19 @@ export async function createPayPalOrder(params: CreateOrderParams) {
       user_action: "PAY_NOW",
       shipping_preference: "NO_SHIPPING",
     },
-    payment_source: {
-      card: {
-        attributes: {
-          verification: {
-            method: "SCA_WHEN_REQUIRED",
+    ...(params.paymentSourceType === "card"
+      ? {
+          payment_source: {
+            card: {
+              attributes: {
+                verification: {
+                  method: "SCA_WHEN_REQUIRED",
+                },
+              },
+            },
           },
-        },
-      },
-    },
+        }
+      : {}),
   };
 
   if (params.shippingAddress) {

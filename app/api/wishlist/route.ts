@@ -37,8 +37,8 @@ export async function GET(request: Request) {
           id: wi.product.id,
           name: wi.product.name,
           slug: wi.product.slug,
-          price: wi.product.price,
-          salePrice: wi.product.salePrice,
+          price: Number(wi.product.price),
+          salePrice: wi.product.salePrice !== null && wi.product.salePrice !== undefined ? Number(wi.product.salePrice) : null,
           stock: wi.product.stock,
           image: wi.product.images?.[0]?.url ?? "/images/product-perfume.jpg",
         },
@@ -51,7 +51,7 @@ export async function GET(request: Request) {
   }
 }
 
-// ─── POST /api/wishlist  { productId } ────────────────────────────────
+// ─── POST /api/wishlist  { productId } or { productIds: [...] } ───────
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) {
     return NextResponse.json({ ok: false, error: "Database not configured." }, { status: 503 });
@@ -67,11 +67,17 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { productId } = body;
+    const { productId, productIds } = body;
 
-    if (!productId) {
+    const idsToSync = Array.isArray(productIds)
+      ? productIds.filter((id) => typeof id === "string" && id.trim())
+      : productId
+        ? [productId]
+        : [];
+
+    if (idsToSync.length === 0) {
       return NextResponse.json(
-        { ok: false, error: "productId is required." },
+        { ok: false, error: "productId or productIds array is required." },
         { status: 400 },
       );
     }
@@ -85,14 +91,45 @@ export async function POST(request: Request) {
       update: {},
     });
 
-    // Upsert wishlist item
-    await prisma.wishlistItem.upsert({
-      where: { wishlistId_productId: { wishlistId: wishlist.id, productId } },
-      create: { wishlistId: wishlist.id, productId },
-      update: {},
+    // Upsert wishlist items
+    for (const pid of idsToSync) {
+      await prisma.wishlistItem.upsert({
+        where: { wishlistId_productId: { wishlistId: wishlist.id, productId: pid } },
+        create: { wishlistId: wishlist.id, productId: pid },
+        update: {},
+      });
+    }
+
+    // Return the updated full list of items
+    const updatedWishlist = await prisma.wishlist.findUnique({
+      where: { userId },
+      include: {
+        items: {
+          include: {
+            product: {
+              include: { images: { orderBy: { sortOrder: "asc" }, take: 1 } },
+            },
+          },
+        },
+      },
     });
 
-    return NextResponse.json({ ok: true });
+    const items =
+      updatedWishlist?.items.map((wi) => ({
+        id: wi.id,
+        productId: wi.productId,
+        product: {
+          id: wi.product.id,
+          name: wi.product.name,
+          slug: wi.product.slug,
+          price: Number(wi.product.price),
+          salePrice: wi.product.salePrice !== null && wi.product.salePrice !== undefined ? Number(wi.product.salePrice) : null,
+          stock: wi.product.stock,
+          image: wi.product.images?.[0]?.url ?? "/images/product-perfume.jpg",
+        },
+      })) ?? [];
+
+    return NextResponse.json({ ok: true, items });
   } catch (error: any) {
     console.error("POST /api/wishlist error:", error);
     return NextResponse.json(

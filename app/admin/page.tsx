@@ -50,7 +50,7 @@ export default async function AdminOverviewPage() {
       ]);
 
       if (oCount > 0 || uCount > 0 || dbProducts.length > 0) {
-        grossSales = revAgg._sum.total ?? 0;
+        grossSales = revAgg._sum.total ? Number(revAgg._sum.total) : 0;
         ordersCount = oCount;
         pendingOrdersCount = pendingCount;
         customersCount = uCount;
@@ -62,7 +62,7 @@ export default async function AdminOverviewPage() {
             name: p.name,
             category: p.category.toLowerCase(),
             gender: p.gender.toLowerCase(),
-            price: p.price,
+            price: Number(p.price),
             stock: p.stock,
           }));
         }

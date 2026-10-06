@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
@@ -119,14 +120,16 @@ model Product {
   name            String
   slug            String          @unique
   description     String
-  price           Float
-  salePrice       Float?
+  price           Decimal         @db.Decimal(10, 2)
+  salePrice       Decimal?        @db.Decimal(10, 2)
   gender          Gender
   categoryId      String
   category        ProductCategory
   brand           String
   sku             String          @unique
   status          ProductStatus   @default(DRAFT)
+  isMeasured      Boolean         @default(false)
+  unitOfMeasure   String          @default("unit")
   fragranceFamily String?
   topNotes        String[]
   middleNotes     String[]
@@ -157,6 +160,7 @@ model Product {
   @@index([gender])
   @@index([status])
   @@index([price])
+  @@index([status, category, gender])
 }
 
 model ProductImage {
@@ -170,16 +174,16 @@ model ProductImage {
 }
 
 model Bundle {
-  id           String        @id @default(cuid())
-  name         String
-  slug         String        @unique
-  description  String
-  price         Float
-  originalValue Float
-  status       ProductStatus @default(DRAFT)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  items        BundleItem[]
+  id            String        @id @default(cuid())
+  name          String
+  slug          String        @unique
+  description   String
+  price         Decimal       @db.Decimal(10, 2)
+  originalValue Decimal       @db.Decimal(10, 2)
+  status        ProductStatus @default(DRAFT)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  items         BundleItem[]
 }
 
 model BundleItem {
@@ -202,7 +206,7 @@ model Address {
   city       String
   state      String
   postalCode String
-  country    String   @default("IN")
+  country    String   @default("GB")
   phone      String?
   isDefault  Boolean  @default(false)
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -253,8 +257,8 @@ model Coupon {
   id             String       @id @default(cuid())
   code           String       @unique
   type           DiscountType
-  value          Float
-  minimumOrder   Float        @default(0)
+  value          Decimal      @db.Decimal(10, 2)
+  minimumOrder   Decimal      @default(0) @db.Decimal(10, 2)
   usageLimit     Int?
   usageCount     Int          @default(0)
   startsAt       DateTime?
@@ -273,11 +277,12 @@ model Order {
   couponId              String?
   status                OrderStatus   @default(PENDING)
   paymentStatus         PaymentStatus @default(UNPAID)
-  subtotal              Float
-  discount              Float         @default(0)
-  shipping              Float         @default(0)
-  tax                   Float         @default(0)
-  total                 Float
+  subtotal              Decimal       @db.Decimal(10, 2)
+  discount              Decimal       @default(0) @db.Decimal(10, 2)
+  shipping              Decimal       @default(0) @db.Decimal(10, 2)
+  tax                   Decimal       @default(0) @db.Decimal(10, 2)
+  total                 Decimal       @db.Decimal(10, 2)
+  currency              String        @default("GBP")
   shippingAddressSnapshot Json
   trackingNumber        String?
   shippingMethodId      String?
@@ -302,7 +307,7 @@ model OrderItem {
   productId      String?
   productName    String
   sku            String
-  unitPrice      Float
+  unitPrice      Decimal @db.Decimal(10, 2)
   quantity       Float
   imageUrl       String?
   order          Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -316,13 +321,14 @@ model Payment {
   provider          String
   method            String        @default("CARD")
   providerPaymentId String?       @unique
-  amount            Float
+  amount            Decimal       @db.Decimal(10, 2)
   currency          String        @default("GBP")
   status            PaymentStatus @default(PENDING)
   rawStatus         String?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
   order             Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  @@index([orderId, status])
 }
 
 model Review {
@@ -347,7 +353,7 @@ model ShippingMethod {
   id           String   @id @default(cuid())
   name         String
   timeframe    String
-  price        Float
+  price        Decimal  @db.Decimal(10, 2)
   description  String?
   active       Boolean  @default(true)
   isDefault    Boolean  @default(false)
@@ -359,3 +365,21 @@ model ShippingMethod {
   @@index([displayOrder])
 }
 
+model NewsletterSubscriber {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  subscribedAt DateTime @default(now())
+  active       Boolean  @default(true)
+  @@index([email])
+}
+
+model WebhookEvent {
+  id         String   @id
+  eventType  String
+  resourceId String?
+  status     String?
+  payload    Json?
+  createdAt  DateTime @default(now())
+  @@index([eventType])
+  @@index([createdAt])
+}

@@ -83,8 +83,8 @@ AUTH_SECRET=$(openssl rand -hex 32)
 DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@127.0.0.1:5432/${DB_NAME}?schema=public"
 DIRECT_URL="postgresql://${DB_USER}:${DB_PASS}@127.0.0.1:5432/${DB_NAME}?schema=public"
 
-ADMIN_EMAIL=novixaretail@gmail.com
-ADMIN_PASSWORD=NovixaAdmin2026!
+ADMIN_EMAIL=${ADMIN_EMAIL:-"novixaretail@gmail.com"}
+ADMIN_PASSWORD=${ADMIN_PASSWORD:-$(openssl rand -base64 18)}
 
 # PayPal Complete Payments (PPCP) - Live Credentials
 PAYMENT_PROVIDER=PAYPAL

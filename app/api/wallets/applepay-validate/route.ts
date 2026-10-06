@@ -6,26 +6,20 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { validationUrl, domainName } = body;
 
-    if (!validationUrl) {
+    if (!validationUrl || typeof validationUrl !== "string") {
       return NextResponse.json(
-        { error: "Apple Pay validationUrl is required." },
+        { error: "validationUrl is required." },
         { status: 400 },
       );
     }
 
-    const host = request.headers.get("host") || domainName || "www.novixaretail.com";
-    const cleanHost = host.split(":")[0];
+    const merchantSession = await validateApplePayMerchantSession(validationUrl, domainName);
 
-    const merchantSession = await validateApplePayMerchantSession(validationUrl, cleanHost);
-
-    return NextResponse.json({
-      ok: true,
-      merchantSession,
-    });
+    return NextResponse.json({ ok: true, merchantSession });
   } catch (error: any) {
-    console.error("Apple Pay Merchant Validation Route Error:", error);
+    console.error("Apple Pay validate merchant error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to validate Apple Pay merchant session" },
+      { error: error.message || "Failed to validate Apple Pay merchant." },
       { status: 500 },
     );
   }

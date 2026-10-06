@@ -3,10 +3,13 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import prisma from "@/lib/db/client";
 
+import { sanitizeRedirect } from "@/lib/auth/redirect";
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/account";
+  const rawNext = searchParams.get("next");
+  const next = sanitizeRedirect(rawNext, "/account");
 
   // Resolve public domain safely (prevent internal Docker 0.0.0.0:8080 leaking to users)
   const forwardedHost = request.headers.get("x-forwarded-host");

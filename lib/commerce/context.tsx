@@ -96,9 +96,6 @@ export function CommerceProvider({
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [isCartLoading, setIsCartLoading] = useState(false);
   const hasHydratedRef = useRef(false);
-  const dbAvailable =
-    typeof process !== "undefined" && Boolean(process.env.NEXT_PUBLIC_DB_AVAILABLE !== "false");
-  // We use a ref to avoid re-fetching when userId identity changes between renders
   const userIdRef = useRef(userId);
   userIdRef.current = userId;
 
@@ -107,24 +104,25 @@ export function CommerceProvider({
     setMounted(true);
 
     async function hydrate() {
-      // 1. Load cart
       setIsCartLoading(true);
+
+      // 1. Try server-backed cart first
       try {
         const qs = userId ? `?userId=${encodeURIComponent(userId)}` : "";
         const res = await fetch(`/api/cart${qs}`);
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data.items) && data.items.length > 0) {
-            const sanitizedItems = data.items.map((i: CartItem) => ({
-              ...i,
-              quantity: Math.max(1, Math.round(Number(i.quantity) || 1)),
-            }));
+            const sanitizedItems: CartItem[] = data.items.map((i: CartItem) => {
+              const rawQty = Number(i.quantity);
+              return {
+                ...i,
+                quantity: isNaN(rawQty) || rawQty <= 0 ? 1 : Math.round(rawQty * 100) / 100,
+              };
+            });
             if (data.source === "db") {
               setCart(sanitizedItems);
-              writeLS(
-                "novixa-cart",
-                sanitizedItems.map((i: CartItem) => ({ productId: i.productId, quantity: i.quantity })),
-              );
+              writeLS("novixa-cart", sanitizedItems);
               hasHydratedRef.current = true;
               setIsCartLoading(false);
               return;
@@ -134,35 +132,98 @@ export function CommerceProvider({
       } catch {
         // fall through to localStorage
       }
-      // Fallback: localStorage
+
+      // 2. Fallback: localStorage with live DB product price refresh
       const localCart = readLS<CartItem[]>("novixa-cart", []);
-      const sanitizedLocalCart = localCart.map((i) => ({
-        ...i,
-        quantity: Math.max(1, Math.round(Number(i.quantity) || 1)),
-      }));
-      setCart(sanitizedLocalCart);
+      if (localCart.length > 0) {
+        const pIds = localCart.map((i) => i.productId).filter(Boolean);
+        if (pIds.length > 0) {
+          try {
+            const pRes = await fetch(`/api/products?ids=${encodeURIComponent(pIds.join(","))}`);
+            if (pRes.ok) {
+              const pData = await pRes.json();
+              if (Array.isArray(pData.products) && pData.products.length > 0) {
+                const pMap = new Map(pData.products.map((p: any) => [p.id, p]));
+                localCart.forEach((item) => {
+                  const dbP: any = pMap.get(item.productId);
+                  if (dbP) {
+                    item.product = {
+                      id: dbP.id,
+                      name: dbP.name,
+                      slug: dbP.slug,
+                      price: Number(dbP.price),
+                      salePrice: dbP.salePrice !== undefined && dbP.salePrice !== null ? Number(dbP.salePrice) : null,
+                      stock: Number(dbP.stock),
+                      sku: dbP.sku,
+                      image: dbP.images?.[0] ?? "/images/product-perfume.jpg",
+                    };
+                  }
+                });
+              }
+            }
+          } catch {
+            // Keep existing product snapshots
+          }
+        }
+        const sanitized = localCart.map((i) => {
+          const rawQty = Number(i.quantity);
+          return {
+            ...i,
+            quantity: isNaN(rawQty) || rawQty <= 0 ? 1 : Math.round(rawQty * 100) / 100,
+          };
+        });
+        setCart(sanitized);
+        writeLS("novixa-cart", sanitized);
+      } else {
+        setCart([]);
+      }
+
       hasHydratedRef.current = true;
       setIsCartLoading(false);
     }
 
     async function hydrateWishlist() {
+      const localWishlist = readLS<string[]>("novixa-wishlist", []);
       if (!userId) {
-        setWishlist(readLS<string[]>("novixa-wishlist", []));
+        setWishlist(localWishlist);
         return;
       }
+
       try {
         const res = await fetch(`/api/wishlist?userId=${encodeURIComponent(userId)}`);
         if (res.ok) {
           const data = await res.json();
+          let serverIds: string[] = [];
           if (data.source === "db" && Array.isArray(data.items)) {
-            const ids = data.items.map((i: { productId: string }) => i.productId);
-            setWishlist(ids);
-            writeLS("novixa-wishlist", ids);
-            return;
+            serverIds = data.items.map((i: { productId: string }) => i.productId);
           }
+
+          // Guest to customer wishlist merge
+          const missingOnServer = localWishlist.filter((id) => !serverIds.includes(id));
+          if (missingOnServer.length > 0) {
+            try {
+              const syncRes = await fetch("/api/wishlist", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ productIds: missingOnServer }),
+              });
+              if (syncRes.ok) {
+                const syncData = await syncRes.json();
+                if (Array.isArray(syncData.items)) {
+                  serverIds = syncData.items.map((i: { productId: string }) => i.productId);
+                }
+              }
+            } catch {}
+          }
+
+          const combined = Array.from(new Set([...serverIds, ...localWishlist]));
+          setWishlist(combined);
+          writeLS("novixa-wishlist", combined);
+          return;
         }
       } catch {}
-      setWishlist(readLS<string[]>("novixa-wishlist", []));
+
+      setWishlist(localWishlist);
     }
 
     hydrate();
@@ -173,10 +234,7 @@ export function CommerceProvider({
   // ── Persist cart to localStorage as a write-through ───────────────────────
   useEffect(() => {
     if (!mounted || !hasHydratedRef.current) return;
-    writeLS(
-      "novixa-cart",
-      cart.map((i) => ({ productId: i.productId, quantity: i.quantity })),
-    );
+    writeLS("novixa-cart", cart);
   }, [cart, mounted]);
 
   useEffect(() => {
@@ -188,11 +246,13 @@ export function CommerceProvider({
 
   const addToCart = useCallback(async (productId: string, quantity = 1) => {
     const localProduct = getProduct(productId);
+    const rawQty = Number(quantity);
+    const cleanQty = isNaN(rawQty) || rawQty <= 0 ? 1 : Math.round(rawQty * 100) / 100;
     const stock = localProduct?.stock ?? Infinity;
-    const cleanQty = Math.max(1, Math.round(Number(quantity) || 1));
     if (cleanQty <= 0) return;
 
     const pName = localProduct?.name || "Product";
+    const unitLabel = cleanQty === 1 ? "unit" : "units";
 
     // Optimistic update
     setCart((prev) => {
@@ -200,18 +260,36 @@ export function CommerceProvider({
       if (existing) {
         return prev.map((i) =>
           i.productId === productId
-            ? { ...i, quantity: Math.min(i.quantity + cleanQty, stock) }
+            ? { ...i, quantity: Math.min(Math.round((i.quantity + cleanQty) * 100) / 100, stock) }
             : i,
         );
       }
-      return [...prev, { productId, quantity: Math.min(cleanQty, stock) }];
+      return [
+        ...prev,
+        {
+          productId,
+          quantity: Math.min(cleanQty, stock),
+          product: localProduct
+            ? {
+                id: localProduct.id,
+                name: localProduct.name,
+                slug: localProduct.slug,
+                price: localProduct.price,
+                salePrice: localProduct.salePrice ?? null,
+                stock: localProduct.stock,
+                sku: localProduct.sku,
+                image: localProduct.images[0] || "/images/product-perfume.jpg",
+              }
+            : undefined,
+        },
+      ];
     });
 
     toast.success("Added to shopping bag", {
-      description: `${pName} (${cleanQty} ${cleanQty === 1 ? "unit" : "units"})`,
+      description: `${pName} (${cleanQty} ${unitLabel})`,
     });
 
-    // Server sync (fire-and-forget with rollback on error)
+    // Server sync
     if (userIdRef.current !== undefined) {
       try {
         const res = await fetch("/api/cart", {
@@ -223,20 +301,20 @@ export function CommerceProvider({
         if (res.ok && data.ok && Array.isArray(data.items)) {
           setCart(data.items);
         } else if (!res.ok) {
-          // Rollback
+          // Rollback on server error
           setCart((prev) => {
             const existing = prev.find((i) => i.productId === productId);
             if (!existing) return prev.filter((i) => i.productId !== productId);
+            const rolledBackQty = Math.round((existing.quantity - cleanQty) * 100) / 100;
+            if (rolledBackQty <= 0) return prev.filter((i) => i.productId !== productId);
             return prev.map((i) =>
-              i.productId === productId
-                ? { ...i, quantity: Math.max(1, i.quantity - cleanQty) }
-                : i,
+              i.productId === productId ? { ...i, quantity: rolledBackQty } : i,
             );
           });
           toast.error(data.error || "Failed to update bag on server");
         }
       } catch {
-        // keep optimistic state on network error
+        // Keep optimistic state on network error
       }
     }
   }, []);
@@ -244,7 +322,8 @@ export function CommerceProvider({
   const updateQuantity = useCallback(
     async (productId: string, quantity: number) => {
       const prev = [...cart];
-      const cleanQty = Math.round(Number(quantity));
+      const rawQty = Number(quantity);
+      const cleanQty = Math.round(rawQty * 100) / 100;
 
       if (cleanQty <= 0) {
         setCart((c) => c.filter((i) => i.productId !== productId));
@@ -343,7 +422,7 @@ export function CommerceProvider({
   // ── Derived values ─────────────────────────────────────────────────────────
 
   const cartCount = useMemo(
-    () => cart.reduce((sum, i) => sum + Math.round(Number(i.quantity) || 0), 0),
+    () => Math.round(cart.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0) * 100) / 100,
     [cart],
   );
 

@@ -37,42 +37,26 @@ export async function POST(request: Request) {
       }
     }
 
-    // Capture the payment via PayPal API
+    // Authoritative PayPal API Capture
     let captureData: any;
     try {
       captureData = await capturePayPalOrder(paypalOrderId);
     } catch (captureErr: any) {
-      console.warn("PayPal capture notice:", captureErr.message);
-
-      // Only permit simulated test capture if explicitly in sandbox/test mode
-      const isLive =
-        process.env.PAYPAL_MODE?.toLowerCase() === "live" ||
-        process.env.NEXT_PUBLIC_PAYPAL_MODE?.toLowerCase() === "live";
-
-      const isTestToken =
-        !isLive && Boolean(applePayPayment?.id?.includes("test"));
-
-      if (isTestToken) {
-        return NextResponse.json({
-          ok: true,
-          status: "COMPLETED",
-          captureId: `TEST-APPLEPAY-${Date.now()}`,
-          paypalOrderId,
-          payerEmail: "test-buyer@applepay.test",
-          payerName: "Apple Pay Test User",
-          details: { status: "COMPLETED", testEvaluation: true },
-        });
+      // If already captured, fetch authoritative details
+      if (captureErr?.message?.includes("ORDER_ALREADY_CAPTURED")) {
+        captureData = await getPayPalOrderDetails(paypalOrderId);
+      } else {
+        console.error("PayPal capture error:", captureErr);
+        throw captureErr;
       }
-      throw captureErr;
     }
 
+    const captureRecord = captureData.purchase_units?.[0]?.payments?.captures?.[0];
     const isCompleted =
       captureData.status === "COMPLETED" ||
-      captureData.purchase_units?.[0]?.payments?.captures?.[0]?.status === "COMPLETED";
+      captureRecord?.status === "COMPLETED";
 
-    const captureId =
-      captureData.purchase_units?.[0]?.payments?.captures?.[0]?.id || paypalOrderId;
-
+    const captureId = captureRecord?.id || paypalOrderId;
     const payer = captureData.payer || {};
 
     return NextResponse.json({
@@ -81,7 +65,9 @@ export async function POST(request: Request) {
       captureId,
       paypalOrderId,
       payerEmail: payer.email_address,
-      payerName: payer.name ? `${payer.name.given_name || ""} ${payer.name.surname || ""}`.trim() : null,
+      payerName: payer.name
+        ? `${payer.name.given_name || ""} ${payer.name.surname || ""}`.trim()
+        : null,
       details: captureData,
     });
   } catch (error: any) {

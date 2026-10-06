@@ -24,15 +24,14 @@ export async function POST(request: Request) {
     };
 
     if (process.env.DATABASE_URL) {
-      // 1. Capture customer lead in database if not already present
-      await prisma.user
+      // 1. Capture subscriber lead in dedicated NewsletterSubscriber table
+      await prisma.newsletterSubscriber
         .upsert({
           where: { email: cleanEmail },
-          update: {},
+          update: { active: true },
           create: {
             email: cleanEmail,
-            name: cleanEmail.split("@")[0],
-            role: "CUSTOMER",
+            active: true,
           },
         })
         .catch(() => null);
@@ -53,11 +52,12 @@ export async function POST(request: Request) {
         .catch(() => null);
 
       if (welcomeCoupon) {
+        const minOrderNum = Number(welcomeCoupon.minimumOrder);
         couponDetails = {
           code: welcomeCoupon.code,
           discount: `${welcomeCoupon.value}% off`,
-          minimumOrder: welcomeCoupon.minimumOrder,
-          terms: `Valid on orders above £${welcomeCoupon.minimumOrder}`,
+          minimumOrder: minOrderNum,
+          terms: `Valid on orders above £${minOrderNum}`,
         };
       }
     }

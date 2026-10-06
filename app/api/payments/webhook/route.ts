@@ -23,9 +23,11 @@ export async function POST(request: Request) {
     const transmissionSig = request.headers.get("paypal-transmission-sig");
     const paypalWebhookId = process.env.PAYPAL_WEBHOOK_ID;
 
+    let isVerified = false;
+
     // Check PayPal Asymmetric Webhook Signature
     if (transmissionId && transmissionSig && certUrl && authAlgo && transmissionTime && paypalWebhookId) {
-      const isValid = await verifyPayPalWebhookSignature({
+      isVerified = await verifyPayPalWebhookSignature({
         transmissionId,
         transmissionTime,
         certUrl,
@@ -35,7 +37,7 @@ export async function POST(request: Request) {
         webhookEvent: payload,
       });
 
-      if (!isValid) {
+      if (!isVerified) {
         return NextResponse.json({ error: "Invalid PayPal webhook signature." }, { status: 401 });
       }
     } else {
@@ -43,16 +45,27 @@ export async function POST(request: Request) {
       const signature = request.headers.get("x-webhook-signature") || "";
       const webhookSecret = process.env.PAYMENT_WEBHOOK_SECRET;
 
-      if (webhookSecret) {
-        if (!verifyWebhookSignature(rawBody, signature, webhookSecret)) {
-          return NextResponse.json({ error: "Invalid webhook signature." }, { status: 401 });
-        }
-      } else if (process.env.NODE_ENV === "production") {
-        // Enforce signature in production
-        return NextResponse.json(
-          { error: "Webhook verification unconfigured or signature missing." },
-          { status: 401 },
-        );
+      if (webhookSecret && signature) {
+        isVerified = verifyWebhookSignature(rawBody, signature, webhookSecret);
+      }
+    }
+
+    if (!isVerified) {
+      return NextResponse.json(
+        { error: "Unauthorized. Webhook signature is required and must be valid." },
+        { status: 401 },
+      );
+    }
+
+    // Idempotency: Check if this webhook event was already processed
+    const webhookEventId = payload.id;
+    if (webhookEventId && process.env.DATABASE_URL) {
+      const existingEvent = await prisma.webhookEvent.findUnique({
+        where: { id: webhookEventId },
+      }).catch(() => null);
+
+      if (existingEvent) {
+        return NextResponse.json({ received: true, alreadyProcessed: true });
       }
     }
 
@@ -106,14 +119,19 @@ export async function POST(request: Request) {
       eventStatus === "PAID"
     ) {
       newPaymentStatus = PaymentStatus.PAID;
-      newOrderStatus = OrderStatus.CONFIRMED;
+      // Never downgrade an order that is already PROCESSING, SHIPPED, or DELIVERED
+      if (order.status === OrderStatus.PENDING) {
+        newOrderStatus = OrderStatus.CONFIRMED;
+      }
     } else if (
       eventType === "PAYMENT.CAPTURE.DENIED" ||
       eventType === "PAYMENT.FAILED" ||
       eventStatus === "DENIED" ||
       eventStatus === "FAILED"
     ) {
-      newPaymentStatus = PaymentStatus.FAILED;
+      if (order.paymentStatus !== PaymentStatus.PAID) {
+        newPaymentStatus = PaymentStatus.FAILED;
+      }
     } else if (
       eventType === "PAYMENT.CAPTURE.REVERSED" ||
       eventType === "PAYMENT.CANCELLED" ||
@@ -125,6 +143,24 @@ export async function POST(request: Request) {
     }
 
     await prisma.$transaction(async (tx) => {
+      // If order was cancelled via webhook and wasn't already cancelled, restock inventory
+      if (newOrderStatus === OrderStatus.CANCELLED && order.status !== OrderStatus.CANCELLED) {
+        const orderWithItems = await tx.order.findUnique({
+          where: { id: order.id },
+          include: { items: true },
+        });
+        if (orderWithItems?.items) {
+          for (const item of orderWithItems.items) {
+            if (item.productId) {
+              await tx.product.update({
+                where: { id: item.productId },
+                data: { stock: { increment: Number(item.quantity) } },
+              });
+            }
+          }
+        }
+      }
+
       await tx.order.update({
         where: { id: order.id },
         data: {
@@ -144,6 +180,18 @@ export async function POST(request: Request) {
             }),
           },
         });
+      }
+
+      if (webhookEventId) {
+        await tx.webhookEvent.create({
+          data: {
+            id: webhookEventId,
+            eventType: eventType || "UNKNOWN",
+            resourceId: providerPaymentId || order.id,
+            status: newPaymentStatus,
+            payload: payload,
+          },
+        }).catch(() => null);
       }
     });
 

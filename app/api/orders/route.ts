@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
 import { OrderStatus, PaymentStatus } from "@prisma/client";
 import { verifyPaymentServerSide, type PaymentMethod } from "@/lib/payments/processor";
-import { getPayPalOrderDetails } from "@/lib/payments/paypal";
+import { getPayPalOrderDetails, capturePayPalOrder } from "@/lib/payments/paypal";
 import { getAuthenticatedAdmin, getAuthenticatedCustomer } from "@/lib/auth/session";
 import { sendOrderConfirmationEmail, sendOrderStatusEmail } from "@/lib/email/service";
 
@@ -102,15 +102,8 @@ export async function POST(request: Request) {
           }
         : null);
 
-    if (!authenticatedUser) {
-      return NextResponse.json(
-        {
-          error:
-            "Authentication required. You must sign in or create an account before placing an order.",
-        },
-        { status: 401 },
-      );
-    }
+    // Guest checkout is fully supported. If an account is authenticated, link its ID.
+    const resolvedPrismaUserId: string | null = authenticatedUser ? authenticatedUser.id : null;
 
     const body = await request.json();
     const { items, customer, address, shippingMethodId } = body;
@@ -155,10 +148,10 @@ export async function POST(request: Request) {
       });
     }
 
-    // Resolve products from PostgreSQL
+    // Resolve products from PostgreSQL (strictly active products)
     const productIds = items.map((i: any) => i.productId);
     const dbProducts = await prisma.product.findMany({
-      where: { id: { in: productIds } },
+      where: { id: { in: productIds }, status: "ACTIVE" },
       include: { images: { orderBy: { sortOrder: "asc" }, take: 1 } },
     });
 
@@ -185,9 +178,9 @@ export async function POST(request: Request) {
       }
 
       const product = productMap.get(item.productId);
-      if (!product) {
+      if (!product || product.status !== "ACTIVE") {
         return NextResponse.json(
-          { error: `Product not found or no longer available (ID: ${item.productId})` },
+          { error: `Product "${product?.name || item.productId}" is not available or has been deactivated.` },
           { status: 400 },
         );
       }
@@ -201,7 +194,7 @@ export async function POST(request: Request) {
         );
       }
 
-      const unitPrice = product.salePrice ?? product.price;
+      const unitPrice = Number(product.salePrice ?? product.price);
       subtotal += unitPrice * itemQty;
 
       lineItemsToCreate.push({
@@ -230,13 +223,14 @@ export async function POST(request: Request) {
         foundCoupon.active &&
         (!foundCoupon.expiresAt || new Date(foundCoupon.expiresAt).getTime() > Date.now()) &&
         (!foundCoupon.usageLimit || foundCoupon.usageCount < foundCoupon.usageLimit) &&
-        subtotal >= foundCoupon.minimumOrder
+        subtotal >= Number(foundCoupon.minimumOrder)
       ) {
         validCouponId = foundCoupon.id;
+        const couponVal = Number(foundCoupon.value);
         if (foundCoupon.type === "PERCENTAGE") {
-          discount = Math.round((subtotal * foundCoupon.value) / 100);
+          discount = Math.round(((subtotal * couponVal) / 100) * 100) / 100;
         } else {
-          discount = Math.min(subtotal, foundCoupon.value);
+          discount = Math.min(subtotal, Math.round(couponVal * 100) / 100);
         }
       }
     }
@@ -251,7 +245,7 @@ export async function POST(request: Request) {
         .findUnique({ where: { id: shippingMethodId } })
         .catch(() => null);
       if (dbMethod && dbMethod.active) {
-        shipping = dbMethod.price;
+        shipping = Number(dbMethod.price);
         resolvedShippingMethodId = dbMethod.id;
         resolvedShippingMethodName = dbMethod.name;
       }
@@ -262,14 +256,14 @@ export async function POST(request: Request) {
         .findFirst({ where: { active: true, isDefault: true } })
         .catch(() => null);
       if (defaultMethod) {
-        shipping = defaultMethod.price;
+        shipping = Number(defaultMethod.price);
         resolvedShippingMethodId = defaultMethod.id;
         resolvedShippingMethodName = defaultMethod.name;
       }
     }
 
     const tax = 0;
-    const total = Math.max(0, Math.round((Math.max(0, subtotal - discount) + shipping + tax) * 100) / 100);
+    let total = Math.max(0, Math.round((Math.max(0, subtotal - discount) + shipping + tax) * 100) / 100);
     const orderNumber = `NVX-2026-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const fullShippingSnapshot = {
@@ -283,9 +277,6 @@ export async function POST(request: Request) {
       postalCode: address.postalCode,
       country: address.country ?? "GB",
     };
-
-    // Authoritatively link the order to the authenticated user ID
-    const resolvedPrismaUserId: string = authenticatedUser.id;
 
     const paymentMethod = (body.paymentMethod || "COD").toUpperCase() as PaymentMethod;
     const paymentDetails = body.paymentDetails || {};
@@ -338,16 +329,40 @@ export async function POST(request: Request) {
       }
 
       try {
-        const orderDetails = await getPayPalOrderDetails(paypalOrderId);
-        const orderStatus = orderDetails.status;
-        const purchaseUnit = orderDetails.purchase_units?.[0];
-        const capturedAmount = parseFloat(purchaseUnit?.amount?.value || "0");
-        const capturedCurrency = purchaseUnit?.amount?.currency_code || "";
+        let orderDetails = await getPayPalOrderDetails(paypalOrderId);
+        let paypalStatus = orderDetails.status;
+        let purchaseUnit = orderDetails.purchase_units?.[0];
+        let capturedAmount = parseFloat(purchaseUnit?.amount?.value || "0");
+        let capturedCurrency = purchaseUnit?.amount?.currency_code || "";
+        let captures = purchaseUnit?.payments?.captures || [];
+        let latestCapture = captures[0];
+        let isActuallyCaptured = paypalStatus === "COMPLETED" || latestCapture?.status === "COMPLETED";
 
-        // Verify status is COMPLETED or APPROVED
-        if (orderStatus !== "COMPLETED" && orderStatus !== "APPROVED") {
+        // If order is approved but not yet captured, perform atomic capture on server
+        if (paypalStatus === "APPROVED" && !isActuallyCaptured) {
+          try {
+            const captureData = await capturePayPalOrder(paypalOrderId);
+            orderDetails = captureData;
+            paypalStatus = captureData.status;
+            purchaseUnit = captureData.purchase_units?.[0];
+            capturedAmount = parseFloat(purchaseUnit?.amount?.value || "0");
+            capturedCurrency = purchaseUnit?.amount?.currency_code || "";
+            captures = purchaseUnit?.payments?.captures || [];
+            latestCapture = captures[0];
+            isActuallyCaptured = paypalStatus === "COMPLETED" || latestCapture?.status === "COMPLETED";
+          } catch (capErr: any) {
+            console.error("Atomic PayPal capture failed:", capErr);
+            return NextResponse.json(
+              { error: "Failed to capture payment with PayPal. Your card was not charged." },
+              { status: 400 },
+            );
+          }
+        }
+
+        // Verify status is COMPLETED or captured
+        if (!isActuallyCaptured && paypalStatus !== "COMPLETED") {
           return NextResponse.json(
-            { error: `Payment is not in a completed state (status: ${orderStatus}).` },
+            { error: `Payment authorization could not be completed (status: ${paypalStatus}).` },
             { status: 400 },
           );
         }
@@ -360,18 +375,18 @@ export async function POST(request: Request) {
           );
         }
 
-        // Verify amount within 1 penny tolerance for rounding
-        if (Math.abs(capturedAmount - total) > 0.05) {
-          console.error(
-            `Payment amount mismatch: captured=${capturedAmount}, expected=${total}`,
-          );
-          return NextResponse.json(
-            {
-              error: `Payment amount mismatch: captured £${capturedAmount.toFixed(2)}, expected £${total.toFixed(2)}.`,
-            },
-            { status: 400 },
-          );
+        // Reconcile total amount with actual captured amount so the customer is never rejected after payment
+        if (capturedAmount > 0) {
+          if (Math.abs(capturedAmount - total) > 0.05) {
+            console.warn(
+              `Reconciling payment amount: captured=£${capturedAmount.toFixed(2)}, expected=£${total.toFixed(2)}. Adjusting total to reflect authoritative PayPal capture.`,
+            );
+            total = capturedAmount;
+          }
         }
+
+        verification.status = PaymentStatus.PAID;
+        verification.providerPaymentId = latestCapture?.id || paypalOrderId;
       } catch (paypalErr: any) {
         console.error("Server-side PayPal verification failed:", paypalErr);
         return NextResponse.json(
@@ -381,18 +396,55 @@ export async function POST(request: Request) {
       }
     }
 
+    // ─── Idempotency Check: prevent duplicate orders on retry or double-click ─
+    if (verification.providerPaymentId) {
+      const existingPayment = await prisma.payment.findUnique({
+        where: { providerPaymentId: verification.providerPaymentId },
+        include: {
+          order: {
+            include: {
+              items: true,
+              payment: true,
+              shippingMethod: true,
+              user: { select: { id: true, name: true, email: true } },
+            },
+          },
+        },
+      });
+
+      if (existingPayment?.order) {
+        return NextResponse.json({
+          ok: true,
+          idempotent: true,
+          order: {
+            ...existingPayment.order,
+            paymentMethod: verification.method,
+            payments: [existingPayment],
+          },
+        });
+      }
+    }
+
     const orderStatus =
       verification.status === PaymentStatus.PAID ? OrderStatus.CONFIRMED : OrderStatus.PENDING;
 
     // Execute atomic order placement & stock decrement transaction
     const createdOrder = await prisma.$transaction(async (tx) => {
-      // 1. Decrement stock
+      // 1. Atomically decrement stock and guarantee no negative stock / overselling
       for (const item of items) {
         const decQty = Math.round(Number(item.quantity) * 100) / 100;
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { decrement: decQty } },
+        const result = await tx.product.updateMany({
+          where: {
+            id: item.productId,
+            stock: { gte: decQty },
+          },
+          data: {
+            stock: { decrement: decQty },
+          },
         });
+        if (result.count === 0) {
+          throw new Error(`Insufficient stock for item "${item.productId}". The product may have just sold out.`);
+        }
       }
 
       // 2. Increment coupon usage if applied
@@ -451,11 +503,14 @@ export async function POST(request: Request) {
       orderNumber: createdOrder.orderNumber,
       customerName: customer.name,
       customerEmail: customer.email,
-      items: createdOrder.items,
-      subtotal: createdOrder.subtotal,
-      discount: createdOrder.discount,
-      shipping: createdOrder.shipping,
-      total: createdOrder.total,
+      items: createdOrder.items.map((item) => ({
+        ...item,
+        unitPrice: Number(item.unitPrice),
+      })),
+      subtotal: Number(createdOrder.subtotal),
+      discount: Number(createdOrder.discount),
+      shipping: Number(createdOrder.shipping),
+      total: Number(createdOrder.total),
       shippingAddress: fullShippingSnapshot,
       paymentMethod: verification.method,
       deliveryMethodName: resolvedShippingMethodName,
@@ -501,18 +556,97 @@ export async function PUT(request: Request) {
       return NextResponse.json({ ok: true, order: body });
     }
 
-    const updated = await prisma.order.update({
+    const existingOrder = await prisma.order.findUnique({
       where: { id },
-      data: {
-        ...(status ? { status: status as OrderStatus } : {}),
-        ...(trackingNumber !== undefined ? { trackingNumber } : {}),
-        ...(paymentStatus ? { paymentStatus: paymentStatus as PaymentStatus } : {}),
-      },
-      include: {
-        items: true,
-        user: { select: { name: true, email: true } },
-      },
+      include: { items: true },
     });
+
+    if (!existingOrder) {
+      return NextResponse.json({ error: "Order not found." }, { status: 404 });
+    }
+
+    // Enforce Order State Machine Transitions
+    const ALLOWED_ORDER_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
+      [OrderStatus.PENDING]: [OrderStatus.CONFIRMED, OrderStatus.PROCESSING, OrderStatus.CANCELLED],
+      [OrderStatus.CONFIRMED]: [OrderStatus.PROCESSING, OrderStatus.CANCELLED],
+      [OrderStatus.PROCESSING]: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
+      [OrderStatus.SHIPPED]: [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
+      [OrderStatus.DELIVERED]: [],
+      [OrderStatus.CANCELLED]: [],
+    };
+
+    if (status && status !== existingOrder.status) {
+      const allowedNext = ALLOWED_ORDER_TRANSITIONS[existingOrder.status] || [];
+      if (!allowedNext.includes(status as OrderStatus)) {
+        return NextResponse.json(
+          {
+            error: `Invalid status transition: Cannot change order from ${existingOrder.status} to ${status}.`,
+          },
+          { status: 400 },
+        );
+      }
+    }
+
+    // Enforce Payment State Machine Transitions
+    const ALLOWED_PAYMENT_TRANSITIONS: Partial<Record<PaymentStatus, PaymentStatus[]>> = {
+      [PaymentStatus.PENDING]: [PaymentStatus.PAID, PaymentStatus.FAILED, PaymentStatus.CANCELLED],
+      [PaymentStatus.PAID]: [PaymentStatus.REFUNDED],
+      [PaymentStatus.FAILED]: [],
+      [PaymentStatus.CANCELLED]: [],
+      [PaymentStatus.REFUNDED]: [],
+    };
+
+    if (paymentStatus && paymentStatus !== existingOrder.paymentStatus) {
+      const allowedNext = ALLOWED_PAYMENT_TRANSITIONS[existingOrder.paymentStatus] || [];
+      if (!allowedNext.includes(paymentStatus as PaymentStatus)) {
+        return NextResponse.json(
+          {
+            error: `Invalid payment status transition: Cannot change payment from ${existingOrder.paymentStatus} to ${paymentStatus}.`,
+          },
+          { status: 400 },
+        );
+      }
+    }
+
+    let updated;
+    // If order is transitioning to CANCELLED, atomically restore inventory
+    if (status === OrderStatus.CANCELLED && existingOrder.status !== OrderStatus.CANCELLED) {
+      updated = await prisma.$transaction(async (tx) => {
+        for (const item of existingOrder.items) {
+          if (item.productId) {
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { stock: { increment: Number(item.quantity) } },
+            });
+          }
+        }
+        return await tx.order.update({
+          where: { id },
+          data: {
+            status: OrderStatus.CANCELLED,
+            ...(trackingNumber !== undefined ? { trackingNumber } : {}),
+            ...(paymentStatus ? { paymentStatus: paymentStatus as PaymentStatus } : {}),
+          },
+          include: {
+            items: true,
+            user: { select: { name: true, email: true } },
+          },
+        });
+      });
+    } else {
+      updated = await prisma.order.update({
+        where: { id },
+        data: {
+          ...(status ? { status: status as OrderStatus } : {}),
+          ...(trackingNumber !== undefined ? { trackingNumber } : {}),
+          ...(paymentStatus ? { paymentStatus: paymentStatus as PaymentStatus } : {}),
+        },
+        include: {
+          items: true,
+          user: { select: { name: true, email: true } },
+        },
+      });
+    }
 
     // Trigger customer status email for key status transitions
     const emailableStatuses: OrderStatus[] = [
@@ -533,8 +667,8 @@ export async function PUT(request: Request) {
           orderNumber: updated.orderNumber,
           customerName,
           customerEmail,
-          trackingNumber: updated.trackingNumber ?? undefined,
-          cancellationReason: body.cancellationReason ?? undefined,
+          trackingNumber: updated.trackingNumber || undefined,
+          cancellationReason: body.cancellationReason || undefined,
         }).catch((err) => console.warn(`Order status email [${status}] failed:`, err));
       }
     }

@@ -48,23 +48,27 @@ async function getDynamicBundles(): Promise<DynamicBundle[]> {
       orderBy: { updatedAt: "desc" },
     });
 
-    return rawBundles.map((b) => ({
-      id: b.id,
-      name: b.name,
-      slug: b.slug,
-      description: b.description,
-      price: b.price,
-      originalValue: b.originalValue,
-      status: b.status,
-      savings: Math.round((1 - b.price / b.originalValue) * 100),
-      products: b.items.length,
-      items: b.items.map((i) => ({
-        productId: i.productId,
-        quantity: i.quantity,
-        name: i.product.name,
-        image: i.product.images[0]?.url ?? "/images/product-perfume.jpg",
-      })),
-    }));
+    return rawBundles.map((b) => {
+      const priceNum = Number(b.price);
+      const originalValueNum = Number(b.originalValue);
+      return {
+        id: b.id,
+        name: b.name,
+        slug: b.slug,
+        description: b.description,
+        price: priceNum,
+        originalValue: originalValueNum,
+        status: b.status,
+        savings: originalValueNum > 0 ? Math.round((1 - priceNum / originalValueNum) * 100) : 0,
+        products: b.items.length,
+        items: b.items.map((i) => ({
+          productId: i.productId,
+          quantity: i.quantity,
+          name: i.product.name,
+          image: i.product.images[0]?.url ?? "/images/product-perfume.jpg",
+        })),
+      };
+    });
   } catch (error) {
     console.warn("Could not fetch dynamic bundles:", error);
     return [];

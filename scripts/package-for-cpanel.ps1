@@ -13,7 +13,6 @@ $StandaloneSrc = Join-Path $ProjectRoot ".next\standalone"
 $StaticSrc     = Join-Path $ProjectRoot ".next\static"
 $PublicSrc     = Join-Path $ProjectRoot "public"
 $PrismaSrc     = Join-Path $ProjectRoot "prisma"
-$EnvFile       = Join-Path $ProjectRoot ".env"
 $OutputDir     = Join-Path $ProjectRoot "dist-cpanel"
 $ZipPath       = Join-Path $ProjectRoot "novixa-cpanel-deploy.zip"
 
@@ -86,17 +85,34 @@ if (Test-Path $PublicSrc) {
     Copy-Item "$PublicSrc\*" -Destination $PublicDest -Recurse -Force
 }
 
-# -- 7. Copy Prisma + .env + server.cjs (LiteSpeed CJS wrapper)
-Write-Host "[7/8] Copying Prisma, .env and server.cjs..." -ForegroundColor Yellow
+# -- 7. Copy Prisma + Linux Query Engines + server.cjs (LiteSpeed CJS wrapper)
+Write-Host "[7/8] Copying Prisma, engines and server.cjs..." -ForegroundColor Yellow
 $PrismaDest = Join-Path $OutputDir "prisma"
 Copy-Item $PrismaSrc -Destination $PrismaDest -Recurse -Force
-if (Test-Path $EnvFile) {
-    Copy-Item $EnvFile -Destination (Join-Path $OutputDir ".env") -Force
+
+# Copy complete .prisma/client from project root to include cross-compiled Linux query engines
+$LocalPrismaClient = Join-Path $ProjectRoot "node_modules\.prisma\client"
+$DestPrismaClient  = Join-Path $OutputDir "node_modules\.prisma\client"
+if (Test-Path $LocalPrismaClient) {
+    if (-not (Test-Path $DestPrismaClient)) { New-Item -ItemType Directory -Path $DestPrismaClient -Force | Out-Null }
+    Copy-Item "$LocalPrismaClient\*" -Destination $DestPrismaClient -Recurse -Force
+    Write-Host "  Bundled Linux Prisma engines from project client" -ForegroundColor DarkGray
 }
+
+# DO NOT copy raw local .env with developer secrets into deployment ZIP.
+# Instead copy .env.example so production environment is configured safely in cPanel.
+$EnvExample = Join-Path $ProjectRoot ".env.example"
+if (Test-Path $EnvExample) {
+    Copy-Item $EnvExample -Destination (Join-Path $OutputDir ".env.example") -Force
+}
+
 $ServerCjs = Join-Path $ProjectRoot "server.cjs"
 if (Test-Path $ServerCjs) {
     Copy-Item $ServerCjs -Destination (Join-Path $OutputDir "server.cjs") -Force
 }
+
+# Explicit forensic safeguard: Ensure no secret env files, git dirs, or pem keys exist in release package
+Get-ChildItem -Path $OutputDir -Include ".env", ".env.local", ".env.production", "*.pem", "*.key" -Recurse -Force -File | Remove-Item -Force
 
 # -- 8. Create ZIP
 Write-Host "[8/8] Creating deployment ZIP..." -ForegroundColor Yellow

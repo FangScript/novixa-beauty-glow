@@ -129,6 +129,22 @@ export async function POST(request: Request) {
       const safeFilename = `novixa-${Date.now()}-${randomUUID().slice(0, 8)}${extension}`;
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
+
+      // Verify file signature (magic bytes) to prevent executable masquerading
+      const isSignatureValid =
+        (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) || // JPEG
+        (buffer.length >= 4 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) || // PNG
+        (buffer.length >= 3 && buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) || // GIF
+        (buffer.length >= 12 && buffer.subarray(0, 4).toString("ascii") === "RIFF" && buffer.subarray(8, 12).toString("ascii") === "WEBP") || // WebP
+        (buffer.length >= 12 && (buffer.subarray(4, 12).toString("ascii") === "ftypavif" || buffer.subarray(4, 12).toString("ascii") === "ftypavis")); // AVIF
+
+      if (!isSignatureValid) {
+        return NextResponse.json(
+          { error: `File "${file.name}" does not match a valid image signature.` },
+          { status: 400 },
+        );
+      }
+
       let fileSaved = false;
 
       // ── Strategy 1: Supabase Storage Cloud Upload (Vercel & Production) ───

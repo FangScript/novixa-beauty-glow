@@ -8,22 +8,26 @@ export async function middleware(request: NextRequest) {
   // Refresh Supabase session cookies
   const { supabaseResponse, user } = await updateSession(request);
 
+  // Forward pathname to server components
+  supabaseResponse.headers.set("x-pathname", pathname);
+
   // ── Admin guard ───────────────────────────────────────────────────────────
   if (pathname.startsWith("/admin") && !pathname.startsWith("/admin/login")) {
     const sessionCookie = request.cookies.get("novixa_admin_session")?.value;
-    const isAdmin = Boolean(sessionCookie) || user?.user_metadata?.role === "ADMIN";
-    if (!isAdmin) {
+    const isSupabaseAdmin = user?.user_metadata?.role === "ADMIN";
+
+    // If neither a session cookie nor a verified Supabase admin token exists, redirect immediately
+    if (!sessionCookie && !isSupabaseAdmin) {
       const loginUrl = new URL("/admin/login", request.url);
       return NextResponse.redirect(loginUrl);
     }
+    // Authoritative session verification against PostgreSQL is enforced in app/admin/layout.tsx
+    // and in every admin route handler via getAuthenticatedAdmin().
   }
 
-  // ── Customer guard (Account & Checkout) ───────────────────────────────────
-  if (
-    pathname.startsWith("/account") ||
-    pathname === "/checkout" ||
-    pathname.startsWith("/checkout/")
-  ) {
+  // ── Customer guard (Account Management) ───────────────────────────────────
+  // Note: Guest checkout is permitted on /checkout; only /account requires login.
+  if (pathname.startsWith("/account")) {
     const legacySession = request.cookies.get("novixa_customer_session")?.value;
     if (!user && !legacySession) {
       const loginUrl = new URL("/login", request.url);

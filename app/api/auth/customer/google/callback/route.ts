@@ -6,6 +6,7 @@ import {
   getGoogleRedirectUri,
   verifySignedState,
 } from "@/lib/auth/google-oauth";
+import { sanitizeRedirect } from "@/lib/auth/redirect";
 
 export async function GET(request: Request) {
   const appUrl = getBaseAppUrl(request);
@@ -114,8 +115,8 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${appUrl}/login?error=db_error`);
     }
 
-    // 5. Construct redirect to destination
-    const dest = nextDestination.startsWith("/") ? nextDestination : `/${nextDestination}`;
+    // 5. Construct redirect to destination safely (prevent open redirect)
+    const dest = sanitizeRedirect(nextDestination, "/account");
     const response = NextResponse.redirect(`${appUrl}${dest}`);
 
     // 6. Explicitly attach session cookie to the redirect HTTP response headers

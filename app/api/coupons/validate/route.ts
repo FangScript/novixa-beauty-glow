@@ -51,11 +51,14 @@ export async function POST(request: Request) {
         );
       }
 
-      if (currentSubtotal < coupon.minimumOrder) {
+      const minOrderNum = Number(coupon.minimumOrder);
+      const couponValNum = Number(coupon.value);
+
+      if (currentSubtotal < minOrderNum) {
         return NextResponse.json(
           {
             valid: false,
-            error: `Code ${cleanCode} requires a minimum order value of £${coupon.minimumOrder}.`,
+            error: `Code ${cleanCode} requires a minimum order value of £${minOrderNum}.`,
           },
           { status: 400 },
         );
@@ -63,9 +66,9 @@ export async function POST(request: Request) {
 
       let discount = 0;
       if (coupon.type === "PERCENTAGE") {
-        discount = Math.round((currentSubtotal * coupon.value) / 100);
+        discount = Math.round((currentSubtotal * couponValNum) / 100);
       } else {
-        discount = Math.min(currentSubtotal, coupon.value);
+        discount = Math.min(currentSubtotal, couponValNum);
       }
 
       return NextResponse.json({
@@ -74,12 +77,12 @@ export async function POST(request: Request) {
           id: coupon.id,
           code: coupon.code,
           type: coupon.type,
-          value: coupon.value,
+          value: couponValNum,
         },
         discount,
         message:
           coupon.type === "PERCENTAGE"
-            ? `${coupon.code} applied: ${coupon.value}% discount (-£${discount})`
+            ? `${coupon.code} applied: ${couponValNum}% discount (-£${discount})`
             : `${coupon.code} applied: -£${discount} discount`,
       });
     }

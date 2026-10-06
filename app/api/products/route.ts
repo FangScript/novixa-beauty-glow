@@ -30,12 +30,15 @@ export async function GET(request: Request) {
   const q = searchParams.get("q");
   const category = searchParams.get("category");
   const gender = searchParams.get("gender");
+  const ids = searchParams.get("ids");
+  const idList = ids ? ids.split(",").map((s) => s.trim()).filter(Boolean) : [];
 
   try {
     if (process.env.DATABASE_URL) {
       const dbProducts = await prisma.product.findMany({
         where: {
           status: { not: "ARCHIVED" },
+          ...(idList.length > 0 ? { id: { in: idList } } : {}),
           ...(category && category !== "all" ? { category: toPrismaCategory(category) } : {}),
           ...(gender && gender !== "all" ? { gender: toPrismaGender(gender) } : {}),
           ...(q
@@ -60,8 +63,10 @@ export async function GET(request: Request) {
           name: p.name,
           slug: p.slug,
           description: p.description,
-          price: p.price,
-          salePrice: p.salePrice ?? undefined,
+          price: Number(p.price),
+          salePrice: p.salePrice !== null && p.salePrice !== undefined ? Number(p.salePrice) : undefined,
+          isMeasured: Boolean(p.isMeasured),
+          unitOfMeasure: p.unitOfMeasure || "unit",
           gender: p.gender.toLowerCase(),
           category: p.category.toLowerCase(),
           brand: p.brand,
@@ -87,6 +92,10 @@ export async function GET(request: Request) {
 
   // Fallback to static catalogue
   let list = q ? searchProducts(q) : fallbackProducts;
+
+  if (idList.length > 0) {
+    list = list.filter((p) => idList.includes(p.id) || idList.includes(p.slug));
+  }
 
   if (category && category !== "all") {
     list = list.filter((p) => p.category === category);

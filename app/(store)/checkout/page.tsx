@@ -235,12 +235,6 @@ export default function CheckoutPage() {
     method: PaymentMethodType,
     customPaymentDetails?: any,
   ) => {
-    if (!user) {
-      toast.error("You must be signed in to your account to place an order.");
-      router.push("/login?next=/checkout");
-      return;
-    }
-
     setIsSubmitting(true);
     setErrorMessage(null);
 
@@ -321,11 +315,6 @@ export default function CheckoutPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) {
-      toast.error("You must be signed in to your account to place an order.");
-      router.push("/login?next=/checkout");
-      return;
-    }
     if (!validateAddressForm()) return;
 
     const paymentBox =
@@ -548,25 +537,17 @@ export default function CheckoutPage() {
   return (
     <PageShell eyebrow="Secure Checkout" title="Complete Your Order">
       {!user && (
-        <div className="mb-8 border border-amber-300 bg-amber-50/90 p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <Lock className="text-amber-800 shrink-0 mt-0.5" size={18} />
-            <div>
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-amber-950">
-                Sign In Required to Place Order
-              </h4>
-              <p className="text-xs text-amber-900 mt-0.5">
-                Orders can only be placed by verified account holders. Please sign in or create an account to proceed with checkout.
-              </p>
-            </div>
+        <div className="mb-8 border border-border bg-stone-50/70 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5 text-muted-foreground">
+            <Sparkles size={15} className="text-rosewood shrink-0" />
+            <span>
+              Checking out as guest. Have an account?{" "}
+              <Link href="/login?next=/checkout" className="text-rosewood font-medium underline">
+                Sign in
+              </Link>{" "}
+              for saved delivery addresses and reward history.
+            </span>
           </div>
-          <Button
-            type="button"
-            onClick={() => router.push("/login?next=/checkout")}
-            className="rounded-none bg-[#211b18] text-white hover:bg-black text-[10px] uppercase tracking-wider shrink-0 py-4 px-6 font-semibold"
-          >
-            Sign In / Register
-          </Button>
         </div>
       )}
 
@@ -769,43 +750,30 @@ export default function CheckoutPage() {
                     <p className="text-xs text-muted-foreground leading-relaxed">
                       Pay securely with Visa, Mastercard, or American Express. Direct real-time processing powered by PayPal.
                     </p>
-                    {!user ? (
-                      <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg text-xs text-amber-900 flex flex-col sm:flex-row items-center justify-between gap-3">
-                        <span>Please sign in to your account before entering payment.</span>
-                        <Button
-                          type="button"
-                          onClick={() => router.push("/login?next=/checkout")}
-                          className="text-[10px] bg-[#211b18] text-white hover:bg-black rounded-none py-1.5 px-4 h-8 uppercase font-semibold shrink-0"
-                        >
-                          Sign In / Register
-                        </Button>
-                      </div>
-                    ) : (
-                      <PayPalCheckoutButton
-                        fundingSource="card"
-                        amount={orderTotal}
-                        currency="GBP"
-                        items={cart.map((c) => ({
-                          productId: c.productId,
-                          quantity: c.quantity,
-                        }))}
-                        couponCode={appliedCoupon?.code}
-                        shippingMethodId={selectedShippingMethod?.id}
-                        shippingAddress={currentShippingAddress}
-                        validateBeforePayment={validateAddressForm}
-                        disabled={isSubmitting}
-                        onSuccess={async (res) => {
-                          await submitOrderWithDetails("CARD", {
-                            paypalOrderId: res.paypalOrderId,
-                            captureId: res.captureId,
-                            payerEmail: res.payerEmail || formData.email.trim(),
-                          });
-                        }}
-                        onError={(err) => {
-                          setErrorMessage(err);
-                        }}
-                      />
-                    )}
+                    <PayPalCheckoutButton
+                      fundingSource="card"
+                      amount={orderTotal}
+                      currency="GBP"
+                      items={cart.map((c) => ({
+                        productId: c.productId,
+                        quantity: c.quantity,
+                      }))}
+                      couponCode={appliedCoupon?.code}
+                      shippingMethodId={selectedShippingMethod?.id}
+                      shippingAddress={currentShippingAddress}
+                      validateBeforePayment={validateAddressForm}
+                      disabled={isSubmitting}
+                      onSuccess={async (res) => {
+                        await submitOrderWithDetails("CARD", {
+                          paypalOrderId: res.paypalOrderId,
+                          captureId: res.captureId,
+                          payerEmail: res.payerEmail || formData.email.trim(),
+                        });
+                      }}
+                      onError={(err) => {
+                        setErrorMessage(err);
+                      }}
+                    />
                   </div>
                 )}
               </div>
@@ -851,43 +819,30 @@ export default function CheckoutPage() {
                     <p className="text-xs text-muted-foreground leading-relaxed">
                       Authorize your purchase securely with your PayPal balance, linked bank account, or PayPal Pay in 3 installments.
                     </p>
-                    {!user ? (
-                      <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg text-xs text-amber-900 flex flex-col sm:flex-row items-center justify-between gap-3">
-                        <span>Please sign in to your account before authorizing PayPal payment.</span>
-                        <Button
-                          type="button"
-                          onClick={() => router.push("/login?next=/checkout")}
-                          className="text-[10px] bg-[#211b18] text-white hover:bg-black rounded-none py-1.5 px-4 h-8 uppercase font-semibold shrink-0"
-                        >
-                          Sign In / Register
-                        </Button>
-                      </div>
-                    ) : (
-                      <PayPalCheckoutButton
-                        fundingSource="paypal"
-                        amount={orderTotal}
-                        currency="GBP"
-                        items={cart.map((c) => ({
-                          productId: c.productId,
-                          quantity: c.quantity,
-                        }))}
-                        couponCode={appliedCoupon?.code}
-                        shippingMethodId={selectedShippingMethod?.id}
-                        shippingAddress={currentShippingAddress}
-                        validateBeforePayment={validateAddressForm}
-                        disabled={isSubmitting}
-                        onSuccess={async (res) => {
-                          await submitOrderWithDetails("PAYPAL", {
-                            paypalOrderId: res.paypalOrderId,
-                            captureId: res.captureId,
-                            payerEmail: res.payerEmail || formData.email.trim(),
-                          });
-                        }}
-                        onError={(err) => {
-                          setErrorMessage(err);
-                        }}
-                      />
-                    )}
+                    <PayPalCheckoutButton
+                      fundingSource="paypal"
+                      amount={orderTotal}
+                      currency="GBP"
+                      items={cart.map((c) => ({
+                        productId: c.productId,
+                        quantity: c.quantity,
+                      }))}
+                      couponCode={appliedCoupon?.code}
+                      shippingMethodId={selectedShippingMethod?.id}
+                      shippingAddress={currentShippingAddress}
+                      validateBeforePayment={validateAddressForm}
+                      disabled={isSubmitting}
+                      onSuccess={async (res) => {
+                        await submitOrderWithDetails("PAYPAL", {
+                          paypalOrderId: res.paypalOrderId,
+                          captureId: res.captureId,
+                          payerEmail: res.payerEmail || formData.email.trim(),
+                        });
+                      }}
+                      onError={(err) => {
+                        setErrorMessage(err);
+                      }}
+                    />
                   </div>
                 )}
               </div>
@@ -930,43 +885,30 @@ export default function CheckoutPage() {
                     <p className="text-xs text-muted-foreground leading-relaxed">
                       Check out quickly using payment cards saved in your Google Account. Biometrically protected and fast.
                     </p>
-                    {!user ? (
-                      <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg text-xs text-amber-900 flex flex-col sm:flex-row items-center justify-between gap-3">
-                        <span>Please sign in to your account before authorizing Google Pay.</span>
-                        <Button
-                          type="button"
-                          onClick={() => router.push("/login?next=/checkout")}
-                          className="text-[10px] bg-[#211b18] text-white hover:bg-black rounded-none py-1.5 px-4 h-8 uppercase font-semibold shrink-0"
-                        >
-                          Sign In / Register
-                        </Button>
-                      </div>
-                    ) : (
-                      <NativeGooglePayButton
-                        key="native-google-pay"
-                        amount={orderTotal}
-                        currency="GBP"
-                        items={cart.map((c) => ({
-                          productId: c.productId,
-                          quantity: c.quantity,
-                        }))}
-                        couponCode={appliedCoupon?.code}
-                        shippingMethodId={selectedShippingMethod?.id}
-                        shippingAddress={currentShippingAddress}
-                        validateBeforePayment={validateAddressForm}
-                        disabled={isSubmitting}
-                        onSuccess={async (res) => {
-                          await submitOrderWithDetails("GOOGLE_PAY", {
-                            paypalOrderId: res.paypalOrderId,
-                            captureId: res.captureId,
-                            payerEmail: res.payerEmail || formData.email.trim(),
-                          });
-                        }}
-                        onError={(err) => {
-                          setErrorMessage(err);
-                        }}
-                      />
-                    )}
+                    <NativeGooglePayButton
+                      key="native-google-pay"
+                      amount={orderTotal}
+                      currency="GBP"
+                      items={cart.map((c) => ({
+                        productId: c.productId,
+                        quantity: c.quantity,
+                      }))}
+                      couponCode={appliedCoupon?.code}
+                      shippingMethodId={selectedShippingMethod?.id}
+                      shippingAddress={currentShippingAddress}
+                      validateBeforePayment={validateAddressForm}
+                      disabled={isSubmitting}
+                      onSuccess={async (res) => {
+                        await submitOrderWithDetails("GOOGLE_PAY", {
+                          paypalOrderId: res.paypalOrderId,
+                          captureId: res.captureId,
+                          payerEmail: res.payerEmail || formData.email.trim(),
+                        });
+                      }}
+                      onError={(err) => {
+                        setErrorMessage(err);
+                      }}
+                    />
                   </div>
                 )}
               </div>
@@ -1029,17 +971,6 @@ export default function CheckoutPage() {
                         <p className="text-[11px] text-stone-500 leading-relaxed">
                           To checkout with Apple Pay, open <strong>https://www.novixaretail.com/checkout</strong> on your iPhone or Mac in Safari. On this computer, you can complete your order instantly using <strong>Google Pay</strong>, <strong>Credit or Debit Card</strong>, or <strong>PayPal</strong> above.
                         </p>
-                      </div>
-                    ) : !user ? (
-                      <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg text-xs text-amber-900 flex flex-col sm:flex-row items-center justify-between gap-3">
-                        <span>Please sign in to your account before authorizing Apple Pay.</span>
-                        <Button
-                          type="button"
-                          onClick={() => router.push("/login?next=/checkout")}
-                          className="text-[10px] bg-[#211b18] text-white hover:bg-black rounded-none py-1.5 px-4 h-8 uppercase font-semibold shrink-0"
-                        >
-                          Sign In / Register
-                        </Button>
                       </div>
                     ) : (
                       <NativeApplePayButton
@@ -1166,32 +1097,26 @@ export default function CheckoutPage() {
             </p>
           </div>
 
-          {!user ? (
-            <Button
-              type="button"
-              onClick={() => router.push("/login?next=/checkout")}
-              className="mt-8 w-full rounded-none bg-ink text-white hover:bg-black py-6 text-[10px] font-semibold tracking-[0.14em]"
-            >
-              SIGN IN TO PLACE ORDER — {formatPrice(orderTotal)}
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              onClick={() => {
-                if (validateAddressForm()) {
-                  const paymentBox =
-                    document.getElementById(`method-${paymentMethod.toLowerCase()}`) ||
-                    document.getElementById("method-card");
-                  paymentBox?.scrollIntoView({ behavior: "smooth", block: "center" });
-                  toast.info(`Please complete authorization under ${methodDisplayNames[paymentMethod]}.`);
-                }
-              }}
-              disabled={isSubmitting}
-              className="mt-8 w-full rounded-none bg-ink text-white hover:bg-black py-6 text-[10px] font-semibold tracking-[0.14em]"
-            >
-              PAY WITH {methodDisplayNames[paymentMethod].toUpperCase()} — {formatPrice(orderTotal)}
-            </Button>
-          )}
+          <Button
+            type="button"
+            onClick={() => {
+              if (validateAddressForm()) {
+                const paymentBox =
+                  document.getElementById(`method-${paymentMethod.toLowerCase()}`) ||
+                  document.getElementById("method-card");
+                paymentBox?.scrollIntoView({ behavior: "smooth", block: "center" });
+                toast.info(`Please complete authorization under ${methodDisplayNames[paymentMethod]}.`);
+              }
+            }}
+            disabled={isSubmitting}
+            className="mt-8 w-full rounded-none bg-ink text-white hover:bg-black py-6 text-[10px] font-semibold tracking-[0.14em]"
+          >
+            {isSubmitting ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              `PROCEED TO ${methodDisplayNames[paymentMethod].toUpperCase()} — ${formatPrice(orderTotal)}`
+            )}
+          </Button>
           <div className="mt-3 flex items-center justify-center gap-2 text-[10px] text-muted-foreground">
             <ShieldCheck size={13} className="text-emerald-700" />
             <span>Encrypted Server-Side Checkout</span>

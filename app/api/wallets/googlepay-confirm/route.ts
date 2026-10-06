@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import {
-  confirmPayPalOrderPaymentSource,
   capturePayPalOrder,
+  confirmPayPalOrderPaymentSource,
   getPayPalOrderDetails,
 } from "@/lib/payments/paypal";
 
@@ -12,66 +12,47 @@ export async function POST(request: Request) {
 
     if (!paypalOrderId) {
       return NextResponse.json(
-        { error: "PayPal Order ID is required." },
+        { error: "paypalOrderId is required." },
         { status: 400 },
       );
     }
 
-    // Step 1: If Google Pay payment method token is provided, confirm the payment source with PayPal
+    // If paymentMethodData is provided from Google Pay SDK, confirm payment source with PayPal
     if (paymentMethodData?.tokenizationData?.token) {
       try {
-        const rawToken = paymentMethodData.tokenizationData.token;
+        let parsedToken: any;
+        try {
+          parsedToken = JSON.parse(paymentMethodData.tokenizationData.token);
+        } catch {
+          parsedToken = paymentMethodData.tokenizationData.token;
+        }
+
         await confirmPayPalOrderPaymentSource(paypalOrderId, {
-          google_pay: {
-            name: paymentMethodData.description || "Google Pay User",
-            token: rawToken,
-          },
+          google_pay: typeof parsedToken === "object" ? parsedToken : { token: parsedToken },
         });
-      } catch (confirmError: any) {
-        console.warn("PayPal confirm-payment-source notice for Google Pay:", confirmError.message);
-        // Continue to capture in case it was already confirmed client-side via SDK
+      } catch (confirmErr: any) {
+        console.warn("Notice: Google Pay payment source confirmation:", confirmErr.message);
       }
     }
 
-    // Step 2: Capture the order via PayPal Orders v2 API
+    // Capture the PayPal order
     let captureData: any;
     try {
       captureData = await capturePayPalOrder(paypalOrderId);
     } catch (captureErr: any) {
-      console.warn("PayPal live capture notice for Google Pay token:", captureErr.message);
-
-      // Only allow test fallback if explicitly running in test mode
-      const isLive =
-        (process.env.PAYPAL_MODE?.toLowerCase() === "live" ||
-          process.env.NEXT_PUBLIC_PAYPAL_MODE?.toLowerCase() === "live") &&
-        process.env.NEXT_PUBLIC_GOOGLE_PAY_ENV === "PRODUCTION";
-
-      const isTestToken =
-        !isLive &&
-        (Boolean(paymentMethodData?.description?.includes("1111")) ||
-          process.env.NEXT_PUBLIC_GOOGLE_PAY_ENV === "TEST");
-
-      if (isTestToken) {
-        return NextResponse.json({
-          ok: true,
-          status: "COMPLETED",
-          captureId: `TEST-GPAY-${Date.now()}`,
-          paypalOrderId,
-          payerEmail: "test-buyer@googlepay.test",
-          payerName: paymentMethodData?.description || "Google Pay Test User",
-          details: { status: "COMPLETED", testEvaluation: true },
-        });
+      if (captureErr?.message?.includes("ORDER_ALREADY_CAPTURED")) {
+        captureData = await getPayPalOrderDetails(paypalOrderId);
+      } else {
+        throw captureErr;
       }
-      throw captureErr;
     }
 
+    const captureRecord = captureData.purchase_units?.[0]?.payments?.captures?.[0];
     const isCompleted =
       captureData.status === "COMPLETED" ||
-      captureData.purchase_units?.[0]?.payments?.captures?.[0]?.status === "COMPLETED";
+      captureRecord?.status === "COMPLETED";
 
-    const captureId =
-      captureData.purchase_units?.[0]?.payments?.captures?.[0]?.id || paypalOrderId;
-
+    const captureId = captureRecord?.id || paypalOrderId;
     const payer = captureData.payer || {};
 
     return NextResponse.json({
@@ -86,9 +67,9 @@ export async function POST(request: Request) {
       details: captureData,
     });
   } catch (error: any) {
-    console.error("Google Pay Confirmation & Capture Error:", error);
+    console.error("Google Pay confirm & capture error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to finalize Google Pay payment" },
+      { error: error.message || "Failed to confirm Google Pay transaction with PayPal." },
       { status: 500 },
     );
   }

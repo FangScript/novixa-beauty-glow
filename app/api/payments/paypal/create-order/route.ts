@@ -1,55 +1,55 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
 import { createPayPalOrder } from "@/lib/payments/paypal";
-import { getAuthenticatedAdmin, getAuthenticatedCustomer } from "@/lib/auth/session";
 
 export async function POST(request: Request) {
   try {
-    const authAdmin = await getAuthenticatedAdmin();
-    const authCustomer = await getAuthenticatedCustomer();
-    if (!authAdmin && !authCustomer) {
-      return NextResponse.json(
-        { error: "Authentication required. You must sign in before initiating payment." },
-        { status: 401 },
-      );
-    }
-
     const body = await request.json();
-    const { items, couponCode, shippingMethodId, shippingAddress } = body;
+    const { items, couponCode, shippingMethodId, shippingAddress, paymentSource } = body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: "Cart is empty." }, { status: 400 });
     }
 
-    let subtotal = 0;
-
-    if (process.env.DATABASE_URL) {
-      const productIds = items.map((i: any) => i.productId);
-      const dbProducts = await prisma.product.findMany({
-        where: { id: { in: productIds } },
-      });
-      const productMap = new Map(dbProducts.map((p) => [p.id, p]));
-
-      for (const item of items) {
-        const product = productMap.get(item.productId);
-        const qty = Math.max(1, Number(item.quantity) || 1);
-        if (product) {
-          const unitPrice = product.salePrice ?? product.price;
-          subtotal += unitPrice * qty;
-        }
-      }
-    } else {
-      // Fallback if DB is disconnected
-      subtotal = items.reduce(
-        (sum: number, i: any) => sum + (Number(i.price) || 0) * (Number(i.quantity) || 1),
-        0,
+    if (!process.env.DATABASE_URL) {
+      return NextResponse.json(
+        { error: "Database configuration error. Please try again shortly." },
+        { status: 503 },
       );
     }
 
-    // Calculate coupon discount
+    // Resolve live authoritative product prices from PostgreSQL (strictly active products)
+    const productIds = items.map((i: any) => i.productId);
+    const dbProducts = await prisma.product.findMany({
+      where: { id: { in: productIds }, status: "ACTIVE" },
+    });
+    const productMap = new Map(dbProducts.map((p) => [p.id, p]));
+
+    let subtotal = 0;
+    for (const item of items) {
+      const product = productMap.get(item.productId);
+      if (!product) {
+        return NextResponse.json(
+          { error: `Item is no longer available or has been deactivated.` },
+          { status: 400 },
+        );
+      }
+      const qty = Math.max(0.01, Math.round(Number(item.quantity) * 100) / 100);
+      if (product.stock < qty) {
+        return NextResponse.json(
+          { error: `Insufficient stock for "${product.name}". Only ${product.stock} available.` },
+          { status: 400 },
+        );
+      }
+      const unitPrice = Number(product.salePrice ?? product.price);
+      subtotal += unitPrice * qty;
+    }
+    subtotal = Math.round(subtotal * 100) / 100;
+
+    // Calculate authoritative coupon discount
     let discount = 0;
     const requestedCoupon = (couponCode || "").trim().toUpperCase();
-    if (requestedCoupon && process.env.DATABASE_URL) {
+    if (requestedCoupon) {
       const foundCoupon = await prisma.coupon
         .findUnique({ where: { code: requestedCoupon } })
         .catch(() => null);
@@ -59,45 +59,58 @@ export async function POST(request: Request) {
         foundCoupon.active &&
         (!foundCoupon.expiresAt || new Date(foundCoupon.expiresAt).getTime() > Date.now()) &&
         (!foundCoupon.usageLimit || foundCoupon.usageCount < foundCoupon.usageLimit) &&
-        subtotal >= foundCoupon.minimumOrder
+        subtotal >= Number(foundCoupon.minimumOrder)
       ) {
+        const couponVal = Number(foundCoupon.value);
         if (foundCoupon.type === "PERCENTAGE") {
-          discount = Math.round((subtotal * foundCoupon.value) / 100);
+          discount = Math.round(((subtotal * couponVal) / 100) * 100) / 100;
         } else {
-          discount = Math.min(subtotal, foundCoupon.value);
+          discount = Math.min(subtotal, Math.round(couponVal * 100) / 100);
         }
       }
     }
 
     // Determine authoritative delivery charge
-    let shipping = 0.20;
-    if (process.env.DATABASE_URL) {
-      if (shippingMethodId) {
-        const dbMethod = await prisma.shippingMethod
-          .findUnique({ where: { id: shippingMethodId } })
-          .catch(() => null);
-        if (dbMethod && dbMethod.active) {
-          shipping = dbMethod.price;
-        }
-      } else {
-        const defaultMethod = await prisma.shippingMethod
-          .findFirst({ where: { active: true, isDefault: true } })
-          .catch(() => null);
-        if (defaultMethod) {
-          shipping = defaultMethod.price;
-        }
+    let shipping = 0.2;
+    if (shippingMethodId) {
+      const dbMethod = await prisma.shippingMethod
+        .findUnique({ where: { id: shippingMethodId } })
+        .catch(() => null);
+      if (dbMethod && dbMethod.active) {
+        shipping = Number(dbMethod.price);
+      }
+    } else {
+      const defaultMethod = await prisma.shippingMethod
+        .findFirst({ where: { active: true, isDefault: true } })
+        .catch(() => null);
+      if (defaultMethod) {
+        shipping = Number(defaultMethod.price);
       }
     }
+    shipping = Math.round(shipping * 100) / 100;
 
-    const total = Math.max(0.01, Math.round((Math.max(0, subtotal - discount) + shipping) * 100) / 100);
+    const total = Math.max(
+      0.01,
+      Math.round((Math.max(0, subtotal - discount) + shipping) * 100) / 100,
+    );
 
     const tempOrderRef = `NVX-${Date.now().toString().slice(-6)}`;
+
+    const paymentSourceType =
+      paymentSource === "card"
+        ? "card"
+        : paymentSource === "apple_pay"
+          ? "apple_pay"
+          : paymentSource === "google_pay"
+            ? "google_pay"
+            : "paypal";
 
     const paypalOrder = await createPayPalOrder({
       amount: total,
       currency: "GBP",
       orderNumber: tempOrderRef,
       description: "Novixa Beauty & Glow Luxury Purchase",
+      paymentSourceType,
       shippingAddress,
     });
 

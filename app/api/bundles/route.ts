@@ -21,23 +21,27 @@ export async function GET() {
       });
 
       return NextResponse.json({
-        bundles: bundles.map((b) => ({
-          id: b.id,
-          name: b.name,
-          slug: b.slug,
-          description: b.description,
-          price: b.price,
-          originalValue: b.originalValue,
-          status: b.status,
-          savings: Math.round((1 - b.price / b.originalValue) * 100),
-          products: b.items.length,
-          items: b.items.map((i) => ({
-            productId: i.productId,
-            quantity: i.quantity,
-            name: i.product.name,
-            image: i.product.images[0]?.url ?? "/images/product-perfume.jpg",
-          })),
-        })),
+        bundles: bundles.map((b) => {
+          const priceNum = Number(b.price);
+          const origNum = Number(b.originalValue);
+          return {
+            id: b.id,
+            name: b.name,
+            slug: b.slug,
+            description: b.description,
+            price: priceNum,
+            originalValue: origNum,
+            status: b.status,
+            savings: origNum > 0 ? Math.round((1 - priceNum / origNum) * 100) : 0,
+            products: b.items.length,
+            items: b.items.map((i) => ({
+              productId: i.productId,
+              quantity: i.quantity,
+              name: i.product.name,
+              image: i.product.images[0]?.url ?? "/images/product-perfume.jpg",
+            })),
+          };
+        }),
         source: "db",
       });
     }

@@ -2,19 +2,19 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/db/client";
-
 import { getAuthenticatedCustomer } from "@/lib/auth/session";
 
 const GUEST_COOKIE = "novixa_guest_cart";
 const COOKIE_TTL = 60 * 60 * 24 * 30; // 30 days
 
-/** Resolve or create a cart for the current request. */
+/** Resolve or create a cart for the current request, merging guest cart if user is authenticated. */
 async function resolveCart(_clientUserId?: string | null) {
   if (!process.env.DATABASE_URL) return null;
 
   // Derive authenticated identity strictly from server session
   const authCustomer = await getAuthenticatedCustomer();
   const resolvedUserId = authCustomer?.id || null;
+  const cookieStore = await cookies();
 
   // Authenticated user with confirmed DB row
   if (resolvedUserId) {
@@ -38,11 +38,58 @@ async function resolveCart(_clientUserId?: string | null) {
         },
       });
     }
+
+    // Merge guest cart if present
+    const guestId = cookieStore.get(GUEST_COOKIE)?.value;
+    if (guestId) {
+      try {
+        const guestCart = await prisma.cart.findFirst({
+          where: { sessionId: guestId, userId: null },
+          include: { items: true },
+        });
+
+        if (guestCart && guestCart.items.length > 0) {
+          for (const gItem of guestCart.items) {
+            const existingItem = await prisma.cartItem.findUnique({
+              where: { cartId_productId: { cartId: cart.id, productId: gItem.productId } },
+            });
+            if (existingItem) {
+              await prisma.cartItem.update({
+                where: { id: existingItem.id },
+                data: {
+                  quantity: Math.round((existingItem.quantity + gItem.quantity) * 100) / 100,
+                },
+              });
+            } else {
+              await prisma.cartItem.create({
+                data: { cartId: cart.id, productId: gItem.productId, quantity: gItem.quantity },
+              });
+            }
+          }
+          await prisma.cart.delete({ where: { id: guestCart.id } }).catch(() => null);
+
+          // Refetch fresh merged items
+          const refreshedCart = await prisma.cart.findUnique({
+            where: { id: cart.id },
+            include: {
+              items: {
+                include: {
+                  product: { include: { images: { orderBy: { sortOrder: "asc" }, take: 1 } } },
+                },
+              },
+            },
+          });
+          if (refreshedCart) cart = refreshedCart;
+        }
+      } catch (err) {
+        console.warn("Notice: Guest cart merge non-critical warning:", err);
+      }
+    }
+
     return cart;
   }
 
   // Guest — use/create session-keyed cart
-  const cookieStore = await cookies();
   let guestId = cookieStore.get(GUEST_COOKIE)?.value;
   if (!guestId) {
     guestId = randomBytes(16).toString("hex");
@@ -72,17 +119,20 @@ async function resolveCart(_clientUserId?: string | null) {
 
 function formatCartItem(item: any) {
   const p = item.product;
+  const rawQty = Number(item.quantity);
+  const cleanQty = isNaN(rawQty) || rawQty <= 0 ? 1 : Math.round(rawQty * 100) / 100;
+
   return {
     id: item.id,
     productId: p.id,
-    quantity: Math.max(1, Math.round(Number(item.quantity) || 1)),
+    quantity: cleanQty,
     product: {
       id: p.id,
       name: p.name,
       slug: p.slug,
-      price: p.price,
-      salePrice: p.salePrice,
-      stock: p.stock,
+      price: Number(p.price),
+      salePrice: p.salePrice !== null && p.salePrice !== undefined ? Number(p.salePrice) : null,
+      stock: Number(p.stock),
       sku: p.sku,
       image: p.images?.[0]?.url ?? "/images/product-perfume.jpg",
     },
@@ -107,7 +157,7 @@ export async function GET(request: Request) {
 
     const response = NextResponse.json({ items, cartId: cart.id, source: "db" });
 
-    // Persist guest cookie on the response
+    // Persist guest cookie on the response if guest
     if ("guestId" in result && result.guestId) {
       response.cookies.set(GUEST_COOKIE, result.guestId, {
         httpOnly: true,
@@ -145,7 +195,7 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    const cleanQuantity = Math.max(1, Math.round(rawQuantity));
+    const cleanQuantity = Math.max(0.01, Math.round(rawQuantity * 100) / 100);
 
     // Validate product + stock
     const product = await prisma.product.findUnique({
@@ -169,7 +219,7 @@ export async function POST(request: Request) {
       where: { cartId_productId: { cartId: cart.id, productId } },
     });
 
-    const newQuantity = Math.round((existing?.quantity ?? 0) + cleanQuantity);
+    const newQuantity = Math.round(((existing?.quantity ?? 0) + cleanQuantity) * 100) / 100;
     if (newQuantity > product.stock) {
       return NextResponse.json(
         { ok: false, error: `Only ${product.stock} units of "${product.name}" available.` },
@@ -245,18 +295,33 @@ export async function PUT(request: Request) {
         { status: 400 },
       );
     }
-    const cleanQuantity = Math.max(0, Math.round(rawQuantity));
+    const cleanQuantity = Math.max(0, Math.round(rawQuantity * 100) / 100);
+
+    const result = await resolveCart(userId ?? null);
+    if (!result) {
+      return NextResponse.json({ ok: false, error: "Could not resolve cart." }, { status: 400 });
+    }
+    const cart = "cart" in result ? result.cart : result;
+
+    // Verify ownership: itemId must belong to this specific cart
+    if (itemId) {
+      const item = await prisma.cartItem.findFirst({
+        where: { id: itemId, cartId: cart.id },
+      });
+      if (!item) {
+        return NextResponse.json(
+          { ok: false, error: "Item not found in your cart." },
+          { status: 404 },
+        );
+      }
+    }
 
     // quantity === 0 means remove
     if (cleanQuantity === 0) {
       if (itemId) {
-        await prisma.cartItem.delete({ where: { id: itemId } }).catch(() => {});
-      } else {
-        const result = await resolveCart(userId ?? null);
-        const cart = result && ("cart" in result ? result.cart : result);
-        if (cart && productId) {
-          await prisma.cartItem.deleteMany({ where: { cartId: cart.id, productId } });
-        }
+        await prisma.cartItem.deleteMany({ where: { id: itemId, cartId: cart.id } });
+      } else if (productId) {
+        await prisma.cartItem.deleteMany({ where: { cartId: cart.id, productId } });
       }
       return NextResponse.json({ ok: true, removed: true });
     }
@@ -264,7 +329,7 @@ export async function PUT(request: Request) {
     // Validate stock
     let resolvedProductId = productId;
     if (itemId && !productId) {
-      const item = await prisma.cartItem.findUnique({ where: { id: itemId } });
+      const item = await prisma.cartItem.findFirst({ where: { id: itemId, cartId: cart.id } });
       resolvedProductId = item?.productId;
     }
 
@@ -282,7 +347,10 @@ export async function PUT(request: Request) {
     }
 
     if (itemId) {
-      await prisma.cartItem.update({ where: { id: itemId }, data: { quantity: cleanQuantity } });
+      await prisma.cartItem.updateMany({
+        where: { id: itemId, cartId: cart.id },
+        data: { quantity: cleanQuantity },
+      });
     }
 
     return NextResponse.json({ ok: true });
@@ -307,17 +375,28 @@ export async function DELETE(request: Request) {
     const userId = searchParams.get("userId");
     const clear = searchParams.get("clear") === "true";
 
+    const result = await resolveCart(userId ?? null);
+    if (!result) {
+      return NextResponse.json({ ok: false, error: "Could not resolve cart." }, { status: 400 });
+    }
+    const cart = "cart" in result ? result.cart : result;
+
     if (itemId) {
-      await prisma.cartItem.delete({ where: { id: itemId } }).catch(() => {});
+      // Scoped deletion: cannot delete other users' cart items
+      const deleted = await prisma.cartItem.deleteMany({
+        where: { id: itemId, cartId: cart.id },
+      });
+      if (deleted.count === 0) {
+        return NextResponse.json(
+          { ok: false, error: "Item not found in your cart." },
+          { status: 404 },
+        );
+      }
       return NextResponse.json({ ok: true });
     }
 
     if (clear) {
-      const result = await resolveCart(userId ?? null);
-      const cart = result && ("cart" in result ? result.cart : result);
-      if (cart) {
-        await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
-      }
+      await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
       return NextResponse.json({ ok: true });
     }
 

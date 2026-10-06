@@ -16,7 +16,7 @@ export async function GET() {
 
   return NextResponse.json({
     database: Boolean(process.env.DATABASE_URL),
-    payments: Boolean(process.env.PAYPAL_CLIENT_ID || process.env.STRIPE_SECRET_KEY),
+    payments: Boolean(process.env.PAYPAL_CLIENT_ID),
     email: hasSmtp || hasResend,
     emailProvider: hasSmtp ? "Gmail / SMTP" : hasResend ? "Resend" : null,
     media: Boolean(process.env.MEDIA_BUCKET || process.env.S3_BUCKET),
