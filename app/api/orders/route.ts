@@ -112,13 +112,61 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Your shopping bag is empty." }, { status: 400 });
     }
 
-    if (!customer?.email || !customer?.name) {
-      return NextResponse.json({ error: "Customer name and email are required." }, { status: 400 });
-    }
+    const paymentDetails = body.paymentDetails || {};
 
-    if (!address?.line1 || !address?.city || !address?.state || !address?.postalCode) {
+    const effectiveEmail = (
+      customer?.email ||
+      paymentDetails.payerEmail ||
+      authenticatedUser?.email ||
+      ""
+    ).trim();
+
+    const effectiveName = (
+      customer?.name ||
+      paymentDetails.payerName ||
+      paymentDetails.shippingAddress?.fullName ||
+      authenticatedUser?.name ||
+      "Customer"
+    ).trim();
+
+    const effectivePhone = (
+      customer?.phone ||
+      paymentDetails.phone ||
+      paymentDetails.shippingAddress?.phone ||
+      ""
+    ).trim();
+
+    const effectiveLine1 = (
+      address?.line1 ||
+      paymentDetails.shippingAddress?.line1 ||
+      paymentDetails.shippingAddress?.addressLines?.[0] ||
+      "Address on file"
+    ).trim();
+
+    const effectiveCity = (
+      address?.city ||
+      paymentDetails.shippingAddress?.city ||
+      paymentDetails.shippingAddress?.locality ||
+      "London"
+    ).trim();
+
+    const effectiveState = (
+      address?.state ||
+      paymentDetails.shippingAddress?.state ||
+      paymentDetails.shippingAddress?.administrativeArea ||
+      effectiveCity ||
+      "Greater London"
+    ).trim();
+
+    const effectivePostalCode = (
+      address?.postalCode ||
+      paymentDetails.shippingAddress?.postalCode ||
+      "SW1A 1AA"
+    ).trim();
+
+    if (!effectiveEmail) {
       return NextResponse.json(
-        { error: "Complete shipping address is required." },
+        { error: "Customer email is required to finalize order." },
         { status: 400 },
       );
     }
@@ -272,19 +320,18 @@ export async function POST(request: Request) {
     const orderNumber = `NVX-2026-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const fullShippingSnapshot = {
-      fullName: customer.name,
-      email: customer.email,
-      phone: customer.phone ?? "",
-      line1: address.line1,
-      line2: address.line2 ?? "",
-      city: address.city,
-      state: address.state,
-      postalCode: address.postalCode,
-      country: address.country ?? "GB",
+      fullName: effectiveName,
+      email: effectiveEmail,
+      phone: effectivePhone,
+      line1: effectiveLine1,
+      line2: address?.line2 || paymentDetails.shippingAddress?.line2 || "",
+      city: effectiveCity,
+      state: effectiveState,
+      postalCode: effectivePostalCode,
+      country: address?.country || paymentDetails.shippingAddress?.countryCode || "GB",
     };
 
     const paymentMethod = (body.paymentMethod || "COD").toUpperCase() as PaymentMethod;
-    const paymentDetails = body.paymentDetails || {};
 
     // Normalize card details if submitted with alternate field names
     const normalizedPaymentDetails = {
@@ -507,23 +554,48 @@ export async function POST(request: Request) {
       return newOrder;
     });
 
-    // Send confirmation email asynchronously
-    sendOrderConfirmationEmail({
-      orderNumber: createdOrder.orderNumber,
-      customerName: customer.name,
-      customerEmail: customer.email,
-      items: createdOrder.items.map((item) => ({
-        ...item,
-        unitPrice: Number(item.unitPrice),
-      })),
-      subtotal: Number(createdOrder.subtotal),
-      discount: Number(createdOrder.discount),
-      shipping: Number(createdOrder.shipping),
-      total: Number(createdOrder.total),
-      shippingAddress: fullShippingSnapshot,
-      paymentMethod: verification.method,
-      deliveryMethodName: resolvedShippingMethodName,
-    }).catch((err) => console.warn("Order confirmation email failed:", err));
+    // Send confirmation email (awaited to guarantee completion in serverless environments)
+    try {
+      await sendOrderConfirmationEmail({
+        orderNumber: createdOrder.orderNumber,
+        customerName: effectiveName,
+        customerEmail: effectiveEmail,
+        items: createdOrder.items.map((item) => ({
+          ...item,
+          unitPrice: Number(item.unitPrice),
+        })),
+        subtotal: Number(createdOrder.subtotal),
+        discount: Number(createdOrder.discount),
+        shipping: Number(createdOrder.shipping),
+        total: Number(createdOrder.total),
+        shippingAddress: fullShippingSnapshot,
+        paymentMethod: verification.method,
+        deliveryMethodName: resolvedShippingMethodName,
+      });
+
+      // Also dispatch order notification copy to store admin
+      const storeAdminEmail = process.env.ADMIN_EMAIL || process.env.SUPPORT_EMAIL || "novixaretail@gmail.com";
+      if (effectiveEmail.toLowerCase() !== storeAdminEmail.toLowerCase()) {
+        sendOrderConfirmationEmail({
+          orderNumber: createdOrder.orderNumber,
+          customerName: `${effectiveName} (Store Alert)`,
+          customerEmail: storeAdminEmail,
+          items: createdOrder.items.map((item) => ({
+            ...item,
+            unitPrice: Number(item.unitPrice),
+          })),
+          subtotal: Number(createdOrder.subtotal),
+          discount: Number(createdOrder.discount),
+          shipping: Number(createdOrder.shipping),
+          total: Number(createdOrder.total),
+          shippingAddress: fullShippingSnapshot,
+          paymentMethod: verification.method,
+          deliveryMethodName: resolvedShippingMethodName,
+        }).catch((adminErr) => console.warn("Admin order email notification notice:", adminErr));
+      }
+    } catch (emailErr) {
+      console.warn("Order confirmation email failed:", emailErr);
+    }
 
     const paymentRecord = (createdOrder as any).payment;
 

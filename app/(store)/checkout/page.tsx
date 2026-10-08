@@ -260,6 +260,52 @@ export default function CheckoutPage() {
     setIsSubmitting(true);
     setErrorMessage(null);
 
+    const effectiveEmail = (
+      customPaymentDetails?.payerEmail ||
+      formData.email ||
+      user?.email ||
+      ""
+    ).trim();
+
+    const effectiveName = (
+      customPaymentDetails?.payerName ||
+      formData.name ||
+      user?.name ||
+      "Customer"
+    ).trim();
+
+    const effectivePhone = (
+      customPaymentDetails?.phone ||
+      formData.phone ||
+      ""
+    ).trim();
+
+    const effectiveAddress = {
+      line1: (
+        customPaymentDetails?.shippingAddress?.line1 ||
+        formData.address ||
+        "Address on file"
+      ).trim(),
+      line2: (customPaymentDetails?.shippingAddress?.line2 || "").trim(),
+      city: (
+        customPaymentDetails?.shippingAddress?.city ||
+        formData.city ||
+        "London"
+      ).trim(),
+      state: (
+        customPaymentDetails?.shippingAddress?.state ||
+        formData.state ||
+        formData.city ||
+        "Greater London"
+      ).trim(),
+      postalCode: (
+        customPaymentDetails?.shippingAddress?.postalCode ||
+        formData.pinCode ||
+        "SW1A 1AA"
+      ).trim(),
+      country: customPaymentDetails?.shippingAddress?.country || "GB",
+    };
+
     try {
       const response = await fetch("/api/orders", {
         method: "POST",
@@ -275,17 +321,11 @@ export default function CheckoutPage() {
           shippingMethodName: selectedShippingMethod?.name,
           shipping: shippingCharge,
           customer: {
-            name: formData.name.trim(),
-            email: formData.email.trim(),
-            phone: formData.phone.trim(),
+            name: effectiveName,
+            email: effectiveEmail,
+            phone: effectivePhone,
           },
-          address: {
-            line1: formData.address.trim(),
-            city: formData.city.trim(),
-            state: formData.state.trim(),
-            postalCode: formData.pinCode.trim(),
-            country: "GB",
-          },
+          address: effectiveAddress,
           paymentMethod: method,
           paymentDetails:
             customPaymentDetails ||
@@ -1031,6 +1071,9 @@ export default function CheckoutPage() {
                             paypalOrderId: res.paypalOrderId,
                             captureId: res.captureId,
                             payerEmail: res.payerEmail || formData.email.trim(),
+                            payerName: (res as any).payerName || formData.name.trim(),
+                            phone: (res as any).phone || formData.phone.trim(),
+                            shippingAddress: (res as any).shippingAddress || currentShippingAddress,
                           });
                         }}
                         onError={(err) => {

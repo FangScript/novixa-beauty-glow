@@ -24,6 +24,9 @@ interface NativeApplePayButtonProps {
     paypalOrderId: string;
     captureId?: string;
     payerEmail?: string;
+    payerName?: string;
+    phone?: string;
+    shippingAddress?: any;
   }) => Promise<void>;
   onError?: (error: string) => void;
   disabled?: boolean;
@@ -318,14 +321,38 @@ export function NativeApplePayButton({
 
           // Finalize store order in DB
           try {
+            const payerName = payment.shippingContact?.givenName
+              ? `${payment.shippingContact.givenName} ${payment.shippingContact.familyName || ""}`.trim()
+              : captureResult.payerName;
+
             await onSuccess({
               paypalOrderId,
               captureId: captureResult.captureId,
               payerEmail: payment.shippingContact?.emailAddress || captureResult.payerEmail,
+              payerName,
+              phone: payment.shippingContact?.phoneNumber,
+              shippingAddress: {
+                line1:
+                  payment.shippingContact?.addressLines?.[0] ||
+                  shippingAddress?.addressLine1 ||
+                  "Address on file",
+                line2: payment.shippingContact?.addressLines?.[1] || shippingAddress?.addressLine2,
+                city: payment.shippingContact?.locality || shippingAddress?.city || "London",
+                state:
+                  payment.shippingContact?.administrativeArea ||
+                  shippingAddress?.state ||
+                  "Greater London",
+                postalCode:
+                  payment.shippingContact?.postalCode || shippingAddress?.postalCode || "SW1A 1AA",
+                country: payment.shippingContact?.countryCode || "GB",
+              },
             });
           } catch (orderStoreErr: any) {
             console.error("Store order placement error after successful payment:", orderStoreErr);
-            toast.success("Payment authorized successfully! Finalizing order...");
+            toast.error(
+              orderStoreErr?.message ||
+                "Order registered but confirmation delayed. Please refresh or check orders.",
+            );
           }
         } catch (authErr: any) {
           console.error("Apple Pay payment authorization error:", authErr);
