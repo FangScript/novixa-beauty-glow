@@ -48,6 +48,25 @@ export async function POST(request: Request) {
     // 2. If the order is not yet approved, confirm payment source (Apple Pay or wallet)
     if (orderDetails.status !== "APPROVED") {
       if (applePayPayment) {
+        // In PayPal PPCP mode (no Apple merchant certificate), the client-side SDK
+        // handles Apple Pay token decryption via paypal.Applepay().confirmOrder().
+        // Raw tokens sent to confirm-payment-source will ALWAYS 500.
+        // If the order isn't APPROVED at this point, the client-side confirmation failed.
+        const hasAppleCert = !!(process.env.APPLE_PAY_CERTIFICATE && process.env.APPLE_PAY_PRIVATE_KEY);
+        if (!hasAppleCert) {
+          console.error(
+            `Apple Pay order ${paypalOrderId} is not APPROVED (status: ${orderDetails.status}). ` +
+            `Client-side confirmOrder must succeed before capture. No Apple merchant cert configured for server-side fallback.`,
+          );
+          return NextResponse.json(
+            {
+              error: "Apple Pay confirmation failed. Please try again or use a different payment method.",
+            },
+            { status: 400 },
+          );
+        }
+
+        // Only attempt server-side confirm if Apple merchant certificate IS configured (non-PPCP / direct integration)
         try {
           const confirmData = await confirmPayPalOrderPaymentSource(paypalOrderId, {
             apple_pay: {
@@ -61,7 +80,6 @@ export async function POST(request: Request) {
             `Apple Pay payment source confirmation failed [orderId: ${paypalOrderId}, debug_id: ${confirmErr.debugId || "unknown"}]:`,
             confirmErr.message,
           );
-          // CRITICAL: STOP IMMEDIATELY! Do NOT proceed to capture when confirmation fails.
           return NextResponse.json(
             {
               error: "Payment source confirmation failed with PayPal. Your card was not charged.",

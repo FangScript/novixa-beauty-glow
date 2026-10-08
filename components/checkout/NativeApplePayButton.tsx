@@ -198,34 +198,39 @@ export function NativeApplePayButton({
           // Resolve our PayPal order ID
           const paypalOrderId = await orderPromise;
 
-          // Attempt client-side PayPal confirmation if SDK helper is loaded
+          // CRITICAL: In PayPal PPCP mode, ONLY the client-side PayPal SDK can decrypt
+          // and confirm Apple Pay tokens. The server-side confirm-payment-source endpoint
+          // CANNOT process raw Apple Pay tokens without a dedicated Apple merchant certificate.
+          // This call MUST succeed — there is no server-side fallback.
           const applepayHelper = await getApplePayHelper();
-          if (applepayHelper) {
-            try {
-              await applepayHelper.confirmOrder({
-                orderId: paypalOrderId,
-                token: payment.token,
-                billingContact: payment.billingContact,
-                shippingContact: payment.shippingContact,
-              });
-            } catch (sdkConfirmErr) {
-              console.warn(
-                "Client confirmOrder notice, falling back to backend capture:",
-                sdkConfirmErr,
-              );
-            }
+          if (!applepayHelper) {
+            throw new Error(
+              "PayPal Apple Pay SDK failed to load. Please refresh the page and try again.",
+            );
           }
 
-          // Capture on backend via PayPal Orders v2
+          try {
+            await applepayHelper.confirmOrder({
+              orderId: paypalOrderId,
+              token: payment.token,
+              billingContact: payment.billingContact,
+              shippingContact: payment.shippingContact,
+            });
+          } catch (sdkConfirmErr: any) {
+            console.error("PayPal Apple Pay confirmOrder failed:", sdkConfirmErr);
+            throw new Error(
+              sdkConfirmErr?.message ||
+                "Apple Pay payment confirmation failed. Please try again or use a different payment method.",
+            );
+          }
+
+          // Order is now APPROVED by PayPal — capture on backend.
+          // DO NOT send raw Apple Pay tokens to the server; confirmation was handled client-side.
           const captureRes = await fetch("/api/payments/paypal/capture-order", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               paypalOrderId,
-              applePayPayment: {
-                id: payment.token?.transactionIdentifier,
-                token: payment.token,
-              },
             }),
           });
 
