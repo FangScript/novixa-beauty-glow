@@ -6,7 +6,8 @@ export async function middleware(request: NextRequest) {
   const host = request.headers.get("host") || "";
 
   // ── Canonical host redirect (non-www -> www) ──────────────────────────────
-  if (host === "novixaretail.com") {
+  // Exclude /.well-known so Apple Pay and SSL domain verification bots do not encounter a 301 redirect
+  if (host === "novixaretail.com" && !request.nextUrl.pathname.startsWith("/.well-known/")) {
     const url = new URL(request.url);
     url.host = "www.novixaretail.com";
     url.protocol = "https:";
