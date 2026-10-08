@@ -26,7 +26,14 @@ export async function POST(request: Request) {
     let isVerified = false;
 
     // Check PayPal Asymmetric Webhook Signature
-    if (transmissionId && transmissionSig && certUrl && authAlgo && transmissionTime && paypalWebhookId) {
+    if (
+      transmissionId &&
+      transmissionSig &&
+      certUrl &&
+      authAlgo &&
+      transmissionTime &&
+      paypalWebhookId
+    ) {
       isVerified = await verifyPayPalWebhookSignature({
         transmissionId,
         transmissionTime,
@@ -60,9 +67,11 @@ export async function POST(request: Request) {
     // Idempotency: Check if this webhook event was already processed
     const webhookEventId = payload.id;
     if (webhookEventId && process.env.DATABASE_URL) {
-      const existingEvent = await prisma.webhookEvent.findUnique({
-        where: { id: webhookEventId },
-      }).catch(() => null);
+      const existingEvent = await prisma.webhookEvent
+        .findUnique({
+          where: { id: webhookEventId },
+        })
+        .catch(() => null);
 
       if (existingEvent) {
         return NextResponse.json({ received: true, alreadyProcessed: true });
@@ -104,7 +113,10 @@ export async function POST(request: Request) {
     }
 
     // Idempotency: If order is already paid, acknowledge without re-processing
-    if (order.paymentStatus === PaymentStatus.PAID && (eventStatus === "PAID" || eventStatus === "COMPLETED")) {
+    if (
+      order.paymentStatus === PaymentStatus.PAID &&
+      (eventStatus === "PAID" || eventStatus === "COMPLETED")
+    ) {
       return NextResponse.json({ received: true, alreadyPaid: true });
     }
 
@@ -183,15 +195,17 @@ export async function POST(request: Request) {
       }
 
       if (webhookEventId) {
-        await tx.webhookEvent.create({
-          data: {
-            id: webhookEventId,
-            eventType: eventType || "UNKNOWN",
-            resourceId: providerPaymentId || order.id,
-            status: newPaymentStatus,
-            payload: payload,
-          },
-        }).catch(() => null);
+        await tx.webhookEvent
+          .create({
+            data: {
+              id: webhookEventId,
+              eventType: eventType || "UNKNOWN",
+              resourceId: providerPaymentId || order.id,
+              status: newPaymentStatus,
+              payload: payload,
+            },
+          })
+          .catch(() => null);
       }
     });
 

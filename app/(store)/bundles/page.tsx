@@ -76,10 +76,7 @@ async function getDynamicBundles(): Promise<DynamicBundle[]> {
 }
 
 export default async function BundlesPage() {
-  const [allProducts, dynamicBundles] = await Promise.all([
-    getLiveProducts(),
-    getDynamicBundles(),
-  ]);
+  const [allProducts, dynamicBundles] = await Promise.all([getLiveProducts(), getDynamicBundles()]);
 
   const bundleProducts = allProducts.filter(
     (p) => p.category === "bundle" || p.tags.includes("kit"),

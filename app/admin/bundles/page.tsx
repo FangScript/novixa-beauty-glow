@@ -119,7 +119,7 @@ export default function AdminBundlesPage() {
       // Automatically recalculate suggested original value
       const sum = next.reduce((acc, id) => {
         const prod = availableProducts.find((p) => p.id === id);
-        return acc + (prod ? prod.salePrice ?? prod.price : 0);
+        return acc + (prod ? (prod.salePrice ?? prod.price) : 0);
       }, 0);
 
       setForm((curr) => ({
@@ -333,7 +333,9 @@ export default function AdminBundlesPage() {
 
               <div className="max-h-40 overflow-y-auto border border-[#d9cec5] bg-white/40 divide-y divide-[#eee]">
                 {filteredProducts.length === 0 ? (
-                  <p className="p-3 text-center text-xs text-[#776a61]">No matching products found.</p>
+                  <p className="p-3 text-center text-xs text-[#776a61]">
+                    No matching products found.
+                  </p>
                 ) : (
                   filteredProducts.map((p) => {
                     const isSelected = selectedProductIds.includes(p.id);

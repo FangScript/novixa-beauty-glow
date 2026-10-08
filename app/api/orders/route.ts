@@ -180,7 +180,9 @@ export async function POST(request: Request) {
       const product = productMap.get(item.productId);
       if (!product || product.status !== "ACTIVE") {
         return NextResponse.json(
-          { error: `Product "${product?.name || item.productId}" is not available or has been deactivated.` },
+          {
+            error: `Product "${product?.name || item.productId}" is not available or has been deactivated.`,
+          },
           { status: 400 },
         );
       }
@@ -236,7 +238,7 @@ export async function POST(request: Request) {
     }
 
     // Authoritative Shipping Method Calculation
-    let shipping = 0.20;
+    let shipping = 0.2;
     let resolvedShippingMethodId: string | null = null;
     let resolvedShippingMethodName: string | null = "Normal Delivery";
 
@@ -263,7 +265,10 @@ export async function POST(request: Request) {
     }
 
     const tax = 0;
-    let total = Math.max(0, Math.round((Math.max(0, subtotal - discount) + shipping + tax) * 100) / 100);
+    let total = Math.max(
+      0,
+      Math.round((Math.max(0, subtotal - discount) + shipping + tax) * 100) / 100,
+    );
     const orderNumber = `NVX-2026-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const fullShippingSnapshot = {
@@ -336,7 +341,8 @@ export async function POST(request: Request) {
         let capturedCurrency = purchaseUnit?.amount?.currency_code || "";
         let captures = purchaseUnit?.payments?.captures || [];
         let latestCapture = captures[0];
-        let isActuallyCaptured = paypalStatus === "COMPLETED" || latestCapture?.status === "COMPLETED";
+        let isActuallyCaptured =
+          paypalStatus === "COMPLETED" || latestCapture?.status === "COMPLETED";
 
         // If order is approved but not yet captured, perform atomic capture on server
         if (paypalStatus === "APPROVED" && !isActuallyCaptured) {
@@ -349,7 +355,8 @@ export async function POST(request: Request) {
             capturedCurrency = purchaseUnit?.amount?.currency_code || "";
             captures = purchaseUnit?.payments?.captures || [];
             latestCapture = captures[0];
-            isActuallyCaptured = paypalStatus === "COMPLETED" || latestCapture?.status === "COMPLETED";
+            isActuallyCaptured =
+              paypalStatus === "COMPLETED" || latestCapture?.status === "COMPLETED";
           } catch (capErr: any) {
             console.error("Atomic PayPal capture failed:", capErr);
             return NextResponse.json(
@@ -443,7 +450,9 @@ export async function POST(request: Request) {
           },
         });
         if (result.count === 0) {
-          throw new Error(`Insufficient stock for item "${item.productId}". The product may have just sold out.`);
+          throw new Error(
+            `Insufficient stock for item "${item.productId}". The product may have just sold out.`,
+          );
         }
       }
 

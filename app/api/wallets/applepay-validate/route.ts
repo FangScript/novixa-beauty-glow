@@ -7,10 +7,7 @@ export async function POST(request: Request) {
     const { validationUrl, domainName } = body;
 
     if (!validationUrl || typeof validationUrl !== "string") {
-      return NextResponse.json(
-        { error: "validationUrl is required." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "validationUrl is required." }, { status: 400 });
     }
 
     const merchantSession = await validateApplePayMerchantSession(validationUrl, domainName);

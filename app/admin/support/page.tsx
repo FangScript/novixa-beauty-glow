@@ -84,7 +84,9 @@ export default function AdminSupportPage() {
   const [inquiries, setInquiries] = useState<Inquiry[]>(initialSampleInquiries);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | "PENDING" | "IN_REVIEW" | "RESOLVED">("ALL");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "PENDING" | "IN_REVIEW" | "RESOLVED">(
+    "ALL",
+  );
   const [subjectFilter, setSubjectFilter] = useState("ALL");
   const [selectedInquiry, setSelectedInquiry] = useState<Inquiry | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -277,7 +279,9 @@ export default function AdminSupportPage() {
                 key={st}
                 onClick={() => setStatusFilter(st)}
                 className={`px-3 py-1 text-[10px] uppercase tracking-wider font-semibold transition-colors ${
-                  statusFilter === st ? "bg-[#211b18] text-white" : "text-[#776a61] hover:text-[#211b18]"
+                  statusFilter === st
+                    ? "bg-[#211b18] text-white"
+                    : "text-[#776a61] hover:text-[#211b18]"
                 }`}
               >
                 {st === "ALL" ? "All" : st.replace("_", " ")}
@@ -353,7 +357,9 @@ export default function AdminSupportPage() {
                   </TableCell>
                   <TableCell>
                     <span className="font-medium text-[#211b18]">{inq.subject}</span>
-                    <p className="text-[11px] text-[#776a61] line-clamp-1 max-w-xs">{inq.message}</p>
+                    <p className="text-[11px] text-[#776a61] line-clamp-1 max-w-xs">
+                      {inq.message}
+                    </p>
                   </TableCell>
                   <TableCell className="text-[#8f5d48] font-mono text-xs">
                     {inq.orderNumber || "—"}
@@ -422,7 +428,9 @@ export default function AdminSupportPage() {
             <div className="grid grid-cols-2 gap-3 bg-[#faf7f4] border border-[#e8dfd8] p-3.5 rounded-sm">
               <div>
                 <p className="text-[10px] uppercase text-[#776a61] tracking-wider">Patron</p>
-                <p className="font-semibold text-sm text-[#211b18] mt-0.5">{selectedInquiry.name}</p>
+                <p className="font-semibold text-sm text-[#211b18] mt-0.5">
+                  {selectedInquiry.name}
+                </p>
                 <p className="text-[#8f5d48]">{selectedInquiry.email}</p>
                 {selectedInquiry.phone && (
                   <p className="text-[#776a61] text-[11px] mt-0.5">{selectedInquiry.phone}</p>
@@ -502,7 +510,10 @@ export default function AdminSupportPage() {
         <AdminDialog
           title={`Reply to ${selectedInquiry.name}`}
           description={`Composing email to ${selectedInquiry.email}`}
-          onClose={() => { setShowReplyModal(false); setReplyMessage(""); }}
+          onClose={() => {
+            setShowReplyModal(false);
+            setReplyMessage("");
+          }}
         >
           <div className="space-y-4 text-xs text-[#211b18]">
             {/* Original inquiry recap */}
@@ -511,7 +522,8 @@ export default function AdminSupportPage() {
                 Original Inquiry — {selectedInquiry.subject}
               </p>
               <p className="text-[11px] text-[#665b53] line-clamp-3 leading-relaxed italic">
-                "{selectedInquiry.message.slice(0, 240)}{selectedInquiry.message.length > 240 ? "…" : ""}"
+                "{selectedInquiry.message.slice(0, 240)}
+                {selectedInquiry.message.length > 240 ? "…" : ""}"
               </p>
             </div>
 
@@ -529,8 +541,9 @@ export default function AdminSupportPage() {
                 className="w-full border border-[#d9cec5] bg-white p-3.5 text-sm leading-relaxed text-[#211b18] outline-none focus:border-[#8f5d48] transition-colors resize-none font-sans"
               />
               <p className="mt-1 text-[10px] text-[#a1958b]">
-                This email will be sent from <strong>novixaretail@gmail.com</strong> to <strong>{selectedInquiry.email}</strong>.
-                Your reply will be signed as the NOVIXA Concierge Team.
+                This email will be sent from <strong>novixaretail@gmail.com</strong> to{" "}
+                <strong>{selectedInquiry.email}</strong>. Your reply will be signed as the NOVIXA
+                Concierge Team.
               </p>
             </div>
 
@@ -543,7 +556,10 @@ export default function AdminSupportPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => { setShowReplyModal(false); setReplyMessage(""); }}
+                  onClick={() => {
+                    setShowReplyModal(false);
+                    setReplyMessage("");
+                  }}
                   className="rounded-none text-[10px] uppercase tracking-wider"
                 >
                   <X size={12} className="mr-1" />
@@ -557,9 +573,13 @@ export default function AdminSupportPage() {
                   className="inline-flex items-center gap-1.5 bg-[#8f5d48] text-white hover:bg-[#724837] disabled:opacity-50 disabled:cursor-not-allowed text-[10px] uppercase tracking-wider px-4 py-2 font-semibold transition-colors"
                 >
                   {isSendingReply ? (
-                    <><Loader2 size={12} className="animate-spin" /> Sending…</>
+                    <>
+                      <Loader2 size={12} className="animate-spin" /> Sending…
+                    </>
                   ) : (
-                    <><Send size={12} /> Send Reply</>
+                    <>
+                      <Send size={12} /> Send Reply
+                    </>
                   )}
                 </button>
               </div>

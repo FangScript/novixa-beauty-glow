@@ -64,7 +64,7 @@ const DEFAULT_SHIPPING_OPTIONS: ShippingOption[] = [
     id: "sm-normal",
     name: "Normal Delivery",
     timeframe: "3-5 days",
-    price: 0.20,
+    price: 0.2,
     description: "Standard tracked courier delivery within 3-5 business days.",
     isDefault: true,
   },
@@ -72,7 +72,7 @@ const DEFAULT_SHIPPING_OPTIONS: ShippingOption[] = [
     id: "sm-express",
     name: "Express Delivery",
     timeframe: "1-3 days",
-    price: 0.30,
+    price: 0.3,
     description: "Priority expedited courier dispatch with 1-3 business days delivery.",
     isDefault: false,
   },
@@ -179,19 +179,26 @@ export default function CheckoutPage() {
   };
 
   // Shipping Methods Selection
-  const [shippingMethods, setShippingMethods] = useState<ShippingOption[]>(DEFAULT_SHIPPING_OPTIONS);
-  const [selectedShippingMethod, setSelectedShippingMethod] = useState<ShippingOption>(DEFAULT_SHIPPING_OPTIONS[0]);
+  const [shippingMethods, setShippingMethods] =
+    useState<ShippingOption[]>(DEFAULT_SHIPPING_OPTIONS);
+  const [selectedShippingMethod, setSelectedShippingMethod] = useState<ShippingOption>(
+    DEFAULT_SHIPPING_OPTIONS[0],
+  );
   const [isLoadingShipping, setIsLoadingShipping] = useState(true);
 
   useEffect(() => {
-    const savedMethodId = typeof window !== "undefined" ? localStorage.getItem("novixa_shipping_method_id") : null;
+    const savedMethodId =
+      typeof window !== "undefined" ? localStorage.getItem("novixa_shipping_method_id") : null;
     fetch("/api/shipping-methods")
       .then((res) => res.json())
       .then((data) => {
         if (data.success && Array.isArray(data.methods) && data.methods.length > 0) {
           setShippingMethods(data.methods);
-          const matched = savedMethodId ? data.methods.find((m: any) => m.id === savedMethodId) : null;
-          const defaultOpt = matched || data.methods.find((m: any) => m.isDefault) || data.methods[0];
+          const matched = savedMethodId
+            ? data.methods.find((m: any) => m.id === savedMethodId)
+            : null;
+          const defaultOpt =
+            matched || data.methods.find((m: any) => m.isDefault) || data.methods[0];
           setSelectedShippingMethod(defaultOpt);
         }
       })
@@ -200,8 +207,11 @@ export default function CheckoutPage() {
   }, []);
 
   const discount = appliedCoupon?.discount ?? 0;
-  const shippingCharge = selectedShippingMethod ? selectedShippingMethod.price : 0.20;
-  const orderTotal = Math.max(0, Math.round((Math.max(0, subtotal - discount) + shippingCharge) * 100) / 100);
+  const shippingCharge = selectedShippingMethod ? selectedShippingMethod.price : 0.2;
+  const orderTotal = Math.max(
+    0,
+    Math.round((Math.max(0, subtotal - discount) + shippingCharge) * 100) / 100,
+  );
 
   const currentShippingAddress = useMemo(
     () => ({
@@ -217,7 +227,6 @@ export default function CheckoutPage() {
 
   // Format card number with spaces (4 4 4 4)
 
-
   const validateAddressForm = (): boolean => {
     if (!formData.name.trim() || !formData.email.trim()) {
       toast.error("Please enter your name and email address.");
@@ -230,10 +239,7 @@ export default function CheckoutPage() {
     return true;
   };
 
-  const submitOrderWithDetails = async (
-    method: PaymentMethodType,
-    customPaymentDetails?: any,
-  ) => {
+  const submitOrderWithDetails = async (method: PaymentMethodType, customPaymentDetails?: any) => {
     setIsSubmitting(true);
     setErrorMessage(null);
 
@@ -270,11 +276,11 @@ export default function CheckoutPage() {
               ? {
                   bankReference: `NVX-${Date.now().toString().slice(-6)}`,
                 }
-                : method === "PAYPAL"
-                  ? {
-                      payerEmail: formData.email.trim(),
-                    }
-                  : {}),
+              : method === "PAYPAL"
+                ? {
+                    payerEmail: formData.email.trim(),
+                  }
+                : {}),
         }),
       });
 
@@ -438,7 +444,9 @@ export default function CheckoutPage() {
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Delivery Method</span>
               <span className="text-foreground font-medium">
-                {confirmedOrder.shippingMethodName || selectedShippingMethod?.name || "Normal Delivery"}
+                {confirmedOrder.shippingMethodName ||
+                  selectedShippingMethod?.name ||
+                  "Normal Delivery"}
               </span>
             </div>
             <div className="flex justify-between text-xs">
@@ -501,7 +509,10 @@ export default function CheckoutPage() {
               </div>
             )}
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span>Delivery ({confirmedOrder.shippingMethodName || selectedShippingMethod?.name || "Standard"})</span>
+              <span>
+                Delivery (
+                {confirmedOrder.shippingMethodName || selectedShippingMethod?.name || "Standard"})
+              </span>
               <span>{formatPrice(shipping)}</span>
             </div>
             <div className="flex justify-between pt-2 border-t border-border font-display text-lg text-foreground">
@@ -640,7 +651,9 @@ export default function CheckoutPage() {
                     key={method.id}
                     onClick={() => {
                       setSelectedShippingMethod(method);
-                      try { localStorage.setItem("novixa_shipping_method_id", method.id); } catch {}
+                      try {
+                        localStorage.setItem("novixa_shipping_method_id", method.id);
+                      } catch {}
                     }}
                     className={`relative cursor-pointer border p-4 transition-all ${
                       isSelected
@@ -657,7 +670,9 @@ export default function CheckoutPage() {
                           checked={isSelected}
                           onChange={() => {
                             setSelectedShippingMethod(method);
-                            try { localStorage.setItem("novixa_shipping_method_id", method.id); } catch {}
+                            try {
+                              localStorage.setItem("novixa_shipping_method_id", method.id);
+                            } catch {}
                           }}
                           className="mt-0.5 h-4 w-4 text-rosewood"
                         />
@@ -747,7 +762,8 @@ export default function CheckoutPage() {
                     onClick={(e) => e.stopPropagation()}
                   >
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Pay securely with Visa, Mastercard, or American Express. Direct real-time processing powered by PayPal.
+                      Pay securely with Visa, Mastercard, or American Express. Direct real-time
+                      processing powered by PayPal.
                     </p>
                     <PayPalCheckoutButton
                       fundingSource="card"
@@ -816,7 +832,8 @@ export default function CheckoutPage() {
                     onClick={(e) => e.stopPropagation()}
                   >
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Authorize your purchase securely with your PayPal balance, linked bank account, or PayPal Pay in 3 installments.
+                      Authorize your purchase securely with your PayPal balance, linked bank
+                      account, or PayPal Pay in 3 installments.
                     </p>
                     <PayPalCheckoutButton
                       fundingSource="paypal"
@@ -882,7 +899,8 @@ export default function CheckoutPage() {
                     onClick={(e) => e.stopPropagation()}
                   >
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Check out quickly using payment cards saved in your Google Account. Biometrically protected and fast.
+                      Check out quickly using payment cards saved in your Google Account.
+                      Biometrically protected and fast.
                     </p>
                     <NativeGooglePayButton
                       key="native-google-pay"
@@ -956,7 +974,8 @@ export default function CheckoutPage() {
                     onClick={(e) => e.stopPropagation()}
                   >
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Seamless one-touch checkout via Safari on iOS or macOS with Face ID / Touch ID.
+                      Seamless one-touch checkout via Safari on iOS or macOS with Face ID / Touch
+                      ID.
                     </p>
                     {!hasApplePay ? (
                       <div className="bg-stone-50 border border-stone-200 p-4 rounded-lg text-xs text-stone-700 space-y-2.5">
@@ -965,10 +984,16 @@ export default function CheckoutPage() {
                           <span>Apple Pay Device & Browser Requirement</span>
                         </div>
                         <p className="text-muted-foreground leading-relaxed">
-                          Apple Pay is powered by the Apple Secure Enclave and is natively supported when browsing in <strong>Safari</strong> on an <strong>iPhone, iPad, or Mac</strong>.
+                          Apple Pay is powered by the Apple Secure Enclave and is natively supported
+                          when browsing in <strong>Safari</strong> on an{" "}
+                          <strong>iPhone, iPad, or Mac</strong>.
                         </p>
                         <p className="text-[11px] text-stone-500 leading-relaxed">
-                          To checkout with Apple Pay, open <strong>https://www.novixaretail.com/checkout</strong> on your iPhone or Mac in Safari. On this computer, you can complete your order instantly using <strong>Google Pay</strong>, <strong>Credit or Debit Card</strong>, or <strong>PayPal</strong> above.
+                          To checkout with Apple Pay, open{" "}
+                          <strong>https://www.novixaretail.com/checkout</strong> on your iPhone or
+                          Mac in Safari. On this computer, you can complete your order instantly
+                          using <strong>Google Pay</strong>, <strong>Credit or Debit Card</strong>,
+                          or <strong>PayPal</strong> above.
                         </p>
                       </div>
                     ) : (
@@ -1081,9 +1106,7 @@ export default function CheckoutPage() {
             {/* Shipping */}
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>Delivery ({selectedShippingMethod?.name || "Normal"})</span>
-              <span className="font-medium text-foreground">
-                {formatPrice(shippingCharge)}
-              </span>
+              <span className="font-medium text-foreground">{formatPrice(shippingCharge)}</span>
             </div>
 
             {/* Order Total */}
@@ -1104,7 +1127,9 @@ export default function CheckoutPage() {
                   document.getElementById(`method-${paymentMethod.toLowerCase()}`) ||
                   document.getElementById("method-card");
                 paymentBox?.scrollIntoView({ behavior: "smooth", block: "center" });
-                toast.info(`Please complete authorization under ${methodDisplayNames[paymentMethod]}.`);
+                toast.info(
+                  `Please complete authorization under ${methodDisplayNames[paymentMethod]}.`,
+                );
               }
             }}
             disabled={isSubmitting}

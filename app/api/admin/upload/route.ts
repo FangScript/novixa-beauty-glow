@@ -88,7 +88,10 @@ export async function POST(request: Request) {
     );
 
     if (validFiles.length === 0) {
-      return NextResponse.json({ error: "No valid image files provided for upload." }, { status: 400 });
+      return NextResponse.json(
+        { error: "No valid image files provided for upload." },
+        { status: 400 },
+      );
     }
 
     const uploadDir = path.join(process.cwd(), "public", "uploads", "products");
@@ -97,7 +100,10 @@ export async function POST(request: Request) {
 
     for (const file of validFiles) {
       const mimeType = (file.type || "").toLowerCase().trim();
-      const rawExt = path.extname(file.name || "").toLowerCase().trim();
+      const rawExt = path
+        .extname(file.name || "")
+        .toLowerCase()
+        .trim();
 
       const isMimeAllowed = ALLOWED_MIME_TYPES.has(mimeType);
       const isExtAllowed = ALLOWED_EXTENSIONS.has(rawExt);
@@ -121,7 +127,7 @@ export async function POST(request: Request) {
       }
 
       // Determine clean extension
-      let extension = isExtAllowed ? rawExt : (MIME_TO_EXT[mimeType] || ".jpg");
+      let extension = isExtAllowed ? rawExt : MIME_TO_EXT[mimeType] || ".jpg";
       if (extension === ".jpeg" || extension === ".jfif") {
         extension = ".jpg";
       }
@@ -133,10 +139,18 @@ export async function POST(request: Request) {
       // Verify file signature (magic bytes) to prevent executable masquerading
       const isSignatureValid =
         (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) || // JPEG
-        (buffer.length >= 4 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) || // PNG
+        (buffer.length >= 4 &&
+          buffer[0] === 0x89 &&
+          buffer[1] === 0x50 &&
+          buffer[2] === 0x4e &&
+          buffer[3] === 0x47) || // PNG
         (buffer.length >= 3 && buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) || // GIF
-        (buffer.length >= 12 && buffer.subarray(0, 4).toString("ascii") === "RIFF" && buffer.subarray(8, 12).toString("ascii") === "WEBP") || // WebP
-        (buffer.length >= 12 && (buffer.subarray(4, 12).toString("ascii") === "ftypavif" || buffer.subarray(4, 12).toString("ascii") === "ftypavis")); // AVIF
+        (buffer.length >= 12 &&
+          buffer.subarray(0, 4).toString("ascii") === "RIFF" &&
+          buffer.subarray(8, 12).toString("ascii") === "WEBP") || // WebP
+        (buffer.length >= 12 &&
+          (buffer.subarray(4, 12).toString("ascii") === "ftypavif" ||
+            buffer.subarray(4, 12).toString("ascii") === "ftypavis")); // AVIF
 
       if (!isSignatureValid) {
         return NextResponse.json(
@@ -180,7 +194,10 @@ export async function POST(request: Request) {
           uploadedUrls.push(`/uploads/products/${safeFilename}`);
           fileSaved = true;
         } catch (diskErr: any) {
-          console.warn("Local disk write failed (expected on read-only serverless):", diskErr?.message);
+          console.warn(
+            "Local disk write failed (expected on read-only serverless):",
+            diskErr?.message,
+          );
         }
       }
 
@@ -205,5 +222,3 @@ export async function POST(request: Request) {
     );
   }
 }
-
-

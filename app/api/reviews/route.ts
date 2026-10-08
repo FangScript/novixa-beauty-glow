@@ -151,7 +151,16 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { productId, userId, rating, title, body: reviewBody, authorName, authorEmail, images } = body;
+    const {
+      productId,
+      userId,
+      rating,
+      title,
+      body: reviewBody,
+      authorName,
+      authorEmail,
+      images,
+    } = body;
 
     if (!productId || !rating || !reviewBody) {
       return NextResponse.json(
@@ -161,7 +170,9 @@ export async function POST(request: Request) {
     }
 
     const reviewImages = Array.isArray(images)
-      ? images.filter((img) => typeof img === "string" && img.startsWith("/uploads/reviews/")).slice(0, 4)
+      ? images
+          .filter((img) => typeof img === "string" && img.startsWith("/uploads/reviews/"))
+          .slice(0, 4)
       : [];
 
     const cleanEmail = (authorEmail || "").trim().toLowerCase();

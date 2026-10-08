@@ -400,7 +400,8 @@ export function ProductReviews({ productId, productSlug, productName }: ProductR
                 </span>
               </div>
               <p className="mt-1 text-[11px] text-muted-foreground">
-                Attach real customer photos (e.g., packaging, bottle, texture, application). Up to 4 photos (JPG, PNG, WebP, max 5MB each).
+                Attach real customer photos (e.g., packaging, bottle, texture, application). Up to 4
+                photos (JPG, PNG, WebP, max 5MB each).
               </p>
 
               {/* Upload trigger & Previews grid */}
@@ -410,7 +411,6 @@ export function ProductReviews({ productId, productSlug, productName }: ProductR
                     key={idx}
                     className="group relative h-20 w-20 overflow-hidden rounded border border-border bg-sand/30 shadow-sm"
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={imgUrl}
                       alt={`Review photo ${idx + 1}`}
@@ -446,7 +446,9 @@ export function ProductReviews({ productId, productSlug, productName }: ProductR
                     ) : (
                       <>
                         <Camera size={20} className="mb-1 text-rosewood/80" />
-                        <span className="text-[9px] font-semibold tracking-wider uppercase">Add Photo</span>
+                        <span className="text-[9px] font-semibold tracking-wider uppercase">
+                          Add Photo
+                        </span>
                       </>
                     )}
                   </label>
@@ -655,7 +657,6 @@ export function ProductReviews({ productId, productSlug, productName }: ProductR
                         className="group relative h-20 w-20 overflow-hidden rounded border border-border bg-sand/20 focus:outline-none transition-transform hover:scale-105 hover:shadow-md"
                         aria-label={`View photo ${i + 1} from ${rev.customer}`}
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={imgUrl}
                           alt={`Review photo by ${rev.customer}`}
@@ -692,7 +693,6 @@ export function ProductReviews({ productId, productSlug, productName }: ProductR
               <X size={18} />
             </button>
 
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={lightboxImage}
               alt="Enlarged review photo"

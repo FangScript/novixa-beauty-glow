@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { z } from "zod";
 const perfumeProduct = "/images/product-perfume.jpg";
 const bundleProduct = "/images/product-bundle.jpg";

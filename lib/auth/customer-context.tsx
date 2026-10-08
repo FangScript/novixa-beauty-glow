@@ -1,6 +1,14 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useCallback, useMemo, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  type ReactNode,
+} from "react";
 import { createClient } from "@/utils/supabase/client";
 
 export type Customer = {
@@ -231,59 +239,53 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
     [supabase, syncPrismaUser],
   );
 
-  const register = useCallback(
-    async (name: string, email: string, password: string) => {
-      const cleanEmail = email.trim().toLowerCase();
-      const cleanName = name.trim();
-      try {
-        // Direct database registration (creates user, session cookie, and logs in immediately without confirmation email)
-        const res = await fetch("/api/auth/customer/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: cleanName, email: cleanEmail, password }),
-        });
+  const register = useCallback(async (name: string, email: string, password: string) => {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = name.trim();
+    try {
+      // Direct database registration (creates user, session cookie, and logs in immediately without confirmation email)
+      const res = await fetch("/api/auth/customer/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: cleanName, email: cleanEmail, password }),
+      });
 
-        const data = await res.json().catch(() => ({ ok: false }));
+      const data = await res.json().catch(() => ({ ok: false }));
 
-        if (res.ok && data.ok && data.user) {
-          const formatted: Customer = {
-            id: data.user.id,
-            name: data.user.name || cleanName,
-            email: data.user.email,
-            role: "CUSTOMER",
-          };
-          setUser(formatted);
-          if (typeof window !== "undefined") {
-            localStorage.setItem("novixa_customer_email", data.user.email);
-          }
-          return { ok: true };
-        }
-
-        if (data.error) {
-          return { ok: false, error: data.error };
-        }
-
-        return { ok: false, error: "Registration failed. Please try again." };
-      } catch (err: any) {
-        return { ok: false, error: err.message || "Registration failed." };
-      }
-    },
-    [],
-  );
-
-  const signInWithGoogle = useCallback(
-    async (next = "/account") => {
-      try {
+      if (res.ok && data.ok && data.user) {
+        const formatted: Customer = {
+          id: data.user.id,
+          name: data.user.name || cleanName,
+          email: data.user.email,
+          role: "CUSTOMER",
+        };
+        setUser(formatted);
         if (typeof window !== "undefined") {
-          window.location.href = `/api/auth/customer/google?next=${encodeURIComponent(next)}`;
+          localStorage.setItem("novixa_customer_email", data.user.email);
         }
         return { ok: true };
-      } catch (err: any) {
-        return { ok: false, error: err.message || "Google sign-in failed." };
       }
-    },
-    [],
-  );
+
+      if (data.error) {
+        return { ok: false, error: data.error };
+      }
+
+      return { ok: false, error: "Registration failed. Please try again." };
+    } catch (err: any) {
+      return { ok: false, error: err.message || "Registration failed." };
+    }
+  }, []);
+
+  const signInWithGoogle = useCallback(async (next = "/account") => {
+    try {
+      if (typeof window !== "undefined") {
+        window.location.href = `/api/auth/customer/google?next=${encodeURIComponent(next)}`;
+      }
+      return { ok: true };
+    } catch (err: any) {
+      return { ok: false, error: err.message || "Google sign-in failed." };
+    }
+  }, []);
 
   const resetPassword = useCallback(
     async (email: string) => {

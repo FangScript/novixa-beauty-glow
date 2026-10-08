@@ -130,7 +130,8 @@ export default function AdminOrdersPage() {
             payment: o.paymentStatus === "PAID" ? "Paid" : "Pending Payment",
             paymentRecord,
             trackingNumber: o.trackingNumber || "",
-            shippingMethodName: o.shippingMethodName || (o.shippingMethod ? o.shippingMethod.name : null),
+            shippingMethodName:
+              o.shippingMethodName || (o.shippingMethod ? o.shippingMethod.name : null),
             shippingCharge: o.shipping,
             items: (o.items || []).map((i: any) => ({
               name: i.productName,
@@ -157,9 +158,10 @@ export default function AdminOrdersPage() {
   const filtered = useMemo(
     () =>
       orders.filter((order) => {
-        const matchesQuery = `${order.orderNumber} ${order.customer} ${order.email} ${order.paymentRecord?.providerPaymentId || ""}`
-          .toLowerCase()
-          .includes(query.toLowerCase());
+        const matchesQuery =
+          `${order.orderNumber} ${order.customer} ${order.email} ${order.paymentRecord?.providerPaymentId || ""}`
+            .toLowerCase()
+            .includes(query.toLowerCase());
 
         const matchesStatus = statusFilter === "All" || order.status === statusFilter;
 
@@ -376,7 +378,10 @@ export default function AdminOrdersPage() {
                         </AdminStatus>
                       </div>
                       {payment?.providerPaymentId && (
-                        <p className="font-mono text-[9px] text-[#8f8279] truncate max-w-[140px]" title={payment.providerPaymentId}>
+                        <p
+                          className="font-mono text-[9px] text-[#8f8279] truncate max-w-[140px]"
+                          title={payment.providerPaymentId}
+                        >
                           Tx: {payment.providerPaymentId}
                         </p>
                       )}
@@ -432,7 +437,13 @@ export default function AdminOrdersPage() {
                     Transaction Record
                   </p>
                 </div>
-                <AdminStatus tone={selected.paymentRecord?.status === "PAID" || selected.payment === "Paid" ? "positive" : "warning"}>
+                <AdminStatus
+                  tone={
+                    selected.paymentRecord?.status === "PAID" || selected.payment === "Paid"
+                      ? "positive"
+                      : "warning"
+                  }
+                >
                   {selected.paymentRecord?.status || selected.payment}
                 </AdminStatus>
               </div>
@@ -440,7 +451,9 @@ export default function AdminOrdersPage() {
               {selected.paymentRecord ? (
                 <div className="grid gap-2 sm:grid-cols-2 text-xs pt-1 border-t border-[#e7ddd5]">
                   <div>
-                    <span className="text-muted-foreground text-[11px] block">Payment Gateway:</span>
+                    <span className="text-muted-foreground text-[11px] block">
+                      Payment Gateway:
+                    </span>
                     <span className="font-medium text-foreground">
                       {selected.paymentRecord.provider === "PAYPAL"
                         ? "PayPal Express"
@@ -451,9 +464,12 @@ export default function AdminOrdersPage() {
                   </div>
 
                   <div>
-                    <span className="text-muted-foreground text-[11px] block">Settlement Amount:</span>
+                    <span className="text-muted-foreground text-[11px] block">
+                      Settlement Amount:
+                    </span>
                     <span className="font-medium text-foreground">
-                      £{selected.paymentRecord.amount.toLocaleString("en-GB")} {selected.paymentRecord.currency}
+                      £{selected.paymentRecord.amount.toLocaleString("en-GB")}{" "}
+                      {selected.paymentRecord.currency}
                     </span>
                   </div>
 
@@ -468,11 +484,17 @@ export default function AdminOrdersPage() {
                         </code>
                         <button
                           type="button"
-                          onClick={() => copyToClipboard(selected.paymentRecord?.providerPaymentId || "")}
+                          onClick={() =>
+                            copyToClipboard(selected.paymentRecord?.providerPaymentId || "")
+                          }
                           className="text-[#8f5d48] hover:text-black transition-colors"
                           title="Copy Transaction ID"
                         >
-                          {copiedTxId ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                          {copiedTxId ? (
+                            <Check size={13} className="text-emerald-600" />
+                          ) : (
+                            <Copy size={13} />
+                          )}
                         </button>
                       </div>
                     </div>
@@ -480,7 +502,9 @@ export default function AdminOrdersPage() {
 
                   {selected.paymentRecord.parsedMetadata?.payerEmail && (
                     <div>
-                      <span className="text-muted-foreground text-[11px] block">Payer Account:</span>
+                      <span className="text-muted-foreground text-[11px] block">
+                        Payer Account:
+                      </span>
                       <span className="font-mono text-foreground text-[11px]">
                         {selected.paymentRecord.parsedMetadata.payerEmail}
                       </span>
@@ -489,7 +513,9 @@ export default function AdminOrdersPage() {
 
                   {selected.paymentRecord.parsedMetadata?.mode && (
                     <div>
-                      <span className="text-muted-foreground text-[11px] block">Gateway Environment:</span>
+                      <span className="text-muted-foreground text-[11px] block">
+                        Gateway Environment:
+                      </span>
                       <span className="uppercase text-[10px] font-semibold text-stone-700 bg-stone-200/80 px-1.5 py-0.5 rounded">
                         {selected.paymentRecord.parsedMetadata.mode}
                       </span>
@@ -500,7 +526,9 @@ export default function AdminOrdersPage() {
                     <div className="sm:col-span-2 text-[10px] text-muted-foreground pt-1">
                       Authorized timestamp:{" "}
                       <span className="font-mono">
-                        {new Date(selected.paymentRecord.parsedMetadata.authorizedAt).toLocaleString("en-GB")}
+                        {new Date(
+                          selected.paymentRecord.parsedMetadata.authorizedAt,
+                        ).toLocaleString("en-GB")}
                       </span>
                     </div>
                   )}
@@ -516,13 +544,17 @@ export default function AdminOrdersPage() {
             <div className="text-xs border-b border-[#d9cec5] pb-3 space-y-2">
               <div className="flex items-center justify-between bg-stone-50 border border-[#e7ddd5] p-2.5">
                 <div>
-                  <span className="text-muted-foreground text-[10px] uppercase tracking-wider block">Delivery Option</span>
+                  <span className="text-muted-foreground text-[10px] uppercase tracking-wider block">
+                    Delivery Option
+                  </span>
                   <span className="font-semibold text-foreground">
                     {selected.shippingMethodName || "Normal Delivery"}
                   </span>
                 </div>
                 <span className="font-mono font-medium text-foreground">
-                  {selected.shippingCharge !== undefined ? `£${selected.shippingCharge.toFixed(2)}` : "£0.20"}
+                  {selected.shippingCharge !== undefined
+                    ? `£${selected.shippingCharge.toFixed(2)}`
+                    : "£0.20"}
                 </span>
               </div>
               <div>

@@ -135,7 +135,9 @@ export function PayPalCheckoutButton({
         </div>
       )}
 
-      <div className={`w-full max-w-full overflow-hidden ${isProcessing || disabled ? "pointer-events-none opacity-50" : ""}`}>
+      <div
+        className={`w-full max-w-full overflow-hidden ${isProcessing || disabled ? "pointer-events-none opacity-50" : ""}`}
+      >
         <PayPalScriptProvider
           options={{
             clientId,

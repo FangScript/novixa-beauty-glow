@@ -61,7 +61,10 @@ export async function PUT(request: Request) {
     const { id, status } = body;
 
     if (!id || !status) {
-      return NextResponse.json({ error: "Inquiry ID and new status are required." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Inquiry ID and new status are required." },
+        { status: 400 },
+      );
     }
 
     const normalizedStatus = status === "IN_PROGRESS" ? "IN_REVIEW" : status;

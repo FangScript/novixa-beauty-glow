@@ -9,10 +9,10 @@ set -euo pipefail
 cd /opt/novixa
 
 ENV_FILE=".env.production"
-CLIENT_ID="BAAi8QOljyA26-sCFX-3M0WIYmJk_qm16xSH4wVblfWVIv_-NFY7GvGAIw9f6D5-A8CtcHPlUOhDpXXxGs"
-SECRET_KEY="EHGkhsGc-Xwzi7U6ZvGTxe2D90LFdvE6O7KXCIqeWIOZrxIZ3QCXxdT4ZVMl2crnLskJ5VxQkT7yre24"
-SUPABASE_URL="https://macpycxntatdcsxvckmr.supabase.co"
-SUPABASE_ANON="sb_publishable_nOsrXBUwXTnAC-jZv_sa6g_BcwTK0QY"
+CLIENT_ID="${PAYPAL_CLIENT_ID:-${NEXT_PUBLIC_PAYPAL_CLIENT_ID:-"BAAi8QOljyA26-sCFX-3M0WIYmJk_qm16xSH4wVblfWVIv_-NFY7GvGAIw9f6D5-A8CtcHPlUOhDpXXxGs"}}"
+SECRET_KEY="${PAYPAL_CLIENT_SECRET:-""}"
+SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL:-"https://macpycxntatdcsxvckmr.supabase.co"}"
+SUPABASE_ANON="${NEXT_PUBLIC_SUPABASE_ANON_KEY:-"sb_publishable_nOsrXBUwXTnAC-jZv_sa6g_BcwTK0QY"}"
 
 echo "=== 1. Syncing $ENV_FILE with Live Credentials ==="
 
@@ -53,7 +53,7 @@ docker build \
   --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="$SUPABASE_ANON" \
   --build-arg NEXT_PUBLIC_GOOGLE_PAY_MERCHANT_ID="BCR2DN6D5L703ZKP" \
   --build-arg NEXT_PUBLIC_PAYPAL_MODE="live" \
-  --build-arg NEXT_PUBLIC_GOOGLE_PAY_ENV="${GOOGLE_PAY_ENV:-TEST}" \
+  --build-arg NEXT_PUBLIC_GOOGLE_PAY_ENV="${GOOGLE_PAY_ENV:-PRODUCTION}" \
   -t novixa-beauty-glow:latest .
 
 echo "=== 3. Recreating Container with New Image & Live Env ==="

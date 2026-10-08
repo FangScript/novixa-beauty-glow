@@ -9,8 +9,8 @@ export async function GET() {
 
   const hasSmtp = Boolean(
     process.env.SMTP_HOST &&
-      (process.env.SMTP_USER || process.env.EMAIL_USER) &&
-      (process.env.SMTP_PASS || process.env.EMAIL_PASS || process.env.EMAIL_PASSWORD)
+    (process.env.SMTP_USER || process.env.EMAIL_USER) &&
+    (process.env.SMTP_PASS || process.env.EMAIL_PASS || process.env.EMAIL_PASSWORD),
   );
   const hasResend = Boolean(process.env.RESEND_API_KEY || process.env.EMAIL_API_KEY);
 

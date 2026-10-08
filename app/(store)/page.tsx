@@ -272,7 +272,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-
       {/* Customer Testimonial */}
       <section id="reviews" className="page-shell pb-20">
         <div className="relative overflow-hidden bg-ink p-10 text-primary-foreground md:p-16">

@@ -36,7 +36,10 @@ export default function AdminSettingsPage() {
 
   const items = [
     { label: "PostgreSQL database (Supabase)", connected: Boolean(services.database) },
-    { label: "Payment provider (PayPal REST API / Express)", connected: Boolean(services.payments) },
+    {
+      label: "Payment provider (PayPal REST API / Express)",
+      connected: Boolean(services.payments),
+    },
     {
       label: `Transactional email (${services.emailProvider || "Gmail SMTP / Resend"})`,
       connected: Boolean(services.email),

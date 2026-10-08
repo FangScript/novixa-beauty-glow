@@ -148,7 +148,6 @@ export default function AdminReviewsPage() {
                         className="group relative block h-10 w-10 overflow-hidden rounded border border-[#e7ddd5] shadow-xs"
                         title="Click to view patron photo full size"
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={imgUrl}
                           alt="Review attachment"

@@ -25,9 +25,7 @@ export async function generateMetadata({
     `Shop ${product.name} at NOVIXA UK. Handcrafted British luxury fragrance & beauty. Enjoy fast Royal Mail Tracked delivery across the UK.`;
 
   const primaryImage = product.images?.[0] || "/images/hero-perfume.jpg";
-  const imageUrl = primaryImage.startsWith("http")
-    ? primaryImage
-    : `${baseUrl}${primaryImage}`;
+  const imageUrl = primaryImage.startsWith("http") ? primaryImage : `${baseUrl}${primaryImage}`;
 
   return {
     title,
@@ -73,11 +71,7 @@ export async function generateMetadata({
   };
 }
 
-export default async function ProductDetailPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
+export default async function ProductDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const product = await getLiveProductBySlug(slug);
 
@@ -97,9 +91,7 @@ export default async function ProductDetailPage({
 
   const productUrl = `${baseUrl}/products/${product.slug || slug}`;
   const primaryImage = product.images?.[0] || "/images/hero-perfume.jpg";
-  const imageUrl = primaryImage.startsWith("http")
-    ? primaryImage
-    : `${baseUrl}${primaryImage}`;
+  const imageUrl = primaryImage.startsWith("http") ? primaryImage : `${baseUrl}${primaryImage}`;
 
   const allImages = (product.images || []).map((img: string) =>
     img.startsWith("http") ? img : `${baseUrl}${img}`,
@@ -118,7 +110,8 @@ export default async function ProductDetailPage({
         "@id": `${productUrl}/#product`,
         name: product.name,
         image: allImages.length > 0 ? allImages : [imageUrl],
-        description: product.description || `Handcrafted ${product.name} by NOVIXA British luxury atelier.`,
+        description:
+          product.description || `Handcrafted ${product.name} by NOVIXA British luxury atelier.`,
         sku: product.id,
         mpn: `NOV-${product.id.slice(0, 8).toUpperCase()}`,
         brand: {

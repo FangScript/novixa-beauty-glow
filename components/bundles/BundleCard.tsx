@@ -46,7 +46,9 @@ export function BundleCard({ bundle }: { bundle: DynamicBundle }) {
       addToCart(item.productId, item.quantity || 1);
     });
 
-    toast.success(`"${bundle.name}" set (${bundle.items.length} items) added to your shopping bag.`);
+    toast.success(
+      `"${bundle.name}" set (${bundle.items.length} items) added to your shopping bag.`,
+    );
   };
 
   return (

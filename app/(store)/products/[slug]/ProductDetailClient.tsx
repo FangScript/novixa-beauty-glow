@@ -7,7 +7,12 @@ import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/layout/PageShell";
 import { QuantityControl } from "@/components/cart/QuantityControl";
 import { ProductCard } from "@/components/products/ProductCard";
-import { formatPrice, products, registerLiveProducts, type Product } from "@/lib/products/catalogue";
+import {
+  formatPrice,
+  products,
+  registerLiveProducts,
+  type Product,
+} from "@/lib/products/catalogue";
 import { useCommerce } from "@/lib/commerce/context";
 import { ProductReviews } from "@/components/products/ProductReviews";
 
@@ -27,14 +32,16 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
 
   const wishlisted = isWishlisted(product.id);
 
-  const related = (relatedProducts && relatedProducts.length > 0)
-    ? relatedProducts
-    : products
-        .filter(
-          (p) =>
-            p.id !== product.id && (p.category === product.category || p.gender === product.gender),
-        )
-        .slice(0, 4);
+  const related =
+    relatedProducts && relatedProducts.length > 0
+      ? relatedProducts
+      : products
+          .filter(
+            (p) =>
+              p.id !== product.id &&
+              (p.category === product.category || p.gender === product.gender),
+          )
+          .slice(0, 4);
 
   return (
     <PageShell eyebrow={product.category} title={product.name}>

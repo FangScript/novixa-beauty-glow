@@ -25,7 +25,12 @@ interface AddressSelectorProps {
   className?: string;
 }
 
-export function AddressSelector({ value, onChange, required = true, className = "" }: AddressSelectorProps) {
+export function AddressSelector({
+  value,
+  onChange,
+  required = true,
+  className = "",
+}: AddressSelectorProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<UKAddressEntry[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -112,13 +117,17 @@ export function AddressSelector({ value, onChange, required = true, className = 
                   onClick={() => handleSelectAddress(entry)}
                   className="flex items-start gap-2.5 px-3.5 py-2.5 hover:bg-sand/30 cursor-pointer text-left transition-colors group"
                 >
-                  <MapPin size={13} className="text-rosewood/70 shrink-0 mt-0.5 group-hover:text-rosewood" />
+                  <MapPin
+                    size={13}
+                    className="text-rosewood/70 shrink-0 mt-0.5 group-hover:text-rosewood"
+                  />
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium text-foreground group-hover:text-rosewood transition-colors">
                       {entry.line1} {entry.line2 ? `• ${entry.line2}` : ""}
                     </p>
                     <p className="text-[11px] text-muted-foreground">
-                      {entry.city}, {entry.county} • <span className="font-semibold text-foreground/80">{entry.postcode}</span>
+                      {entry.city}, {entry.county} •{" "}
+                      <span className="font-semibold text-foreground/80">{entry.postcode}</span>
                     </p>
                   </div>
                 </li>

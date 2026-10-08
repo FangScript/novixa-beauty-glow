@@ -11,10 +11,7 @@ export async function POST(request: Request) {
     const { paypalOrderId, paymentMethodData } = body;
 
     if (!paypalOrderId) {
-      return NextResponse.json(
-        { error: "paypalOrderId is required." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "paypalOrderId is required." }, { status: 400 });
     }
 
     // If paymentMethodData is provided from Google Pay SDK, confirm payment source with PayPal
@@ -48,9 +45,7 @@ export async function POST(request: Request) {
     }
 
     const captureRecord = captureData.purchase_units?.[0]?.payments?.captures?.[0];
-    const isCompleted =
-      captureData.status === "COMPLETED" ||
-      captureRecord?.status === "COMPLETED";
+    const isCompleted = captureData.status === "COMPLETED" || captureRecord?.status === "COMPLETED";
 
     const captureId = captureRecord?.id || paypalOrderId;
     const payer = captureData.payer || {};

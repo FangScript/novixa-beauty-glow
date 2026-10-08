@@ -21,7 +21,7 @@ const DEFAULT_SHIPPING_OPTIONS: ShippingOption[] = [
   {
     id: "normal",
     name: "Normal Delivery",
-    price: 0.20,
+    price: 0.2,
     timeframe: "3-5 days",
     description: "Standard tracked courier delivery within 3-5 business days.",
     isDefault: true,
@@ -29,7 +29,7 @@ const DEFAULT_SHIPPING_OPTIONS: ShippingOption[] = [
   {
     id: "express",
     name: "Express Delivery",
-    price: 0.30,
+    price: 0.3,
     timeframe: "1-3 days",
     description: "Priority expedited courier dispatch with 1-3 business days delivery.",
     isDefault: false,
@@ -40,11 +40,13 @@ export default function CartPage() {
   const { cart, updateQuantity, removeFromCart, subtotal } = useCommerce();
   const items = cartProducts(cart);
 
-  const [shippingMethods, setShippingMethods] = useState<ShippingOption[]>(DEFAULT_SHIPPING_OPTIONS);
+  const [shippingMethods, setShippingMethods] =
+    useState<ShippingOption[]>(DEFAULT_SHIPPING_OPTIONS);
   const [selectedMethodId, setSelectedMethodId] = useState<string>("normal");
 
   useEffect(() => {
-    const saved = typeof window !== "undefined" ? localStorage.getItem("novixa_shipping_method_id") : null;
+    const saved =
+      typeof window !== "undefined" ? localStorage.getItem("novixa_shipping_method_id") : null;
     fetch("/api/shipping-methods")
       .then((res) => res.json())
       .then((data) => {
@@ -154,9 +156,7 @@ export default function CartPage() {
                       }`}
                     >
                       <div className="flex flex-col">
-                        <span className="font-semibold text-xs text-foreground">
-                          {method.name}
-                        </span>
+                        <span className="font-semibold text-xs text-foreground">{method.name}</span>
                         <span className="text-[10px] text-muted-foreground mt-0.5">
                           {method.timeframe}
                         </span>
@@ -177,9 +177,7 @@ export default function CartPage() {
               </div>
               <div className="flex justify-between text-muted-foreground">
                 <span>Delivery ({selectedShipping.name})</span>
-                <span className="text-foreground font-medium">
-                  {formatPrice(shipping)}
-                </span>
+                <span className="text-foreground font-medium">{formatPrice(shipping)}</span>
               </div>
               <div className="flex justify-between border-t border-border pt-4 font-semibold text-base text-foreground">
                 <span>Estimated Total</span>

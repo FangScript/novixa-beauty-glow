@@ -582,7 +582,8 @@ export function searchAddressDictionary(query: string, maxResults = 8): UKAddres
       continue;
     }
 
-    const searchBlob = `${item.line1} ${item.line2 || ""} ${item.city} ${item.county} ${item.postcode}`.toLowerCase();
+    const searchBlob =
+      `${item.line1} ${item.line2 || ""} ${item.city} ${item.county} ${item.postcode}`.toLowerCase();
     if (searchBlob.includes(normalized)) {
       partialMatches.push(item);
     }

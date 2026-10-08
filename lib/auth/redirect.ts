@@ -8,7 +8,12 @@ export function sanitizeRedirect(url: string | null | undefined, fallback = "/ac
   const trimmed = url.trim();
 
   // Must begin with a single forward slash and not double forward slash or backslash
-  if (!trimmed.startsWith("/") || trimmed.startsWith("//") || trimmed.startsWith("/\\") || trimmed.startsWith("\\")) {
+  if (
+    !trimmed.startsWith("/") ||
+    trimmed.startsWith("//") ||
+    trimmed.startsWith("/\\") ||
+    trimmed.startsWith("\\")
+  ) {
     return fallback;
   }
 

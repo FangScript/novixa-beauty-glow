@@ -99,4 +99,3 @@ export async function GET(request: Request) {
 
   return NextResponse.redirect(`${publicBaseUrl}/login?error=auth_exchange_failed`);
 }
-

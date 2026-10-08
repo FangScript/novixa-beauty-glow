@@ -18,15 +18,7 @@ const ALLOWED_MIME_TYPES = new Set([
   "image/gif",
 ]);
 
-const ALLOWED_EXTENSIONS = new Set([
-  ".jpg",
-  ".jpeg",
-  ".png",
-  ".webp",
-  ".avif",
-  ".gif",
-  ".jfif",
-]);
+const ALLOWED_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".avif", ".gif", ".jfif"]);
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB per file
 const MAX_FILES = 4;
@@ -61,7 +53,10 @@ export async function POST(request: Request) {
 
     for (const file of files) {
       const mimeType = (file.type || "").toLowerCase().trim();
-      const rawExt = path.extname(file.name || "").toLowerCase().trim();
+      const rawExt = path
+        .extname(file.name || "")
+        .toLowerCase()
+        .trim();
 
       const isMimeAllowed = ALLOWED_MIME_TYPES.has(mimeType);
       const isExtAllowed = ALLOWED_EXTENSIONS.has(rawExt);
@@ -93,10 +88,18 @@ export async function POST(request: Request) {
       // Verify file signature (magic bytes) to prevent executable masquerading
       const isSignatureValid =
         (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) || // JPEG
-        (buffer.length >= 4 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) || // PNG
+        (buffer.length >= 4 &&
+          buffer[0] === 0x89 &&
+          buffer[1] === 0x50 &&
+          buffer[2] === 0x4e &&
+          buffer[3] === 0x47) || // PNG
         (buffer.length >= 3 && buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) || // GIF
-        (buffer.length >= 12 && buffer.subarray(0, 4).toString("ascii") === "RIFF" && buffer.subarray(8, 12).toString("ascii") === "WEBP") || // WebP
-        (buffer.length >= 12 && (buffer.subarray(4, 12).toString("ascii") === "ftypavif" || buffer.subarray(4, 12).toString("ascii") === "ftypavis")); // AVIF
+        (buffer.length >= 12 &&
+          buffer.subarray(0, 4).toString("ascii") === "RIFF" &&
+          buffer.subarray(8, 12).toString("ascii") === "WEBP") || // WebP
+        (buffer.length >= 12 &&
+          (buffer.subarray(4, 12).toString("ascii") === "ftypavif" ||
+            buffer.subarray(4, 12).toString("ascii") === "ftypavis")); // AVIF
 
       if (!isSignatureValid) {
         return NextResponse.json(
@@ -164,4 +167,3 @@ export async function POST(request: Request) {
     );
   }
 }
-

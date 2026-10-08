@@ -6,7 +6,7 @@ export const DEFAULT_SHIPPING_METHODS = [
   {
     name: "Normal Delivery",
     timeframe: "3-5 days",
-    price: 0.20,
+    price: 0.2,
     description: "Standard tracked courier delivery within 3-5 business days.",
     active: true,
     isDefault: true,
@@ -15,7 +15,7 @@ export const DEFAULT_SHIPPING_METHODS = [
   {
     name: "Express Delivery",
     timeframe: "1-3 days",
-    price: 0.30,
+    price: 0.3,
     description: "Priority expedited courier dispatch with 1-3 business days delivery.",
     active: true,
     isDefault: false,
@@ -81,19 +81,33 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, timeframe, price, description, active = true, isDefault = false, displayOrder = 0 } = body;
+    const {
+      name,
+      timeframe,
+      price,
+      description,
+      active = true,
+      isDefault = false,
+      displayOrder = 0,
+    } = body;
 
     if (!name || typeof name !== "string" || !name.trim()) {
       return NextResponse.json({ error: "Delivery method name is required." }, { status: 400 });
     }
 
     if (!timeframe || typeof timeframe !== "string" || !timeframe.trim()) {
-      return NextResponse.json({ error: "Delivery timeframe is required (e.g. 3-5 days)." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Delivery timeframe is required (e.g. 3-5 days)." },
+        { status: 400 },
+      );
     }
 
     const numericPrice = Number(price);
     if (isNaN(numericPrice) || numericPrice < 0) {
-      return NextResponse.json({ error: "Valid non-negative price is required (e.g. 0.20)." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Valid non-negative price is required (e.g. 0.20)." },
+        { status: 400 },
+      );
     }
 
     if (!process.env.DATABASE_URL) {
@@ -190,7 +204,8 @@ export async function PUT(request: Request) {
       }
       dataToUpdate.price = Math.round(num * 100) / 100;
     }
-    if (description !== undefined) dataToUpdate.description = description ? String(description).trim() : null;
+    if (description !== undefined)
+      dataToUpdate.description = description ? String(description).trim() : null;
     if (active !== undefined) dataToUpdate.active = Boolean(active);
     if (isDefault !== undefined) dataToUpdate.isDefault = Boolean(isDefault);
     if (displayOrder !== undefined) dataToUpdate.displayOrder = Number(displayOrder) || 0;

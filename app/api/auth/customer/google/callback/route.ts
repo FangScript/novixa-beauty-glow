@@ -1,11 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { loginWithGoogle, CUSTOMER_SESSION_COOKIE, SESSION_TTL_SECONDS } from "@/lib/auth/session";
-import {
-  getBaseAppUrl,
-  getGoogleRedirectUri,
-  verifySignedState,
-} from "@/lib/auth/google-oauth";
+import { getBaseAppUrl, getGoogleRedirectUri, verifySignedState } from "@/lib/auth/google-oauth";
 import { sanitizeRedirect } from "@/lib/auth/redirect";
 
 export async function GET(request: Request) {

@@ -72,9 +72,7 @@ export function NativeGooglePayButton({
   // in the Google Pay & Wallet Console. Setting environment to PRODUCTION before Google approval
   // triggers [OR_BIBED_11] ("Merchant trouble accepting payments").
   const googlePayEnv: "TEST" | "PRODUCTION" =
-    process.env.NEXT_PUBLIC_GOOGLE_PAY_ENV === "PRODUCTION"
-      ? "PRODUCTION"
-      : "TEST";
+    process.env.NEXT_PUBLIC_GOOGLE_PAY_ENV === "PRODUCTION" ? "PRODUCTION" : "TEST";
 
   // Step 1: Dynamically load the Google Pay Web SDK script
   useEffect(() => {
@@ -105,7 +103,11 @@ export function NativeGooglePayButton({
 
   // Step 2: Initialize PaymentsClient and verify isReadyToPay with PayPal tokenization
   useEffect(() => {
-    if (!isSdkLoaded || typeof window === "undefined" || !window.google?.payments?.api?.PaymentsClient) {
+    if (
+      !isSdkLoaded ||
+      typeof window === "undefined" ||
+      !window.google?.payments?.api?.PaymentsClient
+    ) {
       return;
     }
 
@@ -229,7 +231,8 @@ export function NativeGooglePayButton({
         }
       }
 
-      const origin = typeof window !== "undefined" ? window.location.origin : "https://www.novixaretail.com";
+      const origin =
+        typeof window !== "undefined" ? window.location.origin : "https://www.novixaretail.com";
       const gpayMerchantId = process.env.NEXT_PUBLIC_GOOGLE_PAY_MERCHANT_ID || "BCR2DN6D5L703ZKP";
 
       const paymentDataRequest = {
@@ -264,7 +267,10 @@ export function NativeGooglePayButton({
             paymentMethodData: paymentData.paymentMethodData,
           });
         } catch (sdkConfirmErr: any) {
-          console.warn("paypal.Googlepay().confirmOrder notice:", sdkConfirmErr?.message || sdkConfirmErr);
+          console.warn(
+            "paypal.Googlepay().confirmOrder notice:",
+            sdkConfirmErr?.message || sdkConfirmErr,
+          );
         }
       }
 
@@ -365,7 +371,8 @@ export function NativeGooglePayButton({
 
       {isReadyToPay === false && (
         <div className="p-3 bg-amber-50 border border-amber-200 text-xs text-amber-800">
-          Google Pay is not available on this browser or no compatible card is configured. Please select Credit Card or PayPal above.
+          Google Pay is not available on this browser or no compatible card is configured. Please
+          select Credit Card or PayPal above.
         </div>
       )}
 

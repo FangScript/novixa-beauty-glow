@@ -165,12 +165,8 @@ export default function AdminShippingPage() {
       if (!res.ok || !data.success) {
         throw new Error(data.error || "Failed to toggle status.");
       }
-      setMethods((curr) =>
-        curr.map((m) => (m.id === item.id ? { ...m, active: nextActive } : m)),
-      );
-      toast.success(
-        `"${item.name}" is now ${nextActive ? "active" : "inactive"}.`,
-      );
+      setMethods((curr) => curr.map((m) => (m.id === item.id ? { ...m, active: nextActive } : m)));
+      toast.success(`"${item.name}" is now ${nextActive ? "active" : "inactive"}.`);
     } catch (err: any) {
       toast.error(err.message || "Could not change status.");
     }
@@ -187,9 +183,7 @@ export default function AdminShippingPage() {
       if (!res.ok || !data.success) {
         throw new Error(data.error || "Failed to set default.");
       }
-      setMethods((curr) =>
-        curr.map((m) => ({ ...m, isDefault: m.id === item.id })),
-      );
+      setMethods((curr) => curr.map((m) => ({ ...m, isDefault: m.id === item.id })));
       toast.success(`"${item.name}" set as the default delivery method.`);
     } catch (err: any) {
       toast.error(err.message || "Could not set default.");
@@ -226,9 +220,7 @@ export default function AdminShippingPage() {
 
   const activeCount = methods.filter((m) => m.active).length;
   const defaultMethod = methods.find((m) => m.isDefault);
-  const lowestCharge = methods.length
-    ? Math.min(...methods.map((m) => m.price))
-    : 0;
+  const lowestCharge = methods.length ? Math.min(...methods.map((m) => m.price)) : 0;
 
   return (
     <AdminShell
@@ -251,7 +243,11 @@ export default function AdminShippingPage() {
         <MetricCard
           label="Default Method"
           value={defaultMethod?.name || "None"}
-          detail={defaultMethod ? `${defaultMethod.timeframe} · ${formatPrice(defaultMethod.price)}` : "Select a default"}
+          detail={
+            defaultMethod
+              ? `${defaultMethod.timeframe} · ${formatPrice(defaultMethod.price)}`
+              : "Select a default"
+          }
         />
         <MetricCard
           label="Base Delivery Charge"
@@ -268,7 +264,8 @@ export default function AdminShippingPage() {
               Shipping Rates & Delivery Timeframes
             </h3>
             <p className="mt-1 text-xs text-[#776a61]">
-              Manage the shipping methods shown to patrons at checkout. Charges are calculated dynamically.
+              Manage the shipping methods shown to patrons at checkout. Charges are calculated
+              dynamically.
             </p>
           </div>
           <Button
@@ -389,108 +386,108 @@ export default function AdminShippingPage() {
           title={editingMethod ? "Edit Delivery Option" : "Add Delivery Option"}
           description="Configure shipping option name, estimated timeframe, and cost charged to patrons."
         >
-        <div className="space-y-4 text-xs">
-          <AdminField label="Delivery Option Name *">
-            <input
-              type="text"
-              required
-              placeholder="e.g. Normal Delivery or Express Delivery"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full border border-[#d9cec5] bg-white px-3 py-2 text-xs outline-none focus:border-[#8f5d48]"
-            />
-          </AdminField>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <AdminField label="Estimated Timeframe *">
+          <div className="space-y-4 text-xs">
+            <AdminField label="Delivery Option Name *">
               <input
                 type="text"
                 required
-                placeholder="e.g. 3-5 days or 1-3 days"
-                value={form.timeframe}
-                onChange={(e) => setForm({ ...form, timeframe: e.target.value })}
+                placeholder="e.g. Normal Delivery or Express Delivery"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
                 className="w-full border border-[#d9cec5] bg-white px-3 py-2 text-xs outline-none focus:border-[#8f5d48]"
               />
             </AdminField>
 
-            <AdminField label="Delivery Charge (£) *">
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                required
-                placeholder="e.g. 0.20 or 0.30"
-                value={form.price}
-                onChange={(e) => setForm({ ...form, price: e.target.value })}
-                className="w-full border border-[#d9cec5] bg-white px-3 py-2 text-xs outline-none focus:border-[#8f5d48]"
-              />
-            </AdminField>
-          </div>
-
-          <AdminField label="Customer Description (Optional)">
-            <textarea
-              rows={2}
-              placeholder="e.g. Priority dispatch with Royal Mail Special Tracked courier."
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              className="w-full border border-[#d9cec5] bg-white p-3 text-xs outline-none focus:border-[#8f5d48]"
-            />
-          </AdminField>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <AdminField label="Display Priority / Order">
-              <input
-                type="number"
-                min="0"
-                value={form.displayOrder}
-                onChange={(e) => setForm({ ...form, displayOrder: e.target.value })}
-                className="w-full border border-[#d9cec5] bg-white px-3 py-2 text-xs outline-none focus:border-[#8f5d48]"
-              />
-            </AdminField>
-
-            <div className="flex flex-col justify-end space-y-2 pt-2">
-              <label className="flex items-center gap-2 cursor-pointer text-xs text-[#211b18]">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <AdminField label="Estimated Timeframe *">
                 <input
-                  type="checkbox"
-                  checked={form.isDefault}
-                  onChange={(e) => setForm({ ...form, isDefault: e.target.checked })}
-                  className="rounded border-[#d9cec5]"
+                  type="text"
+                  required
+                  placeholder="e.g. 3-5 days or 1-3 days"
+                  value={form.timeframe}
+                  onChange={(e) => setForm({ ...form, timeframe: e.target.value })}
+                  className="w-full border border-[#d9cec5] bg-white px-3 py-2 text-xs outline-none focus:border-[#8f5d48]"
                 />
-                <span>Set as default selection</span>
-              </label>
+              </AdminField>
 
-              <label className="flex items-center gap-2 cursor-pointer text-xs text-[#211b18]">
+              <AdminField label="Delivery Charge (£) *">
                 <input
-                  type="checkbox"
-                  checked={form.active}
-                  onChange={(e) => setForm({ ...form, active: e.target.checked })}
-                  className="rounded border-[#d9cec5]"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  required
+                  placeholder="e.g. 0.20 or 0.30"
+                  value={form.price}
+                  onChange={(e) => setForm({ ...form, price: e.target.value })}
+                  className="w-full border border-[#d9cec5] bg-white px-3 py-2 text-xs outline-none focus:border-[#8f5d48]"
                 />
-                <span>Active (visible in checkout)</span>
-              </label>
+              </AdminField>
+            </div>
+
+            <AdminField label="Customer Description (Optional)">
+              <textarea
+                rows={2}
+                placeholder="e.g. Priority dispatch with Royal Mail Special Tracked courier."
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                className="w-full border border-[#d9cec5] bg-white p-3 text-xs outline-none focus:border-[#8f5d48]"
+              />
+            </AdminField>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <AdminField label="Display Priority / Order">
+                <input
+                  type="number"
+                  min="0"
+                  value={form.displayOrder}
+                  onChange={(e) => setForm({ ...form, displayOrder: e.target.value })}
+                  className="w-full border border-[#d9cec5] bg-white px-3 py-2 text-xs outline-none focus:border-[#8f5d48]"
+                />
+              </AdminField>
+
+              <div className="flex flex-col justify-end space-y-2 pt-2">
+                <label className="flex items-center gap-2 cursor-pointer text-xs text-[#211b18]">
+                  <input
+                    type="checkbox"
+                    checked={form.isDefault}
+                    onChange={(e) => setForm({ ...form, isDefault: e.target.checked })}
+                    className="rounded border-[#d9cec5]"
+                  />
+                  <span>Set as default selection</span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer text-xs text-[#211b18]">
+                  <input
+                    type="checkbox"
+                    checked={form.active}
+                    onChange={(e) => setForm({ ...form, active: e.target.checked })}
+                    className="rounded border-[#d9cec5]"
+                  />
+                  <span>Active (visible in checkout)</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-4 border-t border-[#e7ddd5]">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpenModal(false)}
+                className="rounded-none text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSave}
+                disabled={isSaving}
+                className="rounded-none bg-[#211b18] text-white hover:bg-black text-xs font-semibold"
+              >
+                {isSaving ? "Saving…" : editingMethod ? "Save Changes" : "Create Option"}
+              </Button>
             </div>
           </div>
-
-          <div className="flex items-center justify-end gap-2 pt-4 border-t border-[#e7ddd5]">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpenModal(false)}
-              className="rounded-none text-xs"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={handleSave}
-              disabled={isSaving}
-              className="rounded-none bg-[#211b18] text-white hover:bg-black text-xs font-semibold"
-            >
-              {isSaving ? "Saving…" : editingMethod ? "Save Changes" : "Create Option"}
-            </Button>
-          </div>
-        </div>
-      </AdminDialog>
+        </AdminDialog>
       )}
     </AdminShell>
   );

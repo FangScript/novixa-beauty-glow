@@ -4,13 +4,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 export type PaymentProvider = "PAYPAL" | "LOCAL_GATEWAY" | "BANK_TRANSFER" | "COD" | "OTHER";
 
 export type PaymentMethod =
-  | "CARD"
-  | "PAYPAL"
-  | "GOOGLE_PAY"
-  | "APPLE_PAY"
-  | "KLARNA"
-  | "BANK_TRANSFER"
-  | "COD";
+  "CARD" | "PAYPAL" | "GOOGLE_PAY" | "APPLE_PAY" | "KLARNA" | "BANK_TRANSFER" | "COD";
 
 export interface PaymentVerificationResult {
   valid: boolean;

@@ -229,7 +229,9 @@ export default function AccountAddressesPage() {
               }
             />
 
-            {field("Address Line 2 (optional)", "line2", { placeholder: "Apartment, suite, unit, etc." })}
+            {field("Address Line 2 (optional)", "line2", {
+              placeholder: "Apartment, suite, unit, etc.",
+            })}
 
             {field("Phone (for delivery)", "phone", {
               type: "tel",

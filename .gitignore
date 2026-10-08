@@ -47,3 +47,10 @@ certbot/
 *.zip
 dist-cpanel/
 .env.production
+
+# Local asset downloads
+/apple pay/
+/Google-Pay-Acceptance (1)/
+/GPay_Acceptance_Mark_800.png
+/google-pay-mark_800.svg
+

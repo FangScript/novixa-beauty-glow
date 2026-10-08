@@ -23,8 +23,7 @@ const smtpTransport =
     : null;
 
 export const SENDER_EMAIL =
-  process.env.EMAIL_FROM ||
-  (smtpUser ? `NOVIXA <${smtpUser}>` : "NOVIXA <novixaretail@gmail.com>");
+  process.env.EMAIL_FROM || (smtpUser ? `NOVIXA <${smtpUser}>` : "NOVIXA <novixaretail@gmail.com>");
 
 export const ADMIN_EMAIL =
   process.env.ADMIN_EMAIL || process.env.SUPPORT_EMAIL || "novixaretail@gmail.com";
@@ -334,7 +333,15 @@ export interface OrderStatusEmailParams {
  * Covers: PROCESSING, SHIPPED, DELIVERED, and CANCELLED states.
  */
 export async function sendOrderStatusEmail(params: OrderStatusEmailParams) {
-  const { status, orderNumber, customerName, customerEmail, trackingNumber, trackingUrl, cancellationReason } = params;
+  const {
+    status,
+    orderNumber,
+    customerName,
+    customerEmail,
+    trackingNumber,
+    trackingUrl,
+    cancellationReason,
+  } = params;
 
   let subject = "";
   let innerRows = "";
@@ -366,9 +373,7 @@ export async function sendOrderStatusEmail(params: OrderStatusEmailParams) {
         </td>
       </tr>
       ${emailFooter()}`;
-  }
-
-  else if (status === "SHIPPED") {
+  } else if (status === "SHIPPED") {
     subject = `Your NOVIXA Order ${orderNumber} Has Shipped ✈`;
     const trackingBlock = trackingNumber
       ? `<div style="margin: 20px 0; padding: 18px 20px; background: #f0f7ec; border: 1px solid #c5dbb8; border-radius: 2px;">
@@ -396,9 +401,7 @@ export async function sendOrderStatusEmail(params: OrderStatusEmailParams) {
         </td>
       </tr>
       ${emailFooter()}`;
-  }
-
-  else if (status === "DELIVERED") {
+  } else if (status === "DELIVERED") {
     subject = `Your NOVIXA Order ${orderNumber} Has Arrived 🎁`;
     innerRows = `
       ${emailHeader("Order Delivered")}
@@ -424,9 +427,7 @@ export async function sendOrderStatusEmail(params: OrderStatusEmailParams) {
         </td>
       </tr>
       ${emailFooter()}`;
-  }
-
-  else if (status === "CANCELLED") {
+  } else if (status === "CANCELLED") {
     subject = `Important: Your NOVIXA Order ${orderNumber} Has Been Cancelled`;
     innerRows = `
       ${emailHeader("Order Cancelled")}
@@ -439,13 +440,15 @@ export async function sendOrderStatusEmail(params: OrderStatusEmailParams) {
             We regret to inform you that your order <strong style="color:#211b18;">${orderNumber}</strong> has been
             cancelled.
           </p>
-          ${cancellationReason
-            ? `<div style="padding: 14px 18px; background: #fdf8f6; border-left: 3px solid #c9765d; margin-bottom: 20px;">
+          ${
+            cancellationReason
+              ? `<div style="padding: 14px 18px; background: #fdf8f6; border-left: 3px solid #c9765d; margin-bottom: 20px;">
                 <p style="margin: 0; font-size: 12px; color: #8f2d18; line-height: 1.7;">
                   <strong>Reason:</strong> ${cancellationReason}
                 </p>
                </div>`
-            : ""}
+              : ""
+          }
           <div style="padding: 18px 20px; background: #faf7f4; border-left: 3px solid #8f5d48; margin-bottom: 20px;">
             <p style="margin: 0; font-size: 12px; color: #665b53; line-height: 1.7;">
               <strong style="color:#8f5d48; font-size:10px; text-transform:uppercase; letter-spacing:0.1em;">Refund Information</strong><br/>

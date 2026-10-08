@@ -20,11 +20,7 @@ export function getPayPalBaseUrl(): string {
 }
 
 export function getPayPalClientId(): string {
-  return (
-    process.env.PAYPAL_CLIENT_ID ||
-    process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID ||
-    ""
-  );
+  return process.env.PAYPAL_CLIENT_ID || process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "";
 }
 
 export function getPayPalClientSecret(): string {
@@ -168,7 +164,10 @@ export async function createPayPalOrder(params: CreateOrderParams) {
 
     // CRITICAL: PayPal schema strictly forbids empty strings ("") in optional fields.
     // Only include address_line_2 and admin_area_1 if they contain actual text.
-    if (params.shippingAddress.addressLine2 && params.shippingAddress.addressLine2.trim().length > 0) {
+    if (
+      params.shippingAddress.addressLine2 &&
+      params.shippingAddress.addressLine2.trim().length > 0
+    ) {
       addressObj.address_line_2 = params.shippingAddress.addressLine2.trim();
     }
     if (params.shippingAddress.state && params.shippingAddress.state.trim().length > 0) {
@@ -217,7 +216,7 @@ export async function createPayPalOrder(params: CreateOrderParams) {
   if (!response.ok) {
     console.error("PayPal Create Order Error:", JSON.stringify(data, null, 2));
     const detailMsg = data.details
-      ?.map((d: any) => `${d.description || d.issue || ""}${d.field ? ' (' + d.field + ')' : ''}`)
+      ?.map((d: any) => `${d.description || d.issue || ""}${d.field ? " (" + d.field + ")" : ""}`)
       .filter(Boolean)
       .join(". ");
     throw new Error(detailMsg || data.message || "Failed to create PayPal order");
@@ -243,10 +242,25 @@ export async function capturePayPalOrder(paypalOrderId: string) {
   });
 
   const data = await response.json();
+  const debugId = response.headers.get("Paypal-Debug-Id") || data?.debug_id;
 
   if (!response.ok) {
-    console.error("PayPal Capture Order Error:", data);
-    throw new Error(data.message || data.details?.[0]?.description || "Failed to capture PayPal payment");
+    console.error(
+      `PayPal Capture Order Error [orderId: ${paypalOrderId}, status: ${response.status}, debug_id: ${debugId}]:`,
+      {
+        name: data?.name,
+        message: data?.message,
+        debug_id: debugId,
+        details: data?.details,
+      },
+    );
+    const err = new Error(
+      data?.message || data?.details?.[0]?.description || "Failed to capture PayPal payment",
+    ) as any;
+    err.debugId = debugId;
+    err.status = response.status;
+    err.details = data?.details;
+    throw err;
   }
 
   return data;
@@ -277,6 +291,44 @@ export async function getPayPalOrderDetails(paypalOrderId: string) {
 }
 
 /**
+ * Formats and normalizes an Apple Pay payment source for PayPal's Orders v2 API.
+ * PayPal Orders v2 schema requires /payment_source/apple_pay/token to be a base64-encoded string
+ * (description: "Encrypted ApplePay token, containing card information. This token would be base64encoded.").
+ */
+export function formatApplePayPaymentSource(applePay: {
+  id?: string;
+  token?: any;
+  [key: string]: any;
+}): Record<string, any> {
+  const formatted: Record<string, any> = { ...applePay };
+
+  // Set Apple Pay transaction identifier
+  const id = applePay.id || applePay.token?.transactionIdentifier;
+  if (id && typeof id === "string") {
+    formatted.id = id;
+  }
+
+  // Format token as base64-encoded string
+  if (applePay.token) {
+    if (typeof applePay.token === "object") {
+      // Runtime PKPaymentToken object containing paymentData, paymentMethod, transactionIdentifier
+      formatted.token = Buffer.from(JSON.stringify(applePay.token), "utf8").toString("base64");
+    } else if (typeof applePay.token === "string") {
+      const trimmed = applePay.token.trim();
+      if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+        // Raw JSON string -> base64 encode
+        formatted.token = Buffer.from(trimmed, "utf8").toString("base64");
+      } else {
+        // Already a base64 string -> preserve without double-encoding
+        formatted.token = trimmed;
+      }
+    }
+  }
+
+  return formatted;
+}
+
+/**
  * Confirms a payment source (e.g. Apple Pay, Google Pay) for an existing PayPal order.
  */
 export async function confirmPayPalOrderPaymentSource(
@@ -286,26 +338,50 @@ export async function confirmPayPalOrderPaymentSource(
   const accessToken = await getPayPalAccessToken();
   const baseUrl = getPayPalBaseUrl();
 
-  const response = await fetch(
-    `${baseUrl}/v2/checkout/orders/${orderId}/confirm-payment-source`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-        Prefer: "return=representation",
-      },
-      body: JSON.stringify({ payment_source: paymentSource }),
+  // Normalize payment_source to ensure schema compliance
+  const normalizedPaymentSource: Record<string, any> = { ...paymentSource };
+  if (normalizedPaymentSource.apple_pay) {
+    normalizedPaymentSource.apple_pay = formatApplePayPaymentSource(
+      normalizedPaymentSource.apple_pay,
+    );
+  }
+
+  const response = await fetch(`${baseUrl}/v2/checkout/orders/${orderId}/confirm-payment-source`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
     },
-  );
+    body: JSON.stringify({ payment_source: normalizedPaymentSource }),
+  });
 
   const data = await response.json();
+  const debugId = response.headers.get("Paypal-Debug-Id") || data?.debug_id;
 
   if (!response.ok) {
-    console.error("PayPal Confirm Payment Source Error:", data);
-    throw new Error(
-      data.message || data.details?.[0]?.description || "Failed to confirm payment source with PayPal",
+    console.error(
+      `PayPal Confirm Payment Source Error [orderId: ${orderId}, status: ${response.status}, debug_id: ${debugId}]:`,
+      {
+        name: data?.name,
+        message: data?.message,
+        debug_id: debugId,
+        details: data?.details?.map((d: any) => ({
+          field: d.field,
+          issue: d.issue,
+          description: d.description,
+        })),
+      },
     );
+    const err = new Error(
+      data?.message ||
+        data?.details?.[0]?.description ||
+        "Failed to confirm payment source with PayPal",
+    ) as any;
+    err.debugId = debugId;
+    err.status = response.status;
+    err.details = data?.details;
+    throw err;
   }
 
   return data;
@@ -328,7 +404,8 @@ export async function validateApplePayMerchantSession(validationUrl: string, dom
 
   const cert = process.env.APPLE_PAY_CERTIFICATE;
   const key = process.env.APPLE_PAY_PRIVATE_KEY;
-  const merchantIdentifier = process.env.APPLE_PAY_MERCHANT_IDENTIFIER || "merchant.com.novixaretail";
+  const merchantIdentifier =
+    process.env.APPLE_PAY_MERCHANT_IDENTIFIER || "merchant.com.novixaretail";
   const displayName = "NOVIXA UK";
   const domain = domainName || process.env.NEXT_PUBLIC_APP_DOMAIN || "www.novixaretail.com";
 
@@ -360,8 +437,7 @@ export async function validateApplePayMerchantSession(validationUrl: string, dom
   // If running in development/sandbox without an Apple cert installed,
   // return a mock session object only in development/sandbox mode
   const isProduction =
-    process.env.NODE_ENV === "production" ||
-    process.env.PAYPAL_MODE?.toLowerCase() === "live";
+    process.env.NODE_ENV === "production" || process.env.PAYPAL_MODE?.toLowerCase() === "live";
 
   if (isProduction) {
     throw new Error(

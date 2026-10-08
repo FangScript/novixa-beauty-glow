@@ -37,8 +37,7 @@ function mapDbProduct(p: any): Product {
     coverage: p.coverage ?? undefined,
     skinType: p.skinType ?? undefined,
     hairType: p.hairType ?? undefined,
-    badge:
-      p.tags?.includes("bestseller") || p.sku === "NVP-001" ? "BEST SELLER" : undefined,
+    badge: p.tags?.includes("bestseller") || p.sku === "NVP-001" ? "BEST SELLER" : undefined,
   };
 }
 

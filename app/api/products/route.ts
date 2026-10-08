@@ -31,7 +31,12 @@ export async function GET(request: Request) {
   const category = searchParams.get("category");
   const gender = searchParams.get("gender");
   const ids = searchParams.get("ids");
-  const idList = ids ? ids.split(",").map((s) => s.trim()).filter(Boolean) : [];
+  const idList = ids
+    ? ids
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
 
   try {
     if (process.env.DATABASE_URL) {
@@ -64,7 +69,8 @@ export async function GET(request: Request) {
           slug: p.slug,
           description: p.description,
           price: Number(p.price),
-          salePrice: p.salePrice !== null && p.salePrice !== undefined ? Number(p.salePrice) : undefined,
+          salePrice:
+            p.salePrice !== null && p.salePrice !== undefined ? Number(p.salePrice) : undefined,
           isMeasured: Boolean(p.isMeasured),
           unitOfMeasure: p.unitOfMeasure || "unit",
           gender: p.gender.toLowerCase(),
@@ -135,14 +141,7 @@ export async function POST(request: Request) {
       brand,
     } = body;
 
-    if (
-      !name ||
-      !sku ||
-      price === undefined ||
-      price === null ||
-      price === "" ||
-      !category
-    ) {
+    if (!name || !sku || price === undefined || price === null || price === "" || !category) {
       return NextResponse.json(
         { error: "Product name, SKU, price, and category are required." },
         { status: 400 },
@@ -506,11 +505,7 @@ export async function DELETE(request: Request) {
     if (process.env.DATABASE_URL) {
       const target = await prisma.product.findFirst({
         where: {
-          OR: [
-            { id },
-            { slug: id.toLowerCase() },
-            { sku: id.toUpperCase() },
-          ],
+          OR: [{ id }, { slug: id.toLowerCase() }, { sku: id.toUpperCase() }],
         },
       });
 

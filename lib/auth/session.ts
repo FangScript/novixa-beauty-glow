@@ -70,7 +70,8 @@ export async function getAuthenticatedAdmin() {
     if (user) {
       const isAdmin =
         user.user_metadata?.role === "ADMIN" ||
-        (process.env.ADMIN_EMAIL && user.email?.toLowerCase() === process.env.ADMIN_EMAIL.toLowerCase());
+        (process.env.ADMIN_EMAIL &&
+          user.email?.toLowerCase() === process.env.ADMIN_EMAIL.toLowerCase());
       if (isAdmin) {
         return {
           id: user.id,
@@ -259,7 +260,11 @@ export async function loginCustomer(email: string, password: string) {
   const cleanEmail = email.toLowerCase().trim();
   const user = await prisma.user.findUnique({ where: { email: cleanEmail } });
 
-  if (!user || (user.role !== "CUSTOMER" && user.role !== "ADMIN") || !verifyPassword(password, user.passwordHash)) {
+  if (
+    !user ||
+    (user.role !== "CUSTOMER" && user.role !== "ADMIN") ||
+    !verifyPassword(password, user.passwordHash)
+  ) {
     return { ok: false as const, error: "Invalid email or password." };
   }
 
@@ -270,7 +275,9 @@ export async function loginCustomer(email: string, password: string) {
   // Parallelize session creation and lastLogin update
   await Promise.all([
     prisma.session.create({ data: { id: sessionId, userId: user.id, expiresAt } }),
-    prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }).catch(() => null),
+    prisma.user
+      .update({ where: { id: user.id }, data: { lastLoginAt: new Date() } })
+      .catch(() => null),
   ]);
 
   const cookieStore = await cookies();

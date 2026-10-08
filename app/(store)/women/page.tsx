@@ -24,8 +24,7 @@ export const metadata: Metadata = {
     url: `${baseUrl}/women`,
     siteName: "NOVIXA UK",
     title: "Women's Luxury Fragrances & Beauty | NOVIXA UK",
-    description:
-      "Luminous floral notes, couture makeup essentials, and everyday glow for her.",
+    description: "Luminous floral notes, couture makeup essentials, and everyday glow for her.",
     images: [
       {
         url: `${baseUrl}/images/hero-perfume.jpg`,

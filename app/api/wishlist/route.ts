@@ -38,7 +38,10 @@ export async function GET(request: Request) {
           name: wi.product.name,
           slug: wi.product.slug,
           price: Number(wi.product.price),
-          salePrice: wi.product.salePrice !== null && wi.product.salePrice !== undefined ? Number(wi.product.salePrice) : null,
+          salePrice:
+            wi.product.salePrice !== null && wi.product.salePrice !== undefined
+              ? Number(wi.product.salePrice)
+              : null,
           stock: wi.product.stock,
           image: wi.product.images?.[0]?.url ?? "/images/product-perfume.jpg",
         },
@@ -123,7 +126,10 @@ export async function POST(request: Request) {
           name: wi.product.name,
           slug: wi.product.slug,
           price: Number(wi.product.price),
-          salePrice: wi.product.salePrice !== null && wi.product.salePrice !== undefined ? Number(wi.product.salePrice) : null,
+          salePrice:
+            wi.product.salePrice !== null && wi.product.salePrice !== undefined
+              ? Number(wi.product.salePrice)
+              : null,
           stock: wi.product.stock,
           image: wi.product.images?.[0]?.url ?? "/images/product-perfume.jpg",
         },
@@ -147,10 +153,7 @@ export async function DELETE(request: Request) {
 
   const customer = await getAuthenticatedCustomer();
   if (!customer) {
-    return NextResponse.json(
-      { ok: false, error: "Authentication required." },
-      { status: 401 },
-    );
+    return NextResponse.json({ ok: false, error: "Authentication required." }, { status: 401 });
   }
 
   try {
@@ -158,10 +161,7 @@ export async function DELETE(request: Request) {
     const productId = searchParams.get("productId");
 
     if (!productId) {
-      return NextResponse.json(
-        { ok: false, error: "productId is required." },
-        { status: 400 },
-      );
+      return NextResponse.json({ ok: false, error: "productId is required." }, { status: 400 });
     }
 
     const userId = customer.id;

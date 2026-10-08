@@ -47,10 +47,7 @@ export function MastercardLightLogo({ className = "h-5 w-8" }: { className?: str
       <rect width="38" height="24" rx="3.5" fill="#FFFFFF" stroke="#E5E7EB" strokeWidth="1" />
       <circle cx="14.5" cy="12" r="6.2" fill="#EB001B" />
       <circle cx="23.5" cy="12" r="6.2" fill="#F79E1B" />
-      <path
-        d="M 19 7.4 A 6.2 6.2 0 0 0 19 16.6 A 6.2 6.2 0 0 0 19 7.4"
-        fill="#FF5F00"
-      />
+      <path d="M 19 7.4 A 6.2 6.2 0 0 0 19 16.6 A 6.2 6.2 0 0 0 19 7.4" fill="#FF5F00" />
     </svg>
   );
 }
@@ -70,10 +67,7 @@ export function MastercardDarkLogo({ className = "h-5 w-8" }: { className?: stri
       <rect width="38" height="24" rx="3.5" fill="#222222" />
       <circle cx="14.5" cy="12" r="6.2" fill="#EB001B" />
       <circle cx="23.5" cy="12" r="6.2" fill="#F79E1B" />
-      <path
-        d="M 19 7.4 A 6.2 6.2 0 0 0 19 16.6 A 6.2 6.2 0 0 0 19 7.4"
-        fill="#FF5F00"
-      />
+      <path d="M 19 7.4 A 6.2 6.2 0 0 0 19 16.6 A 6.2 6.2 0 0 0 19 7.4" fill="#FF5F00" />
     </svg>
   );
 }
@@ -91,7 +85,16 @@ export function AmexLogo({ className = "h-5 w-8" }: { className?: string }) {
       aria-label="American Express"
     >
       <rect width="38" height="24" rx="3.5" fill="#007BC1" />
-      <rect x="2.5" y="2.5" width="33" height="19" rx="1.5" stroke="#FFFFFF" strokeWidth="0.8" strokeOpacity="0.4" />
+      <rect
+        x="2.5"
+        y="2.5"
+        width="33"
+        height="19"
+        rx="1.5"
+        stroke="#FFFFFF"
+        strokeWidth="0.8"
+        strokeOpacity="0.4"
+      />
       <text
         x="19"
         y="11.5"
@@ -339,10 +342,7 @@ export function MaestroLogo({ className = "h-5 w-8" }: { className?: string }) {
       <rect width="38" height="24" rx="3.5" fill="#FFFFFF" stroke="#E5E7EB" strokeWidth="1" />
       <circle cx="14.5" cy="12" r="6.2" fill="#EB001B" />
       <circle cx="23.5" cy="12" r="6.2" fill="#0099DF" />
-      <path
-        d="M 19 7.4 A 6.2 6.2 0 0 0 19 16.6 A 6.2 6.2 0 0 0 19 7.4"
-        fill="#762B86"
-      />
+      <path d="M 19 7.4 A 6.2 6.2 0 0 0 19 16.6 A 6.2 6.2 0 0 0 19 7.4" fill="#762B86" />
     </svg>
   );
 }
@@ -368,11 +368,7 @@ export const ALL_CARD_BRANDS = [
  * When a brand is actively detected, it highlights the matching icon
  * and subtly fades the others.
  */
-export function CardBrandBadges({
-  detectedBrand = null,
-}: {
-  detectedBrand?: string | null;
-}) {
+export function CardBrandBadges({ detectedBrand = null }: { detectedBrand?: string | null }) {
   return (
     <div
       aria-label="Accepted card payment brands"
@@ -445,7 +441,6 @@ export function PayPalBadge({ className = "h-5 w-16" }: { className?: string }) 
  */
 export function GooglePayBadge({ className = "h-5 w-12" }: { className?: string }) {
   return (
-    // eslint-disable-next-line @next/next/no-img-element
     <img
       src="/images/payments/google-pay-mark.svg"
       alt="Google Pay"

@@ -152,7 +152,10 @@ export function CommerceProvider({
                       name: dbP.name,
                       slug: dbP.slug,
                       price: Number(dbP.price),
-                      salePrice: dbP.salePrice !== undefined && dbP.salePrice !== null ? Number(dbP.salePrice) : null,
+                      salePrice:
+                        dbP.salePrice !== undefined && dbP.salePrice !== null
+                          ? Number(dbP.salePrice)
+                          : null,
                       stock: Number(dbP.stock),
                       sku: dbP.sku,
                       image: dbP.images?.[0] ?? "/images/product-perfume.jpg",
@@ -228,7 +231,6 @@ export function CommerceProvider({
 
     hydrate();
     hydrateWishlist();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
   // ── Persist cart to localStorage as a write-through ───────────────────────

@@ -75,11 +75,7 @@ export function ProductImageUpload({ images, onChange }: ProductImageUploadProps
         }
 
         const newUrls: string[] = (
-          data.urls && Array.isArray(data.urls)
-            ? data.urls
-            : data.url
-              ? [data.url]
-              : []
+          data.urls && Array.isArray(data.urls) ? data.urls : data.url ? [data.url] : []
         ).filter(Boolean);
 
         if (newUrls.length > 0) {
@@ -343,4 +339,3 @@ export function ProductImageUpload({ images, onChange }: ProductImageUploadProps
     </div>
   );
 }
-
