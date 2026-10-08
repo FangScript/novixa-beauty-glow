@@ -110,9 +110,17 @@ export async function POST(request: Request) {
     }
 
     // 3. Verify order is in APPROVED or COMPLETED state before attempting capture
+    // When client-side SDK confirms payment, PayPal's backend can take 200-800ms to propagate APPROVED
     if (orderDetails.status !== "APPROVED" && orderDetails.status !== "COMPLETED") {
-      // Re-fetch in case confirmation updated state remotely
-      orderDetails = await getPayPalOrderDetails(paypalOrderId);
+      for (let attempt = 0; attempt < 4; attempt++) {
+        await new Promise((r) => setTimeout(r, 600));
+        try {
+          orderDetails = await getPayPalOrderDetails(paypalOrderId);
+          if (orderDetails.status === "APPROVED" || orderDetails.status === "COMPLETED") {
+            break;
+          }
+        } catch {}
+      }
     }
 
     if (orderDetails.status !== "APPROVED" && orderDetails.status !== "COMPLETED") {
