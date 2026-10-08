@@ -175,29 +175,7 @@ export function NativeGooglePayButton({
     setIsProcessing(true);
 
     try {
-      // 1. Create a server-authoritative PayPal order
-      const orderRes = await fetch("/api/payments/paypal/create-order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
-          couponCode: couponCode || undefined,
-          shippingMethodId: shippingMethodId || undefined,
-          shippingAddress: shippingAddress?.addressLine1 ? shippingAddress : undefined,
-          currency,
-          paymentSource: "google_pay",
-        }),
-      });
-
-      const orderData = await orderRes.json();
-      if (!orderRes.ok || !orderData.id) {
-        throw new Error(orderData.error || "Failed to initialize PayPal order for Google Pay.");
-      }
-
-      const paypalOrderId = orderData.id;
-
-      // 2. Request payment data via native Google Pay sheet
-      // Check if PayPal SDK provides dynamic Google Pay config
+      // 1. Prepare payment data request with official parameters
       let allowedPaymentMethods: any[] = [
         {
           type: "CARD",
@@ -257,7 +235,29 @@ export function NativeGooglePayButton({
               },
       };
 
+      // 2. Start server-authoritative PayPal order creation in parallel
+      const orderPromise = fetch("/api/payments/paypal/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+          couponCode: couponCode || undefined,
+          shippingMethodId: shippingMethodId || undefined,
+          shippingAddress: shippingAddress?.addressLine1 ? shippingAddress : undefined,
+          currency,
+          paymentSource: "google_pay",
+        }),
+      }).then(async (orderRes) => {
+        const orderData = await orderRes.json();
+        if (!orderRes.ok || !orderData.id) {
+          throw new Error(orderData.error || "Failed to initialize PayPal order for Google Pay.");
+        }
+        return orderData.id as string;
+      });
+
+      // 3. Immediately trigger Google Pay sheet to preserve user activation & prevent popup blockers
       const paymentData = await paymentsClientRef.current.loadPaymentData(paymentDataRequest);
+      const paypalOrderId = await orderPromise;
 
       // Optional: Client-side SDK confirmation if available
       if (typeof window !== "undefined" && (window as any).paypal?.Googlepay) {

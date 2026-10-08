@@ -119,6 +119,23 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>("CARD");
   const [useShippingAsBilling, setUseShippingAsBilling] = useState(true);
 
+  // Restore preferred payment method (complies with Google Pay returning user preference guideline)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("novixa_preferred_payment");
+      if (saved && ["CARD", "PAYPAL", "GOOGLE_PAY", "APPLE_PAY"].includes(saved)) {
+        setPaymentMethod(saved as PaymentMethodType);
+      }
+    } catch {}
+  }, []);
+
+  const handleSelectPaymentMethod = (method: PaymentMethodType) => {
+    setPaymentMethod(method);
+    try {
+      localStorage.setItem("novixa_preferred_payment", method);
+    } catch {}
+  };
+
   // Device Apple Pay capability detection (strictly Safari / iOS / macOS)
   const [hasApplePay, setHasApplePay] = useState(false);
   useEffect(() => {
@@ -725,7 +742,7 @@ export default function CheckoutPage() {
               {/* Option 1: Credit or Debit Card */}
               <div
                 id="method-card"
-                onClick={() => setPaymentMethod("CARD")}
+                onClick={() => handleSelectPaymentMethod("CARD")}
                 className={`cursor-pointer rounded-xl border p-4 transition-all ${
                   paymentMethod === "CARD"
                     ? "border-blue-600 ring-1 ring-blue-600 bg-white shadow-xs"
@@ -739,7 +756,7 @@ export default function CheckoutPage() {
                       id="radio-card"
                       name="payment_choice"
                       checked={paymentMethod === "CARD"}
-                      onChange={() => setPaymentMethod("CARD")}
+                      onChange={() => handleSelectPaymentMethod("CARD")}
                       className="h-4 w-4 text-blue-600 focus:ring-blue-600"
                     />
                     <label
@@ -796,7 +813,7 @@ export default function CheckoutPage() {
               {/* Option 2: PayPal */}
               <div
                 id="method-paypal"
-                onClick={() => setPaymentMethod("PAYPAL")}
+                onClick={() => handleSelectPaymentMethod("PAYPAL")}
                 className={`cursor-pointer rounded-xl border p-4 transition-all ${
                   paymentMethod === "PAYPAL"
                     ? "border-blue-600 ring-1 ring-blue-600 bg-white shadow-xs"
@@ -810,7 +827,7 @@ export default function CheckoutPage() {
                       id="radio-paypal"
                       name="payment_choice"
                       checked={paymentMethod === "PAYPAL"}
-                      onChange={() => setPaymentMethod("PAYPAL")}
+                      onChange={() => handleSelectPaymentMethod("PAYPAL")}
                       className="h-4 w-4 text-blue-600 focus:ring-blue-600"
                     />
                     <label
@@ -866,7 +883,7 @@ export default function CheckoutPage() {
               {/* Option 3: Google Pay */}
               <div
                 id="method-google-pay"
-                onClick={() => setPaymentMethod("GOOGLE_PAY")}
+                onClick={() => handleSelectPaymentMethod("GOOGLE_PAY")}
                 className={`cursor-pointer rounded-xl border p-4 transition-all ${
                   paymentMethod === "GOOGLE_PAY"
                     ? "border-blue-600 ring-1 ring-blue-600 bg-white shadow-xs"
@@ -880,7 +897,7 @@ export default function CheckoutPage() {
                       id="radio-gpay"
                       name="payment_choice"
                       checked={paymentMethod === "GOOGLE_PAY"}
-                      onChange={() => setPaymentMethod("GOOGLE_PAY")}
+                      onChange={() => handleSelectPaymentMethod("GOOGLE_PAY")}
                       className="h-4 w-4 text-blue-600 focus:ring-blue-600"
                     />
                     <label
@@ -932,7 +949,7 @@ export default function CheckoutPage() {
               {/* Option 4: Apple Pay (Always visible on all platforms) */}
               <div
                 id="method-apple-pay"
-                onClick={() => setPaymentMethod("APPLE_PAY")}
+                onClick={() => handleSelectPaymentMethod("APPLE_PAY")}
                 className={`cursor-pointer rounded-xl border p-4 transition-all ${
                   paymentMethod === "APPLE_PAY"
                     ? "border-blue-600 ring-1 ring-blue-600 bg-white shadow-xs"
@@ -946,7 +963,7 @@ export default function CheckoutPage() {
                       id="radio-applepay"
                       name="payment_choice"
                       checked={paymentMethod === "APPLE_PAY"}
-                      onChange={() => setPaymentMethod("APPLE_PAY")}
+                      onChange={() => handleSelectPaymentMethod("APPLE_PAY")}
                       className="h-4 w-4 text-rosewood"
                     />
                     <label
