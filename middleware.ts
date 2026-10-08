@@ -3,6 +3,16 @@ import type { NextRequest } from "next/server";
 import { updateSession } from "@/utils/supabase/middleware";
 
 export async function middleware(request: NextRequest) {
+  const host = request.headers.get("host") || "";
+
+  // ── Canonical host redirect (non-www -> www) ──────────────────────────────
+  if (host === "novixaretail.com") {
+    const url = new URL(request.url);
+    url.host = "www.novixaretail.com";
+    url.protocol = "https:";
+    return NextResponse.redirect(url, 301);
+  }
+
   const { pathname } = request.nextUrl;
 
   // Refresh Supabase session cookies

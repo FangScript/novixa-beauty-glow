@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Gem, Sparkles, ShieldCheck, UsersRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,18 @@ import { ProductCard } from "@/components/products/ProductCard";
 import { getLiveProducts } from "@/lib/products/get-products";
 import { NewsletterForm } from "@/components/storefront/NewsletterForm";
 import type { Product } from "@/lib/products/catalogue";
+
+const baseUrl = "https://www.novixaretail.com";
+
+export const metadata: Metadata = {
+  alternates: {
+    canonical: baseUrl,
+    languages: {
+      "en-GB": baseUrl,
+      "x-default": baseUrl,
+    },
+  },
+};
 
 const categories = [
   {

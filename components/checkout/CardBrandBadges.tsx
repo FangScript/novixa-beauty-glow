@@ -439,7 +439,7 @@ export function PayPalBadge({ className = "h-5 w-16" }: { className?: string }) 
  * 12. Google Pay Badge
  * Uses the official, unmodified Google Pay Acceptance Mark (see Google Pay brand guidelines).
  */
-export function GooglePayBadge({ className = "h-5 w-12" }: { className?: string }) {
+export function GooglePayBadge({ className = "h-7 w-auto" }: { className?: string }) {
   return (
     <img
       src="/images/payments/google-pay-mark.svg"

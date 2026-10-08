@@ -57,13 +57,6 @@ export const metadata: Metadata = {
     email: true,
     url: true,
   },
-  alternates: {
-    canonical: baseUrl,
-    languages: {
-      "en-GB": baseUrl,
-      "x-default": baseUrl,
-    },
-  },
   openGraph: {
     type: "website",
     locale: "en_GB",
@@ -109,7 +102,10 @@ export const metadata: Metadata = {
     "content-language": "en-GB",
   },
   verification: {
-    google: "googlee0fc743357390d7b",
+    google:
+      process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION ||
+      process.env.GOOGLE_SITE_VERIFICATION ||
+      "googlee0fc743357390d7b",
   },
   icons: {
     icon: [

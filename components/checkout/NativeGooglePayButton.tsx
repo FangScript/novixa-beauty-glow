@@ -338,8 +338,7 @@ export function NativeGooglePayButton({
       });
 
       button.style.width = "100%";
-      button.style.height = "48px";
-      button.style.borderRadius = "4px";
+      button.style.minHeight = "48px";
 
       container.appendChild(button);
     } catch (err) {

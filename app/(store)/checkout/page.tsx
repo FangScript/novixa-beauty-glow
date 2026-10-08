@@ -435,7 +435,7 @@ export default function CheckoutPage() {
                   </div>
                 )}
                 {orderPayMethod === "PAYPAL" && <PayPalBadge className="h-4 w-12" />}
-                {orderPayMethod === "GOOGLE_PAY" && <GooglePayBadge className="h-4 w-9" />}
+                {orderPayMethod === "GOOGLE_PAY" && <GooglePayBadge className="h-6 w-auto" />}
                 {orderPayMethod === "APPLE_PAY" && <ApplePayBadge className="h-4 w-9" />}
                 {orderPayMethod === "KLARNA" && <KlarnaBadge className="h-4 w-9" />}
                 {orderPayMethod === "BANK_TRANSFER" && <BankTransferBadges className="h-4" />}
@@ -887,11 +887,10 @@ export default function CheckoutPage() {
                       htmlFor="radio-gpay"
                       className="font-medium text-foreground cursor-pointer text-sm sm:text-base flex items-center gap-2 select-none"
                     >
-                      <Smartphone size={16} />
                       Google Pay
                     </label>
                   </div>
-                  <GooglePayBadge className="h-5 w-12" />
+                  <GooglePayBadge className="h-7 w-auto" />
                 </div>
                 {paymentMethod === "GOOGLE_PAY" && (
                   <div
