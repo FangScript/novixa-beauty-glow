@@ -214,13 +214,16 @@ export default function AdminShippingPage() {
     }
   };
 
-  const formatPrice = (val: number) => {
-    return `£${val.toFixed(2)}`;
+  const formatPrice = (val: number | string | any) => {
+    const num = Number(val);
+    return isNaN(num) ? "£0.00" : `£${num.toFixed(2)}`;
   };
 
   const activeCount = methods.filter((m) => m.active).length;
   const defaultMethod = methods.find((m) => m.isDefault);
-  const lowestCharge = methods.length ? Math.min(...methods.map((m) => m.price)) : 0;
+  const lowestCharge = methods.length
+    ? Math.min(...methods.map((m) => Number(m.price) || 0))
+    : 0;
 
   return (
     <AdminShell

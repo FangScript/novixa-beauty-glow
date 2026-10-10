@@ -363,7 +363,7 @@ export default function AdminBundlesPage() {
                           </div>
                         </div>
                         <span className="font-medium text-[#211b18]">
-                          £{(p.salePrice ?? p.price).toFixed(2)}
+                          £{Number(p.salePrice ?? p.price).toFixed(2)}
                         </span>
                       </div>
                     );

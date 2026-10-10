@@ -60,7 +60,13 @@ export async function GET(request: Request) {
       orderBy: [{ displayOrder: "asc" }, { price: "asc" }, { createdAt: "asc" }],
     });
 
-    return NextResponse.json({ success: true, methods });
+    return NextResponse.json({
+      success: true,
+      methods: methods.map((m) => ({
+        ...m,
+        price: Number(m.price),
+      })),
+    });
   } catch (error: any) {
     console.error("GET /api/shipping-methods error:", error);
     return NextResponse.json(

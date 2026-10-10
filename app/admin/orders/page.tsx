@@ -553,8 +553,8 @@ export default function AdminOrdersPage() {
                 </div>
                 <span className="font-mono font-medium text-foreground">
                   {selected.shippingCharge !== undefined
-                    ? `£${selected.shippingCharge.toFixed(2)}`
-                    : "£0.20"}
+                    ? `£${Number(selected.shippingCharge || 0).toFixed(2)}`
+                    : "£0.00"}
                 </span>
               </div>
               <div>
