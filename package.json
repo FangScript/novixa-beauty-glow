@@ -9,6 +9,7 @@
     "postinstall": "prisma generate",
     "start": "next start -p 8080",
     "lint": "eslint .",
+    "test": "npx tsx --test tests/**/*.test.ts",
     "format": "prettier --write .",
     "catalogue:check": "npx tsx qa/count-catalogue.ts",
     "db:generate": "prisma generate",

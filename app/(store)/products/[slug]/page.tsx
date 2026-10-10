@@ -170,13 +170,17 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             returnFees: "https://schema.org/FreeReturn",
           },
         },
-        aggregateRating: {
-          "@type": "AggregateRating",
-          ratingValue: Number(product.rating || 4.9).toFixed(1),
-          reviewCount: Number(product.reviewCount || 42),
-          bestRating: "5",
-          worstRating: "1",
-        },
+        ...(Number(product.reviewCount || 0) > 0
+          ? {
+              aggregateRating: {
+                "@type": "AggregateRating",
+                ratingValue: Number(product.rating || 5).toFixed(1),
+                reviewCount: Number(product.reviewCount),
+                bestRating: "5",
+                worstRating: "1",
+              },
+            }
+          : {}),
       },
       {
         "@type": "BreadcrumbList",

@@ -5,21 +5,45 @@ import {
   type Product,
 } from "@/lib/products/catalogue";
 
+function isInternalTestProduct(p: any): boolean {
+  const name = (p.name || "").toLowerCase();
+  const slug = (p.slug || "").toLowerCase();
+  const desc = (p.description || "").toLowerCase();
+  return (
+    desc.includes("testing product") ||
+    desc.includes("test product") ||
+    slug === "odessian-mist" ||
+    slug.startsWith("test-") ||
+    name === "odessian mist"
+  );
+}
+
 function mapDbProduct(p: any): Product {
+  const approvedReviews = p.reviews || [];
+  const reviewCount = approvedReviews.length;
+  const rating =
+    reviewCount > 0
+      ? Number(
+          (
+            approvedReviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviewCount
+          ).toFixed(1),
+        )
+      : Number(p.rating || 0);
+
   return {
     id: p.id,
     name: p.name,
     slug: p.slug,
     description: p.description,
-    price: p.price,
-    salePrice: p.salePrice ?? undefined,
+    price: Number(p.price),
+    salePrice: p.salePrice !== null && p.salePrice !== undefined ? Number(p.salePrice) : undefined,
     gender: (p.gender?.toLowerCase() ?? "unisex") as Product["gender"],
     category: (p.category?.toLowerCase() ?? "perfume") as Product["category"],
     brand: p.brand || "NOVIXA",
     sku: p.sku,
     stock: p.stock ?? 0,
-    rating: Number(p.rating ?? 0),
-    reviewCount: p.reviewCount ?? 0,
+    rating,
+    reviewCount,
     tags: p.tags ?? [],
     images:
       p.images && p.images.length > 0
@@ -45,13 +69,18 @@ export async function getLiveProducts(): Promise<Product[]> {
   try {
     if (process.env.DATABASE_URL) {
       const dbProducts = await prisma.product.findMany({
-        where: { status: { not: "ARCHIVED" } },
-        include: { images: { orderBy: { sortOrder: "asc" } } },
+        where: { status: "ACTIVE" },
+        include: {
+          images: { orderBy: { sortOrder: "asc" } },
+          reviews: { where: { status: "APPROVED" }, select: { rating: true } },
+        },
         orderBy: { updatedAt: "desc" },
       });
 
-      if (dbProducts.length > 0) {
-        const live = dbProducts.map(mapDbProduct);
+      const published = dbProducts.filter((p) => !isInternalTestProduct(p));
+
+      if (published.length > 0) {
+        const live = published.map(mapDbProduct);
         registerLiveProducts(live);
         return live;
       }
@@ -60,13 +89,18 @@ export async function getLiveProducts(): Promise<Product[]> {
     console.warn("Failed to fetch live products from database, falling back to catalogue:", error);
   }
 
-  return fallbackProducts;
+  return fallbackProducts.filter((p) => !isInternalTestProduct(p));
 }
 
 export async function getLiveProductBySlug(slug: string): Promise<Product | null> {
   if (!slug) return null;
   const decoded = decodeURIComponent(slug).trim();
   const lower = decoded.toLowerCase();
+
+  // Prevent internal test fixtures from ever resolving
+  if (lower === "odessian-mist" || lower.startsWith("test-")) {
+    return null;
+  }
 
   try {
     if (process.env.DATABASE_URL) {
@@ -79,12 +113,15 @@ export async function getLiveProductBySlug(slug: string): Promise<Product | null
             { id: decoded },
             { sku: { equals: decoded, mode: "insensitive" } },
           ],
-          status: { not: "ARCHIVED" },
+          status: "ACTIVE",
         },
-        include: { images: { orderBy: { sortOrder: "asc" } } },
+        include: {
+          images: { orderBy: { sortOrder: "asc" } },
+          reviews: { where: { status: "APPROVED" }, select: { rating: true } },
+        },
       });
 
-      if (dbProduct) {
+      if (dbProduct && !isInternalTestProduct(dbProduct)) {
         const prod = mapDbProduct(dbProduct);
         registerLiveProducts([prod]);
         return prod;
@@ -96,9 +133,10 @@ export async function getLiveProductBySlug(slug: string): Promise<Product | null
 
   const fallback = fallbackProducts.find(
     (p) =>
-      p.slug.toLowerCase() === lower ||
-      p.id.toLowerCase() === lower ||
-      p.sku.toLowerCase() === lower,
+      !isInternalTestProduct(p) &&
+      (p.slug.toLowerCase() === lower ||
+        p.id.toLowerCase() === lower ||
+        p.sku.toLowerCase() === lower),
   );
   return fallback ?? null;
 }

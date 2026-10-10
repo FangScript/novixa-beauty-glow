@@ -498,3 +498,49 @@ export async function verifyPayPalWebhookSignature(params: {
     return false;
   }
 }
+
+/**
+ * Initiates a refund for an authorized captured payment via PayPal Payments v2 API.
+ */
+export async function refundPayPalCapture(
+  captureId: string,
+  amount?: number,
+  currency: string = "GBP",
+) {
+  const accessToken = await getPayPalAccessToken();
+  const baseUrl = getPayPalBaseUrl();
+
+  const payload: Record<string, any> = {};
+  if (amount !== undefined && amount > 0) {
+    payload.amount = {
+      value: amount.toFixed(2),
+      currency_code: currency,
+    };
+  }
+
+  const response = await fetch(`${baseUrl}/v2/payments/captures/${captureId}/refund`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json();
+  const debugId = response.headers.get("Paypal-Debug-Id") || data?.debug_id;
+
+  if (!response.ok) {
+    console.error(`PayPal Refund Error [captureId: ${captureId}, debug_id: ${debugId}]:`, data);
+    const err = new Error(
+      data?.message || data?.details?.[0]?.description || "Failed to process refund with PayPal",
+    ) as any;
+    err.debugId = debugId;
+    err.status = response.status;
+    err.details = data?.details;
+    throw err;
+  }
+
+  return data;
+}

@@ -42,7 +42,7 @@ export async function GET(request: Request) {
     if (process.env.DATABASE_URL) {
       const dbProducts = await prisma.product.findMany({
         where: {
-          status: { not: "ARCHIVED" },
+          status: "ACTIVE",
           ...(idList.length > 0 ? { id: { in: idList } } : {}),
           ...(category && category !== "all" ? { category: toPrismaCategory(category) } : {}),
           ...(gender && gender !== "all" ? { gender: toPrismaGender(gender) } : {}),
@@ -58,32 +58,59 @@ export async function GET(request: Request) {
         },
         include: {
           images: { orderBy: { sortOrder: "asc" } },
+          reviews: { where: { status: "APPROVED" }, select: { rating: true } },
         },
         orderBy: { updatedAt: "desc" },
       });
 
-      if (dbProducts.length > 0) {
-        const mapped = dbProducts.map((p) => ({
-          id: p.id,
-          name: p.name,
-          slug: p.slug,
-          description: p.description,
-          price: Number(p.price),
-          salePrice:
-            p.salePrice !== null && p.salePrice !== undefined ? Number(p.salePrice) : undefined,
-          isMeasured: Boolean(p.isMeasured),
-          unitOfMeasure: p.unitOfMeasure || "unit",
-          gender: p.gender.toLowerCase(),
-          category: p.category.toLowerCase(),
-          brand: p.brand,
-          sku: p.sku,
-          stock: p.stock,
-          rating: Number(p.rating),
-          reviewCount: p.reviewCount,
-          tags: p.tags,
-          images:
-            p.images.length > 0 ? p.images.map((img) => img.url) : ["/images/product-perfume.jpg"],
-        }));
+      const published = dbProducts.filter((p) => {
+        const desc = (p.description || "").toLowerCase();
+        const slug = (p.slug || "").toLowerCase();
+        return (
+          !desc.includes("testing product") &&
+          !desc.includes("test product") &&
+          slug !== "odessian-mist" &&
+          !slug.startsWith("test-")
+        );
+      });
+
+      if (published.length > 0) {
+        const mapped = published.map((p) => {
+          const approvedReviews = (p as any).reviews || [];
+          const count = approvedReviews.length;
+          const rating =
+            count > 0
+              ? Number(
+                  (
+                    approvedReviews.reduce((sum: number, r: any) => sum + r.rating, 0) / count
+                  ).toFixed(1),
+                )
+              : Number(p.rating || 0);
+
+          return {
+            id: p.id,
+            name: p.name,
+            slug: p.slug,
+            description: p.description,
+            price: Number(p.price),
+            salePrice:
+              p.salePrice !== null && p.salePrice !== undefined ? Number(p.salePrice) : undefined,
+            isMeasured: Boolean(p.isMeasured),
+            unitOfMeasure: p.unitOfMeasure || "unit",
+            gender: p.gender.toLowerCase(),
+            category: p.category.toLowerCase(),
+            brand: p.brand,
+            sku: p.sku,
+            stock: p.stock,
+            rating,
+            reviewCount: count,
+            tags: p.tags,
+            images:
+              p.images.length > 0
+                ? p.images.map((img) => img.url)
+                : ["/images/product-perfume.jpg"],
+          };
+        });
 
         return NextResponse.json({
           total: mapped.length,

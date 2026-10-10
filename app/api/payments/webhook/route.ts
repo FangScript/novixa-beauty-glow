@@ -145,18 +145,29 @@ export async function POST(request: Request) {
         newPaymentStatus = PaymentStatus.FAILED;
       }
     } else if (
+      eventType === "PAYMENT.CAPTURE.REFUNDED" ||
       eventType === "PAYMENT.CAPTURE.REVERSED" ||
       eventType === "PAYMENT.CANCELLED" ||
       eventStatus === "CANCELLED" ||
       eventStatus === "REFUNDED"
     ) {
-      newPaymentStatus = PaymentStatus.CANCELLED;
-      newOrderStatus = OrderStatus.CANCELLED;
+      if (eventType === "PAYMENT.CAPTURE.REFUNDED" || eventStatus === "REFUNDED") {
+        newPaymentStatus = PaymentStatus.REFUNDED;
+        newOrderStatus = OrderStatus.REFUNDED;
+      } else {
+        newPaymentStatus = PaymentStatus.CANCELLED;
+        newOrderStatus = OrderStatus.CANCELLED;
+      }
     }
 
     await prisma.$transaction(async (tx) => {
-      // If order was cancelled via webhook and wasn't already cancelled, restock inventory
-      if (newOrderStatus === OrderStatus.CANCELLED && order.status !== OrderStatus.CANCELLED) {
+      // If order was cancelled or refunded via webhook and wasn't already in that state, restock inventory
+      const isCancellationOrRefund =
+        newOrderStatus === OrderStatus.CANCELLED || newOrderStatus === OrderStatus.REFUNDED;
+      const wasAlreadyRestocked =
+        order.status === OrderStatus.CANCELLED || order.status === OrderStatus.REFUNDED;
+
+      if (isCancellationOrRefund && !wasAlreadyRestocked) {
         const orderWithItems = await tx.order.findUnique({
           where: { id: order.id },
           include: { items: true },

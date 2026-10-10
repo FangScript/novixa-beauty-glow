@@ -44,8 +44,8 @@ export function ContactClient() {
 
   useEffect(() => {
     if (user) {
-      if (!name) setName(user.name || "");
-      if (!email) setEmail(user.email || "");
+      setName((prev) => prev || user.name || "");
+      setEmail((prev) => prev || user.email || "");
     }
   }, [user]);
 

@@ -62,8 +62,8 @@ export function ProductReviews({ productId, productSlug, productName }: ProductR
   // Sync auth state into form
   useEffect(() => {
     if (user) {
-      if (!authorName) setAuthorName(user.name || "");
-      if (!authorEmail) setAuthorEmail(user.email || "");
+      setAuthorName((prev) => prev || user.name || "");
+      setAuthorEmail((prev) => prev || user.email || "");
     }
   }, [user]);
 

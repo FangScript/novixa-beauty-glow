@@ -274,11 +274,7 @@ export default function CheckoutPage() {
       "Customer"
     ).trim();
 
-    const effectivePhone = (
-      customPaymentDetails?.phone ||
-      formData.phone ||
-      ""
-    ).trim();
+    const effectivePhone = (customPaymentDetails?.phone || formData.phone || "").trim();
 
     const effectiveAddress = {
       line1: (
@@ -287,11 +283,7 @@ export default function CheckoutPage() {
         "Address on file"
       ).trim(),
       line2: (customPaymentDetails?.shippingAddress?.line2 || "").trim(),
-      city: (
-        customPaymentDetails?.shippingAddress?.city ||
-        formData.city ||
-        "London"
-      ).trim(),
+      city: (customPaymentDetails?.shippingAddress?.city || formData.city || "London").trim(),
       state: (
         customPaymentDetails?.shippingAddress?.state ||
         formData.state ||

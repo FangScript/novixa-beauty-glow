@@ -42,15 +42,27 @@ export function ProductCard({ product }: { product: Product }) {
             <span className="text-foreground">{formatPrice(product.price)}</span>
           )}
         </p>
-        <div
-          className="my-2.5 flex items-center gap-1 text-champagne"
-          aria-label={`${product.rating} out of 5 stars`}
-        >
-          {[1, 2, 3, 4, 5].map((star) => (
-            <Star key={star} size={11} fill="currentColor" />
-          ))}
-          <span className="ml-1 text-[10px] text-muted-foreground">({product.reviewCount})</span>
-        </div>
+        {product.reviewCount > 0 ? (
+          <div
+            className="my-2.5 flex items-center gap-1 text-champagne"
+            aria-label={`${product.rating} out of 5 stars`}
+          >
+            {[1, 2, 3, 4, 5].map((star) => (
+              <Star
+                key={star}
+                size={11}
+                fill={star <= Math.round(product.rating) ? "currentColor" : "none"}
+                className={star <= Math.round(product.rating) ? "" : "text-border"}
+              />
+            ))}
+            <span className="ml-1 text-[10px] text-muted-foreground">({product.reviewCount})</span>
+          </div>
+        ) : (
+          <div className="my-2.5 flex items-center gap-1 text-muted-foreground/60 text-[10px]">
+            <Star size={11} className="text-border" />
+            <span>New formulation</span>
+          </div>
+        )}
       </div>
       <div className="mt-2 flex gap-2">
         <Button

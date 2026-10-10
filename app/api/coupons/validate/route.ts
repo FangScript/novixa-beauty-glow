@@ -66,7 +66,7 @@ export async function POST(request: Request) {
 
       let discount = 0;
       if (coupon.type === "PERCENTAGE") {
-        discount = Math.round((currentSubtotal * couponValNum) / 100);
+        discount = Math.round(((currentSubtotal * couponValNum) / 100) * 100) / 100;
       } else {
         discount = Math.min(currentSubtotal, couponValNum);
       }
@@ -82,8 +82,8 @@ export async function POST(request: Request) {
         discount,
         message:
           coupon.type === "PERCENTAGE"
-            ? `${coupon.code} applied: ${couponValNum}% discount (-£${discount})`
-            : `${coupon.code} applied: -£${discount} discount`,
+            ? `${coupon.code} applied: ${couponValNum}% discount (-£${discount.toFixed(2)})`
+            : `${coupon.code} applied: -£${discount.toFixed(2)} discount`,
       });
     }
 
@@ -108,7 +108,7 @@ export async function POST(request: Request) {
 
     let discount = 0;
     if (fallback.type === "PERCENTAGE") {
-      discount = Math.round((currentSubtotal * fallback.value) / 100);
+      discount = Math.round(((currentSubtotal * fallback.value) / 100) * 100) / 100;
     } else {
       discount = Math.min(currentSubtotal, fallback.value);
     }
@@ -122,7 +122,10 @@ export async function POST(request: Request) {
         value: fallback.value,
       },
       discount,
-      message: `${cleanCode} applied: -£${discount}`,
+      message:
+        fallback.type === "PERCENTAGE"
+          ? `${cleanCode} applied: ${fallback.value}% discount (-£${discount.toFixed(2)})`
+          : `${cleanCode} applied: -£${discount.toFixed(2)} discount`,
     });
   } catch (error: any) {
     console.error("Coupon validation error:", error);

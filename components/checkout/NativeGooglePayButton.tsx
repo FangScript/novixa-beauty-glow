@@ -317,6 +317,7 @@ export function NativeGooglePayButton({
     currency,
     clientId,
     amount,
+    googlePayEnv,
     onSuccess,
     onError,
   ]);

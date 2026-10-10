@@ -2,45 +2,6 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
 import { getAuthenticatedAdmin } from "@/lib/auth/session";
 
-const defaultReviews = [
-  {
-    id: "rev-1",
-    productId: "oni-perfume",
-    product: "Velvet Rose Eau de Parfum",
-    customer: "Ayesha Khan",
-    rating: 5,
-    title: "Signature evening fragrance",
-    review: "The longevity on this fragrance is unbelievable. Subtle rose and warm amber.",
-    verified: true,
-    status: "Approved",
-    createdAt: "2026-03-15T10:00:00.000Z",
-  },
-  {
-    id: "rev-2",
-    productId: "atlas-daily-grooming-kit",
-    product: "Noir Élan Eau de Parfum",
-    customer: "Arjun Mehta",
-    rating: 5,
-    title: "Unmatched sophistication",
-    review: "Complex woody scent. Perfect for evening events. Gets lots of compliments.",
-    verified: true,
-    status: "Approved",
-    createdAt: "2026-04-02T14:30:00.000Z",
-  },
-  {
-    id: "rev-3",
-    productId: "silk-skin-ritual-kit",
-    product: "Matte Silk Liquid Lipstick",
-    customer: "Mira Shah",
-    rating: 4,
-    title: "Silky, comfortable wear",
-    review: "Comfortable formula that does not dry lips. Would love more nude shades!",
-    verified: true,
-    status: "Approved",
-    createdAt: "2026-05-18T09:15:00.000Z",
-  },
-];
-
 // ─── GET /api/reviews ─────────────────────────────────────────────────────────
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -115,36 +76,13 @@ export async function GET(request: Request) {
     console.warn("Reviews DB query failed, falling back:", error);
   }
 
-  // Filter fallback reviews if specific productId was requested
-  if (productId) {
-    const matched = defaultReviews.filter(
-      (r) => r.productId === productId || r.product.toLowerCase().includes(productId.toLowerCase()),
-    );
-    if (matched.length > 0) {
-      return NextResponse.json({ reviews: matched, source: "default" });
-    }
-    // Return a curated sample for the requested product so the UI looks lively
-    return NextResponse.json({
-      reviews: [
-        {
-          id: `sample-${productId}-1`,
-          productId,
-          product: "Luxury Formulation",
-          customer: "Verified Patron",
-          rating: 5,
-          title: "Exquisite craftsmanship & formulation",
-          review:
-            "From the luxurious packaging to the sublime texture and finish, this completely exceeded my expectations. A true staple in my beauty ritual.",
-          verified: true,
-          status: "Approved",
-          createdAt: new Date().toISOString(),
-        },
-      ],
-      source: "default",
-    });
-  }
-
-  return NextResponse.json({ reviews: defaultReviews, source: "default" });
+  // Clean empty state when no approved reviews exist
+  return NextResponse.json({
+    reviews: [],
+    total: 0,
+    averageRating: 0,
+    source: "empty",
+  });
 }
 
 // ─── POST /api/reviews ────────────────────────────────────────────────────────
@@ -342,6 +280,64 @@ export async function PUT(request: Request) {
     console.error("PUT /api/reviews error:", error);
     return NextResponse.json(
       { error: error.message || "Failed to update review status." },
+      { status: 500 },
+    );
+  }
+}
+
+// ─── DELETE /api/reviews ────────────────────────────────────────────────────────
+export async function DELETE(request: Request) {
+  try {
+    const admin = await getAuthenticatedAdmin();
+    if (!admin) {
+      return NextResponse.json(
+        { error: "Unauthorized. Administrator session required." },
+        { status: 401 },
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+    let id = searchParams.get("id");
+    if (!id) {
+      const body = await request.json().catch(() => ({}));
+      id = body?.id;
+    }
+
+    if (!id) {
+      return NextResponse.json({ error: "Review ID is required." }, { status: 400 });
+    }
+
+    if (process.env.DATABASE_URL) {
+      const existing = await prisma.review.findUnique({ where: { id } });
+      if (!existing) {
+        return NextResponse.json({ error: "Review not found." }, { status: 404 });
+      }
+
+      await prisma.review.delete({ where: { id } });
+
+      // Recalculate product aggregate rating
+      const agg = await prisma.review.aggregate({
+        where: { productId: existing.productId, status: "APPROVED" },
+        _avg: { rating: true },
+        _count: { id: true },
+      });
+
+      await prisma.product.update({
+        where: { id: existing.productId },
+        data: {
+          rating: agg._count.id > 0 ? Number(agg._avg.rating?.toFixed(1) ?? 5.0) : 0,
+          reviewCount: agg._count.id,
+        },
+      });
+
+      return NextResponse.json({ success: true, message: "Review removed." });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error("DELETE /api/reviews error:", error);
+    return NextResponse.json(
+      { error: error.message || "Failed to delete review." },
       { status: 500 },
     );
   }

@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
 import { OrderStatus, PaymentStatus } from "@prisma/client";
 import { verifyPaymentServerSide, type PaymentMethod } from "@/lib/payments/processor";
-import { getPayPalOrderDetails, capturePayPalOrder } from "@/lib/payments/paypal";
+import {
+  getPayPalOrderDetails,
+  capturePayPalOrder,
+  refundPayPalCapture,
+} from "@/lib/payments/paypal";
 import { getAuthenticatedAdmin, getAuthenticatedCustomer } from "@/lib/auth/session";
 import { sendOrderConfirmationEmail, sendOrderStatusEmail } from "@/lib/email/service";
 
@@ -286,7 +290,7 @@ export async function POST(request: Request) {
     }
 
     // Authoritative Shipping Method Calculation
-    let shipping = 0.2;
+    let shipping = 4.95;
     let resolvedShippingMethodId: string | null = null;
     let resolvedShippingMethodName: string | null = "Normal Delivery";
 
@@ -310,6 +314,16 @@ export async function POST(request: Request) {
         resolvedShippingMethodId = defaultMethod.id;
         resolvedShippingMethodName = defaultMethod.name;
       }
+    }
+
+    // Complimentary UK Delivery policy: Orders over £70 qualify for free standard shipping
+    const isStandardOrNormal =
+      !resolvedShippingMethodName ||
+      resolvedShippingMethodName.toLowerCase().includes("normal") ||
+      resolvedShippingMethodName.toLowerCase().includes("standard");
+
+    if (subtotal >= 70 && isStandardOrNormal) {
+      shipping = 0;
     }
 
     const tax = 0;
@@ -429,15 +443,21 @@ export async function POST(request: Request) {
           );
         }
 
-        // Reconcile total amount with actual captured amount so the customer is never rejected after payment
-        if (capturedAmount > 0) {
-          if (Math.abs(capturedAmount - total) > 0.05) {
-            console.warn(
-              `Reconciling payment amount: captured=£${capturedAmount.toFixed(2)}, expected=£${total.toFixed(2)}. Adjusting total to reflect authoritative PayPal capture.`,
-            );
-            total = capturedAmount;
-          }
+        // Strictly verify captured amount against authoritative total (reject tampering)
+        if (capturedAmount <= 0 || Math.abs(capturedAmount - total) > 0.05) {
+          console.error(
+            `Payment amount mismatch rejected: captured=£${capturedAmount.toFixed(2)}, expected=£${total.toFixed(2)}.`,
+          );
+          return NextResponse.json(
+            {
+              error: `Payment amount discrepancy detected: provider captured £${capturedAmount.toFixed(2)}, but order total is £${total.toFixed(2)}. Transaction declined for security.`,
+            },
+            { status: 400 },
+          );
         }
+
+        // Small penny rounding adjustment (within £0.05)
+        total = capturedAmount;
 
         verification.status = PaymentStatus.PAID;
         verification.providerPaymentId = latestCapture?.id || paypalOrderId;
@@ -574,7 +594,8 @@ export async function POST(request: Request) {
       });
 
       // Also dispatch order notification copy to store admin
-      const storeAdminEmail = process.env.ADMIN_EMAIL || process.env.SUPPORT_EMAIL || "novixaretail@gmail.com";
+      const storeAdminEmail =
+        process.env.ADMIN_EMAIL || process.env.SUPPORT_EMAIL || "novixaretail@gmail.com";
       if (effectiveEmail.toLowerCase() !== storeAdminEmail.toLowerCase()) {
         sendOrderConfirmationEmail({
           orderNumber: createdOrder.orderNumber,
@@ -639,7 +660,7 @@ export async function PUT(request: Request) {
 
     const existingOrder = await prisma.order.findUnique({
       where: { id },
-      include: { items: true },
+      include: { items: true, payment: true },
     });
 
     if (!existingOrder) {
@@ -649,11 +670,22 @@ export async function PUT(request: Request) {
     // Enforce Order State Machine Transitions
     const ALLOWED_ORDER_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
       [OrderStatus.PENDING]: [OrderStatus.CONFIRMED, OrderStatus.PROCESSING, OrderStatus.CANCELLED],
-      [OrderStatus.CONFIRMED]: [OrderStatus.PROCESSING, OrderStatus.CANCELLED],
-      [OrderStatus.PROCESSING]: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
-      [OrderStatus.SHIPPED]: [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
-      [OrderStatus.DELIVERED]: [],
+      [OrderStatus.CONFIRMED]: [
+        OrderStatus.PROCESSING,
+        OrderStatus.CANCELLED,
+        OrderStatus.REFUNDED,
+      ],
+      [OrderStatus.PROCESSING]: [OrderStatus.SHIPPED, OrderStatus.CANCELLED, OrderStatus.REFUNDED],
+      [OrderStatus.SHIPPED]: [
+        OrderStatus.DELIVERED,
+        OrderStatus.CANCELLED,
+        OrderStatus.RETURNED,
+        OrderStatus.REFUNDED,
+      ],
+      [OrderStatus.DELIVERED]: [OrderStatus.RETURNED, OrderStatus.REFUNDED],
+      [OrderStatus.RETURNED]: [OrderStatus.REFUNDED],
       [OrderStatus.CANCELLED]: [],
+      [OrderStatus.REFUNDED]: [],
     };
 
     if (status && status !== existingOrder.status) {
@@ -689,9 +721,36 @@ export async function PUT(request: Request) {
       }
     }
 
+    // Process provider refund if transitioning to REFUNDED
+    const isRefunding = status === OrderStatus.REFUNDED || paymentStatus === PaymentStatus.REFUNDED;
+    if (isRefunding && existingOrder.paymentStatus === PaymentStatus.PAID) {
+      if (
+        existingOrder.payment?.providerPaymentId &&
+        existingOrder.payment?.provider === "PAYPAL" &&
+        process.env.PAYPAL_CLIENT_ID &&
+        process.env.PAYPAL_CLIENT_SECRET
+      ) {
+        try {
+          await refundPayPalCapture(
+            existingOrder.payment.providerPaymentId,
+            Number(existingOrder.total),
+          );
+        } catch (refundErr: any) {
+          console.error("PayPal capture refund failed:", refundErr);
+          return NextResponse.json(
+            { error: `PayPal refund failed: ${refundErr.message || "Provider error"}` },
+            { status: 400 },
+          );
+        }
+      }
+    }
+
     let updated;
-    // If order is transitioning to CANCELLED, atomically restore inventory
-    if (status === OrderStatus.CANCELLED && existingOrder.status !== OrderStatus.CANCELLED) {
+    const shouldRestock =
+      (status === OrderStatus.CANCELLED && existingOrder.status !== OrderStatus.CANCELLED) ||
+      (status === OrderStatus.REFUNDED && existingOrder.status !== OrderStatus.REFUNDED);
+
+    if (shouldRestock) {
       updated = await prisma.$transaction(async (tx) => {
         for (const item of existingOrder.items) {
           if (item.productId) {
@@ -701,12 +760,24 @@ export async function PUT(request: Request) {
             });
           }
         }
+
+        const effectivePaymentStatus = isRefunding
+          ? PaymentStatus.REFUNDED
+          : (paymentStatus as PaymentStatus | undefined);
+
+        if (isRefunding && existingOrder.payment) {
+          await tx.payment.update({
+            where: { id: existingOrder.payment.id },
+            data: { status: PaymentStatus.REFUNDED },
+          });
+        }
+
         return await tx.order.update({
           where: { id },
           data: {
-            status: OrderStatus.CANCELLED,
+            ...(status ? { status: status as OrderStatus } : {}),
             ...(trackingNumber !== undefined ? { trackingNumber } : {}),
-            ...(paymentStatus ? { paymentStatus: paymentStatus as PaymentStatus } : {}),
+            ...(effectivePaymentStatus ? { paymentStatus: effectivePaymentStatus } : {}),
           },
           include: {
             items: true,

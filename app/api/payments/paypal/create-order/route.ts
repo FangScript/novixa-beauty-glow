@@ -71,13 +71,16 @@ export async function POST(request: Request) {
     }
 
     // Determine authoritative delivery charge
-    let shipping = 0.2;
+    let shipping = 4.95;
+    let selectedMethodName = "Normal Delivery";
+
     if (shippingMethodId) {
       const dbMethod = await prisma.shippingMethod
         .findUnique({ where: { id: shippingMethodId } })
         .catch(() => null);
       if (dbMethod && dbMethod.active) {
         shipping = Number(dbMethod.price);
+        selectedMethodName = dbMethod.name;
       }
     } else {
       const defaultMethod = await prisma.shippingMethod
@@ -85,7 +88,18 @@ export async function POST(request: Request) {
         .catch(() => null);
       if (defaultMethod) {
         shipping = Number(defaultMethod.price);
+        selectedMethodName = defaultMethod.name;
       }
+    }
+
+    // Complimentary UK Delivery policy: Orders over £70 qualify for free standard shipping
+    const isStandardOrNormal =
+      !selectedMethodName ||
+      selectedMethodName.toLowerCase().includes("normal") ||
+      selectedMethodName.toLowerCase().includes("standard");
+
+    if (subtotal >= 70 && isStandardOrNormal) {
+      shipping = 0;
     }
     shipping = Math.round(shipping * 100) / 100;
 

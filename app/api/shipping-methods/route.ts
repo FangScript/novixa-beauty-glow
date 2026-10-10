@@ -6,8 +6,9 @@ export const DEFAULT_SHIPPING_METHODS = [
   {
     name: "Normal Delivery",
     timeframe: "3-5 days",
-    price: 0.2,
-    description: "Standard tracked courier delivery within 3-5 business days.",
+    price: 4.95,
+    description:
+      "Standard tracked courier delivery within 3-5 business days. Free on orders over £70.",
     active: true,
     isDefault: true,
     displayOrder: 1,
@@ -15,7 +16,7 @@ export const DEFAULT_SHIPPING_METHODS = [
   {
     name: "Express Delivery",
     timeframe: "1-3 days",
-    price: 0.3,
+    price: 7.95,
     description: "Priority expedited courier dispatch with 1-3 business days delivery.",
     active: true,
     isDefault: false,

@@ -38,7 +38,7 @@ export default function ReturnsPage() {
       step: "01",
       title: "Initiate Your Request",
       description:
-        "Notify our Mayfair concierge within 14 calendar days of delivery via email (concierge@novixa.co.uk) or directly through our inquiry form with your order reference.",
+        "Notify our customer care concierge within 14 calendar days of delivery via email (novixaretail@gmail.com) or directly through our inquiry form with your order reference.",
     },
     {
       step: "02",
@@ -56,7 +56,7 @@ export default function ReturnsPage() {
       step: "04",
       title: "Immediate Refund or Exchange",
       description:
-        "Approved returns receive an immediate refund to your original payment card (or Klarna/Clearpay account) within 2–4 working days.",
+        "Approved returns receive an immediate refund to your original payment method within 2–4 working days.",
     },
   ];
 

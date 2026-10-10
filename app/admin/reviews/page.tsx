@@ -22,44 +22,14 @@ type Review = {
   images?: string[];
 };
 
-const initialReviews: Review[] = [
-  {
-    id: "rev-1",
-    product: "Velvet Rose Eau de Parfum",
-    customer: "Ayesha Khan",
-    rating: 5,
-    review: "The longevity on this fragrance is unbelievable. Subtle rose and warm amber.",
-    verified: true,
-    status: "Approved",
-  },
-  {
-    id: "rev-2",
-    product: "Noir Élan Eau de Parfum",
-    customer: "Arjun Mehta",
-    rating: 5,
-    review: "Complex woody scent. Perfect for evening events. Gets lots of compliments.",
-    verified: true,
-    status: "Approved",
-  },
-  {
-    id: "rev-3",
-    product: "Matte Silk Liquid Lipstick",
-    customer: "Mira Shah",
-    rating: 4,
-    review: "Comfortable formula that does not dry lips. Would love more nude shades!",
-    verified: true,
-    status: "Pending",
-  },
-];
-
 export default function AdminReviewsPage() {
-  const [reviews, setReviews] = useState<Review[]>(initialReviews);
+  const [reviews, setReviews] = useState<Review[]>([]);
 
   useEffect(() => {
     fetch("/api/reviews?admin=true")
       .then((res) => res.json())
       .then((data) => {
-        if (data.reviews && Array.isArray(data.reviews) && data.reviews.length > 0) {
+        if (data.reviews && Array.isArray(data.reviews)) {
           setReviews(data.reviews);
         }
       })

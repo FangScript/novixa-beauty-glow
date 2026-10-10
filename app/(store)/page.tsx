@@ -266,9 +266,9 @@ export default async function HomePage() {
               copy: "Beauty for everyone. Direct pricing without compromise on craftsmanship.",
             },
             {
-              icon: UsersRound,
-              title: "Trusted by Thousands",
-              copy: "Real people. Real love. Thousands of verified 5-star experiences.",
+              icon: Sparkles,
+              title: "Artisanal Integrity",
+              copy: "Thoughtfully formulated in small batches with premium ingredients and British craftsmanship.",
             },
           ].map((item) => (
             <div
@@ -285,22 +285,22 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Customer Testimonial */}
-      <section id="reviews" className="page-shell pb-20">
+      {/* Brand Craftsmanship Promise */}
+      <section id="our-promise" className="page-shell pb-20">
         <div className="relative overflow-hidden bg-ink p-10 text-primary-foreground md:p-16">
           <div className="mb-8">
             <p className="text-[9px] font-semibold uppercase tracking-[0.3em] text-champagne">
-              Testimonials
+              Our Promise
             </p>
-            <h2 className="mt-2 font-display text-4xl">What Our Customers Say</h2>
+            <h2 className="mt-2 font-display text-4xl">Artisanal British Formulations</h2>
           </div>
           <blockquote className="border border-primary-foreground/15 p-8 md:p-10">
             <p className="font-display text-xl leading-relaxed md:text-2xl">
-              “Absolutely love the products! The perfume lasts all day and the makeup bundle is
-              perfect. Highly recommend NOVIXA!”
+              “Every fragrance and cosmetic in the NOVIXA collection is developed with meticulous
+              attention to sensory elegance, purity of ingredients, and lasting performance.”
             </p>
             <footer className="mt-5 text-[10px] uppercase tracking-[0.15em] text-champagne">
-              — Ayesha K. · Verified Buyer
+              — The NOVIXA Formulation Atelier
             </footer>
           </blockquote>
         </div>

@@ -126,8 +126,8 @@ export default function PrivacyPage() {
           </p>
           <ul className="mt-2 list-disc pl-5 space-y-1 text-sm text-foreground/80">
             <li>
-              <strong>Logistics & Couriers:</strong> Royal Mail, DPD UK, and Hermes for tracked
-              parcel delivery.
+              <strong>Logistics & Couriers:</strong> Royal Mail and DPD UK for tracked parcel
+              delivery.
             </li>
             <li>
               <strong>Payment Gateways:</strong> PayPal, certified card processing networks (PCI-DSS

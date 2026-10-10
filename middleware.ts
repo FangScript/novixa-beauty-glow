@@ -7,8 +7,13 @@ export async function middleware(request: NextRequest) {
 
   // ── Canonical host redirect (non-www -> www) ──────────────────────────────
   // Exclude /.well-known so Apple Pay and SSL domain verification bots do not encounter a 301 redirect
-  if (host.startsWith("novixaretail.com") && !request.nextUrl.pathname.startsWith("/.well-known/")) {
-    const cleanUrl = new URL(`https://www.novixaretail.com${request.nextUrl.pathname}${request.nextUrl.search}`);
+  if (
+    host.startsWith("novixaretail.com") &&
+    !request.nextUrl.pathname.startsWith("/.well-known/")
+  ) {
+    const cleanUrl = new URL(
+      `https://www.novixaretail.com${request.nextUrl.pathname}${request.nextUrl.search}`,
+    );
     return NextResponse.redirect(cleanUrl, 301);
   }
 

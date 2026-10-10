@@ -41,14 +41,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "Googlebot",
         allow: "/",
-        disallow: [
-          "/admin/*",
-          "/api/*",
-          "/account/*",
-          "/checkout/*",
-          "/cart",
-          "/wishlist",
-        ],
+        disallow: ["/admin/*", "/api/*", "/account/*", "/checkout/*", "/cart", "/wishlist"],
       },
     ],
     sitemap: `${baseUrl}/sitemap.xml`,

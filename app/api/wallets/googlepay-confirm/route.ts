@@ -14,8 +14,38 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "paypalOrderId is required." }, { status: 400 });
     }
 
-    // If paymentMethodData is provided from Google Pay SDK, confirm payment source with PayPal
-    if (paymentMethodData?.tokenizationData?.token) {
+    // 1. Authoritative PayPal Order State Check
+    let orderDetails: any;
+    try {
+      orderDetails = await getPayPalOrderDetails(paypalOrderId);
+    } catch (fetchErr: any) {
+      console.error(`Failed to fetch PayPal order [${paypalOrderId}]:`, fetchErr);
+      return NextResponse.json(
+        { error: fetchErr.message || "Failed to retrieve order state from PayPal." },
+        { status: 500 },
+      );
+    }
+
+    // If order is already completed, return immediately
+    if (orderDetails.status === "COMPLETED") {
+      const captureRecord = orderDetails.purchase_units?.[0]?.payments?.captures?.[0];
+      const captureId = captureRecord?.id || paypalOrderId;
+      const payer = orderDetails.payer || {};
+      return NextResponse.json({
+        ok: true,
+        status: orderDetails.status,
+        captureId,
+        paypalOrderId,
+        payerEmail: payer.email_address,
+        payerName: payer.name
+          ? `${payer.name.given_name || ""} ${payer.name.surname || ""}`.trim()
+          : null,
+        details: orderDetails,
+      });
+    }
+
+    // 2. If not yet approved, confirm payment source if token provided
+    if (orderDetails.status !== "APPROVED" && paymentMethodData?.tokenizationData?.token) {
       try {
         let parsedToken: any;
         try {
@@ -32,7 +62,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // Capture the PayPal order
+    // 3. Capture the PayPal order
     let captureData: any;
     try {
       captureData = await capturePayPalOrder(paypalOrderId);
@@ -46,6 +76,16 @@ export async function POST(request: Request) {
 
     const captureRecord = captureData.purchase_units?.[0]?.payments?.captures?.[0];
     const isCompleted = captureData.status === "COMPLETED" || captureRecord?.status === "COMPLETED";
+
+    const currencyCode =
+      captureData.purchase_units?.[0]?.amount?.currency_code ||
+      captureRecord?.amount?.currency_code;
+    if (currencyCode && currencyCode !== "GBP") {
+      return NextResponse.json(
+        { error: `Payment currency mismatch: expected GBP, received ${currencyCode}.` },
+        { status: 400 },
+      );
+    }
 
     const captureId = captureRecord?.id || paypalOrderId;
     const payer = captureData.payer || {};

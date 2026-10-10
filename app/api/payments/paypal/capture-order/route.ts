@@ -52,15 +52,18 @@ export async function POST(request: Request) {
         // handles Apple Pay token decryption via paypal.Applepay().confirmOrder().
         // Raw tokens sent to confirm-payment-source will ALWAYS 500.
         // If the order isn't APPROVED at this point, the client-side confirmation failed.
-        const hasAppleCert = !!(process.env.APPLE_PAY_CERTIFICATE && process.env.APPLE_PAY_PRIVATE_KEY);
+        const hasAppleCert = !!(
+          process.env.APPLE_PAY_CERTIFICATE && process.env.APPLE_PAY_PRIVATE_KEY
+        );
         if (!hasAppleCert) {
           console.error(
             `Apple Pay order ${paypalOrderId} is not APPROVED (status: ${orderDetails.status}). ` +
-            `Client-side confirmOrder must succeed before capture. No Apple merchant cert configured for server-side fallback.`,
+              `Client-side confirmOrder must succeed before capture. No Apple merchant cert configured for server-side fallback.`,
           );
           return NextResponse.json(
             {
-              error: "Apple Pay confirmation failed. Please try again or use a different payment method.",
+              error:
+                "Apple Pay confirmation failed. Please try again or use a different payment method.",
             },
             { status: 400 },
           );

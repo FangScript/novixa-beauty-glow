@@ -74,17 +74,35 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
 
         {/* Product Info */}
         <div className="lg:py-4">
-          <a
-            href="#reviews"
-            className="inline-flex items-center gap-1 text-champagne hover:opacity-80 transition-opacity"
-          >
-            {[1, 2, 3, 4, 5].map((star) => (
-              <Star key={star} size={13} fill="currentColor" />
-            ))}
-            <span className="ml-2 text-xs text-muted-foreground underline decoration-dotted">
-              {product.rating} · ({product.reviewCount} customer reviews)
-            </span>
-          </a>
+          {product.reviewCount > 0 ? (
+            <a
+              href="#reviews"
+              className="inline-flex items-center gap-1 text-champagne hover:opacity-80 transition-opacity"
+            >
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Star
+                  key={star}
+                  size={13}
+                  fill={star <= Math.round(product.rating) ? "currentColor" : "none"}
+                  className={star <= Math.round(product.rating) ? "" : "text-border"}
+                />
+              ))}
+              <span className="ml-2 text-xs text-muted-foreground underline decoration-dotted">
+                {product.rating} · ({product.reviewCount}{" "}
+                {product.reviewCount === 1 ? "review" : "reviews"})
+              </span>
+            </a>
+          ) : (
+            <a
+              href="#reviews"
+              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Star size={13} className="text-border" />
+              <span className="underline decoration-dotted">
+                Be the first to review this formulation
+              </span>
+            </a>
+          )}
 
           <p className="mt-5 text-2xl font-medium">
             {product.salePrice !== undefined && product.salePrice !== null ? (
