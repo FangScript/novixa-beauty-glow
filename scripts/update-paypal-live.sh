@@ -35,6 +35,8 @@ set_env "PAYPAL_MODE" "live"
 set_env "PAYPAL_CLIENT_ID" "$CLIENT_ID"
 set_env "PAYPAL_CLIENT_SECRET" "$SECRET_KEY"
 set_env "NEXT_PUBLIC_PAYPAL_CLIENT_ID" "$CLIENT_ID"
+set_env "PAYPAL_MERCHANT_ID" "WWHXT7BPBR6P2"
+set_env "NEXT_PUBLIC_PAYPAL_MERCHANT_ID" "WWHXT7BPBR6P2"
 
 # Supabase Production Keys
 set_env "NEXT_PUBLIC_SUPABASE_URL" "$SUPABASE_URL"
@@ -49,6 +51,7 @@ echo "   ✅ $ENV_FILE updated successfully."
 echo "=== 2. Building Docker Image with Baked Production Variables ==="
 docker build \
   --build-arg NEXT_PUBLIC_PAYPAL_CLIENT_ID="$CLIENT_ID" \
+  --build-arg NEXT_PUBLIC_PAYPAL_MERCHANT_ID="WWHXT7BPBR6P2" \
   --build-arg NEXT_PUBLIC_SUPABASE_URL="$SUPABASE_URL" \
   --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="$SUPABASE_ANON" \
   --build-arg NEXT_PUBLIC_GOOGLE_PAY_MERCHANT_ID="BCR2DN6D5L703ZKP" \

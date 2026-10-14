@@ -202,7 +202,7 @@ export function NativeGooglePayButton({
     try {
       // 1. Prepare payment data request with official parameters
       const paypalMerchantId =
-        process.env.NEXT_PUBLIC_PAYPAL_MERCHANT_ID || clientId;
+        process.env.NEXT_PUBLIC_PAYPAL_MERCHANT_ID || "WWHXT7BPBR6P2";
 
       let allowedPaymentMethods: any[] = [
         {
