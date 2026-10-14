@@ -20,6 +20,7 @@ export const COUNTRIES = [
   { code: "ES", name: "Spain" },
   { code: "AE", name: "United Arab Emirates" },
   { code: "SA", name: "Saudi Arabia" },
+  { code: "PK", name: "Pakistan" },
   { code: "CH", name: "Switzerland" },
   { code: "NL", name: "Netherlands" },
   { code: "BE", name: "Belgium" },
@@ -28,6 +29,7 @@ export const COUNTRIES = [
   { code: "DK", name: "Denmark" },
   { code: "SG", name: "Singapore" },
   { code: "JP", name: "Japan" },
+  { code: "NZ", name: "New Zealand" },
 ];
 
 export const UK_COUNTIES = [
@@ -98,6 +100,127 @@ export const UK_COUNTIES = [
   "County Londonderry",
   "County Tyrone",
   "County Fermanagh",
+];
+
+export const US_STATES = [
+  "Alabama",
+  "Alaska",
+  "Arizona",
+  "Arkansas",
+  "California",
+  "Colorado",
+  "Connecticut",
+  "Delaware",
+  "District of Columbia",
+  "Florida",
+  "Georgia",
+  "Hawaii",
+  "Idaho",
+  "Illinois",
+  "Indiana",
+  "Iowa",
+  "Kansas",
+  "Kentucky",
+  "Louisiana",
+  "Maine",
+  "Maryland",
+  "Massachusetts",
+  "Michigan",
+  "Minnesota",
+  "Mississippi",
+  "Missouri",
+  "Montana",
+  "Nebraska",
+  "Nevada",
+  "New Hampshire",
+  "New Jersey",
+  "New Mexico",
+  "New York",
+  "North Carolina",
+  "North Dakota",
+  "Ohio",
+  "Oklahoma",
+  "Oregon",
+  "Pennsylvania",
+  "Puerto Rico",
+  "Rhode Island",
+  "South Carolina",
+  "South Dakota",
+  "Tennessee",
+  "Texas",
+  "Utah",
+  "Vermont",
+  "Virginia",
+  "Washington",
+  "West Virginia",
+  "Wisconsin",
+  "Wyoming",
+];
+
+export const CA_PROVINCES = [
+  "Alberta",
+  "British Columbia",
+  "Manitoba",
+  "New Brunswick",
+  "Newfoundland and Labrador",
+  "Northwest Territories",
+  "Nova Scotia",
+  "Nunavut",
+  "Ontario",
+  "Prince Edward Island",
+  "Quebec",
+  "Saskatchewan",
+  "Yukon",
+];
+
+export const AU_STATES = [
+  "Australian Capital Territory",
+  "New South Wales",
+  "Northern Territory",
+  "Queensland",
+  "South Australia",
+  "Tasmania",
+  "Victoria",
+  "Western Australia",
+];
+
+export const PK_PROVINCES = [
+  "Islamabad Capital Territory",
+  "Punjab",
+  "Sindh",
+  "Khyber Pakhtunkhwa",
+  "Balochistan",
+  "Azad Jammu and Kashmir",
+  "Gilgit-Baltistan",
+];
+
+export const IE_COUNTIES = [
+  "Carlow",
+  "Cavan",
+  "Clare",
+  "Cork",
+  "Donegal",
+  "Dublin",
+  "Galway",
+  "Kerry",
+  "Kildare",
+  "Kilkenny",
+  "Laois",
+  "Leitrim",
+  "Limerick",
+  "Longford",
+  "Louth",
+  "Mayo",
+  "Meath",
+  "Monaghan",
+  "Offaly",
+  "Roscommon",
+  "Sligo",
+  "Tipperary",
+  "Waterford",
+  "Westmeath",
+  "Wexford",
+  "Wicklow",
 ];
 
 export const UK_MAJOR_CITIES: { city: string; county: string }[] = [
@@ -591,3 +714,184 @@ export function searchAddressDictionary(query: string, maxResults = 8): UKAddres
 
   return [...exactPostcodeMatches, ...partialMatches].slice(0, maxResults);
 }
+
+export interface CountryRegionConfig {
+  label: string;
+  postalLabel: string;
+  postalPlaceholder: string;
+  regions: string[] | null;
+}
+
+export function getCountryRegionConfig(countryNameOrCode?: string): CountryRegionConfig {
+  const c = (countryNameOrCode || "United Kingdom").toLowerCase().trim();
+  if (c === "united kingdom" || c === "gb" || c === "uk" || c === "great britain") {
+    return {
+      label: "County / Region",
+      postalLabel: "Postcode",
+      postalPlaceholder: "e.g. SW1A 1AA",
+      regions: UK_COUNTIES,
+    };
+  }
+  if (c === "united states" || c === "us" || c === "usa") {
+    return {
+      label: "State",
+      postalLabel: "ZIP Code",
+      postalPlaceholder: "e.g. 90210",
+      regions: US_STATES,
+    };
+  }
+  if (c === "canada" || c === "ca") {
+    return {
+      label: "Province / Territory",
+      postalLabel: "Postal Code",
+      postalPlaceholder: "e.g. M5V 2T6",
+      regions: CA_PROVINCES,
+    };
+  }
+  if (c === "australia" || c === "au") {
+    return {
+      label: "State / Territory",
+      postalLabel: "Postcode",
+      postalPlaceholder: "e.g. 2000",
+      regions: AU_STATES,
+    };
+  }
+  if (c === "pakistan" || c === "pk") {
+    return {
+      label: "Province / Region",
+      postalLabel: "Postal Code",
+      postalPlaceholder: "e.g. 44000 or 43600",
+      regions: PK_PROVINCES,
+    };
+  }
+  if (c === "ireland" || c === "ie") {
+    return {
+      label: "County",
+      postalLabel: "Eircode / Postcode",
+      postalPlaceholder: "e.g. D02 X285",
+      regions: IE_COUNTIES,
+    };
+  }
+  return {
+    label: "State / Province / Region",
+    postalLabel: "Postal Code",
+    postalPlaceholder: "Postal code",
+    regions: null,
+  };
+}
+
+export interface PostalValidationResult {
+  isValid: boolean;
+  message?: string;
+  normalized?: string;
+}
+
+export const UK_POSTCODE_REGEX = /^[A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2}$/i;
+export const US_ZIP_REGEX = /^\d{5}(-\d{4})?$/;
+export const CA_POSTAL_REGEX = /^[A-Z]\d[A-Z]\s?\d[A-Z]\d$/i;
+export const AU_POSTCODE_REGEX = /^\d{4}$/;
+export const PK_POSTCODE_REGEX = /^\d{5}$/;
+
+export function formatUkPostcode(raw: string): string {
+  const clean = raw.trim().toUpperCase().replace(/\s+/g, "");
+  if (clean.length > 3) {
+    return `${clean.slice(0, -3)} ${clean.slice(-3)}`;
+  }
+  return clean;
+}
+
+export function parseCoordinates(query: string): { lat: number; lon: number } | null {
+  if (!query) return null;
+  const match = query.trim().match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+  if (!match) return null;
+  const lat = parseFloat(match[1]);
+  const lon = parseFloat(match[2]);
+  if (isNaN(lat) || isNaN(lon)) return null;
+  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+  return { lat, lon };
+}
+
+export function isWithinUkBounds(lat: number, lon: number): boolean {
+  return lat >= 49.8 && lat <= 60.9 && lon >= -8.6 && lon <= 1.8;
+}
+
+export function validatePostalCode(
+  postalCode: string,
+  countryNameOrCode?: string
+): PostalValidationResult {
+  const code = (postalCode || "").trim();
+  const c = (countryNameOrCode || "United Kingdom").toLowerCase().trim();
+
+  if (!code) {
+    return { isValid: false, message: "Postal code is required." };
+  }
+
+  // Reject raw coordinates pasted into postal code
+  if (parseCoordinates(code)) {
+    return {
+      isValid: false,
+      message: "Coordinates detected. Please enter a valid postal code.",
+    };
+  }
+
+  if (c === "united kingdom" || c === "gb" || c === "uk" || c === "great britain") {
+    if (!UK_POSTCODE_REGEX.test(code)) {
+      return {
+        isValid: false,
+        message: "Invalid UK postcode format (e.g. SW1A 1AA, M1 1PW, or W1K 5DH).",
+      };
+    }
+    return { isValid: true, normalized: formatUkPostcode(code) };
+  }
+
+  if (c === "united states" || c === "us" || c === "usa") {
+    if (!US_ZIP_REGEX.test(code)) {
+      return {
+        isValid: false,
+        message: "Invalid US ZIP code. Must be 5 digits (e.g. 90210) or ZIP+4.",
+      };
+    }
+    return { isValid: true, normalized: code };
+  }
+
+  if (c === "canada" || c === "ca") {
+    if (!CA_POSTAL_REGEX.test(code)) {
+      return {
+        isValid: false,
+        message: "Invalid Canadian postal code. Format should be like M5V 2T6.",
+      };
+    }
+    return { isValid: true, normalized: code.toUpperCase() };
+  }
+
+  if (c === "australia" || c === "au") {
+    if (!AU_POSTCODE_REGEX.test(code)) {
+      return {
+        isValid: false,
+        message: "Invalid Australian postcode. Must be 4 digits (e.g. 2000).",
+      };
+    }
+    return { isValid: true, normalized: code };
+  }
+
+  if (c === "pakistan" || c === "pk") {
+    if (!PK_POSTCODE_REGEX.test(code)) {
+      return {
+        isValid: false,
+        message: "Invalid Pakistan postal code. Must be 5 digits (e.g. 44000 or 43600).",
+      };
+    }
+    return { isValid: true, normalized: code };
+  }
+
+  // General international check
+  if (code.length < 2 || code.length > 12) {
+    return {
+      isValid: false,
+      message: "Please enter a valid postal code (2 to 12 characters).",
+    };
+  }
+
+  return { isValid: true, normalized: code };
+}
+

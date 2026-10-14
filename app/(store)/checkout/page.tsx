@@ -25,6 +25,7 @@ import { PageShell } from "@/components/layout/PageShell";
 import { Button } from "@/components/ui/button";
 import { cartProducts, formatPrice, useCommerce } from "@/lib/commerce/context";
 import { AddressSelector } from "@/components/address/AddressSelector";
+import { validatePostalCode } from "@/lib/address/dictionary";
 import { useCustomerAuth } from "@/lib/auth/customer-context";
 import { PayPalCheckoutButton } from "@/components/checkout/PayPalCheckoutButton";
 import { NativeGooglePayButton } from "@/components/checkout/NativeGooglePayButton";
@@ -253,6 +254,17 @@ export default function CheckoutPage() {
       toast.error("Please complete your delivery street address, city, and postal code.");
       return false;
     }
+
+    const postalCheck = validatePostalCode(formData.pinCode, formData.country || "United Kingdom");
+    if (!postalCheck.isValid) {
+      toast.error(postalCheck.message || "Please enter a valid postal code for your selected country.");
+      return false;
+    }
+
+    if (postalCheck.normalized && postalCheck.normalized !== formData.pinCode) {
+      setFormData((prev) => ({ ...prev, pinCode: postalCheck.normalized! }));
+    }
+
     return true;
   };
 

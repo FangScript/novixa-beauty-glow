@@ -16,6 +16,7 @@ import {
 import { PageShell } from "@/components/layout/PageShell";
 import { Button } from "@/components/ui/button";
 import { AddressSelector } from "@/components/address/AddressSelector";
+import { validatePostalCode } from "@/lib/address/dictionary";
 
 type Address = {
   id: string;
@@ -99,11 +100,24 @@ export default function AccountAddressesPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus(null);
+
+    const postalCheck = validatePostalCode(form.postalCode, form.country);
+    if (!postalCheck.isValid) {
+      setStatus({
+        type: "error",
+        message: postalCheck.message || "Please enter a valid postal code for your selected country.",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
+      const normalizedForm = postalCheck.normalized
+        ? { ...form, postalCode: postalCheck.normalized }
+        : form;
       const method = editingId ? "PUT" : "POST";
-      const body = editingId ? { ...form, id: editingId } : form;
+      const body = editingId ? { ...normalizedForm, id: editingId } : normalizedForm;
       const res = await fetch("/api/addresses", {
         method,
         headers: { "Content-Type": "application/json" },
