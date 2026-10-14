@@ -226,9 +226,10 @@ export function NativeGooglePayButton({
       ];
 
       // Retrieve dynamic configuration from PayPal Googlepay SDK if available
+      let ppConfig: any = null;
       if (typeof window !== "undefined" && (window as any).paypal?.Googlepay) {
         try {
-          const ppConfig = await (window as any).paypal.Googlepay().config();
+          ppConfig = await (window as any).paypal.Googlepay().config();
           if (ppConfig?.allowedPaymentMethods && ppConfig.allowedPaymentMethods.length > 0) {
             allowedPaymentMethods = ppConfig.allowedPaymentMethods;
           }
@@ -238,6 +239,16 @@ export function NativeGooglePayButton({
       }
 
       const gpayMerchantId = process.env.NEXT_PUBLIC_GOOGLE_PAY_MERCHANT_ID || "BCR2DN6D5L703ZKP";
+
+      const merchantInfo: any = {
+        merchantName: "NOVIXA UK",
+        ...(ppConfig?.merchantInfo || {}),
+      };
+
+      if (googlePayEnv === "PRODUCTION") {
+        merchantInfo.merchantId = gpayMerchantId;
+        merchantInfo.merchantOrigin = "www.novixaretail.com";
+      }
 
       // Official Google Pay API v2 MerchantInfo schema
       const paymentDataRequest: any = {
@@ -250,15 +261,7 @@ export function NativeGooglePayButton({
           currencyCode: currency,
           countryCode: "GB",
         },
-        merchantInfo:
-          googlePayEnv === "PRODUCTION"
-            ? {
-                merchantId: gpayMerchantId,
-                merchantName: "NOVIXA UK",
-              }
-            : {
-                merchantName: "NOVIXA UK",
-              },
+        merchantInfo,
       };
 
       // 2. Start server-authoritative PayPal order creation in parallel
