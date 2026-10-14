@@ -220,7 +220,6 @@ export function NativeGooglePayButton({
             parameters: {
               gateway: "paypalppcp",
               gatewayMerchantId: paypalMerchantId,
-              "paypal:clientId": clientId,
             },
           },
         },
