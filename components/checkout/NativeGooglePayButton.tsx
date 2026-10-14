@@ -35,7 +35,14 @@ declare global {
     google?: {
       payments?: {
         api?: {
-          PaymentsClient: new (options: { environment: "TEST" | "PRODUCTION" }) => any;
+          PaymentsClient: new (options: {
+            environment: "TEST" | "PRODUCTION";
+            merchantInfo?: {
+              merchantId?: string;
+              merchantName?: string;
+              merchantOrigin?: string;
+            };
+          }) => any;
         };
       };
     };
@@ -145,8 +152,21 @@ export function NativeGooglePayButton({
     }
 
     try {
+      const gpayMerchantId =
+        process.env.NEXT_PUBLIC_GOOGLE_PAY_MERCHANT_ID || "BCR2DN6D5L703ZKP";
+
       const client = new window.google.payments.api.PaymentsClient({
         environment: googlePayEnv,
+        merchantInfo:
+          googlePayEnv === "PRODUCTION"
+            ? {
+                merchantId: gpayMerchantId,
+                merchantName: "NOVIXA UK",
+                merchantOrigin: "www.novixaretail.com",
+              }
+            : {
+                merchantName: "NOVIXA UK",
+              },
       });
       paymentsClientRef.current = client;
 
