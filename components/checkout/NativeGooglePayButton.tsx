@@ -74,6 +74,20 @@ export function NativeGooglePayButton({
   const googlePayEnv: "TEST" | "PRODUCTION" =
     process.env.NEXT_PUBLIC_GOOGLE_PAY_ENV === "PRODUCTION" ? "PRODUCTION" : "TEST";
 
+  // Canonical origin guard: Google Pay & Wallet Console whitelists "www.novixaretail.com".
+  // If a user navigates to the non-www domain, seamlessly redirect to www in production.
+  useEffect(() => {
+    if (
+      typeof window !== "undefined" &&
+      window.location.hostname === "novixaretail.com" &&
+      window.location.protocol === "https:"
+    ) {
+      window.location.replace(
+        `https://www.novixaretail.com${window.location.pathname}${window.location.search}`,
+      );
+    }
+  }, []);
+
   // Step 1: Dynamically load the Google Pay Web SDK script
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -101,7 +115,26 @@ export function NativeGooglePayButton({
     document.head.appendChild(script);
   }, [onAvailabilityChange]);
 
-  // Step 2: Initialize PaymentsClient and verify isReadyToPay with PayPal tokenization
+  // Step 1b: Ensure PayPal JS SDK with googlepay component is loaded
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if ((window as any).paypal?.Googlepay) {
+      return;
+    }
+
+    const ppScriptUrl = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=${currency}&components=buttons,googlepay,applepay`;
+    const existing = document.querySelector('script[src*="paypal.com/sdk/js"]');
+    if (!existing) {
+      const script = document.createElement("script");
+      script.src = ppScriptUrl;
+      script.async = true;
+      document.head.appendChild(script);
+    }
+  }, [clientId, currency]);
+
+  // Step 2: Initialize PaymentsClient and verify isReadyToPay
+  // Per Google Pay API v2 guidelines, tokenizationSpecification is NOT required for isReadyToPay.
   useEffect(() => {
     if (
       !isSdkLoaded ||
@@ -117,7 +150,7 @@ export function NativeGooglePayButton({
       });
       paymentsClientRef.current = client;
 
-      // Base card payment method for isReadyToPay check
+      // Base card payment method for isReadyToPay check (no tokenization needed for readiness check)
       const isReadyToPayRequest = {
         apiVersion: 2,
         apiVersionMinor: 0,
@@ -127,14 +160,6 @@ export function NativeGooglePayButton({
             parameters: {
               allowedAuthMethods: ["PAN_ONLY", "CRYPTOGRAM_3DS"],
               allowedCardNetworks: ["MASTERCARD", "VISA", "AMEX", "DISCOVER"],
-            },
-            tokenizationSpecification: {
-              type: "PAYMENT_GATEWAY",
-              parameters: {
-                gateway: "paypalppcp",
-                gatewayMerchantId: clientId,
-                "paypal:clientId": clientId,
-              },
             },
           },
         ],
@@ -176,6 +201,9 @@ export function NativeGooglePayButton({
 
     try {
       // 1. Prepare payment data request with official parameters
+      const paypalMerchantId =
+        process.env.NEXT_PUBLIC_PAYPAL_MERCHANT_ID || clientId;
+
       let allowedPaymentMethods: any[] = [
         {
           type: "CARD",
@@ -191,13 +219,14 @@ export function NativeGooglePayButton({
             type: "PAYMENT_GATEWAY",
             parameters: {
               gateway: "paypalppcp",
-              gatewayMerchantId: clientId,
+              gatewayMerchantId: paypalMerchantId,
               "paypal:clientId": clientId,
             },
           },
         },
       ];
 
+      // Retrieve dynamic configuration from PayPal Googlepay SDK if available
       if (typeof window !== "undefined" && (window as any).paypal?.Googlepay) {
         try {
           const ppConfig = await (window as any).paypal.Googlepay().config();
@@ -209,11 +238,10 @@ export function NativeGooglePayButton({
         }
       }
 
-      const origin =
-        typeof window !== "undefined" ? window.location.origin : "https://www.novixaretail.com";
       const gpayMerchantId = process.env.NEXT_PUBLIC_GOOGLE_PAY_MERCHANT_ID || "BCR2DN6D5L703ZKP";
 
-      const paymentDataRequest = {
+      // Official Google Pay API v2 MerchantInfo schema
+      const paymentDataRequest: any = {
         apiVersion: 2,
         apiVersionMinor: 0,
         allowedPaymentMethods,
@@ -228,7 +256,6 @@ export function NativeGooglePayButton({
             ? {
                 merchantId: gpayMerchantId,
                 merchantName: "NOVIXA UK",
-                merchantOrigin: origin,
               }
             : {
                 merchantName: "NOVIXA UK",
@@ -298,9 +325,20 @@ export function NativeGooglePayButton({
     } catch (err: any) {
       if (err?.statusCode === "CANCELED" || err?.message?.includes("CANCELED")) {
         toast.info("Google Pay authorization was cancelled.");
+      } else if (
+        err?.message?.includes("OR_BIBED_11") ||
+        String(err).includes("OR_BIBED_11") ||
+        err?.statusMessage?.includes("OR_BIBED_11")
+      ) {
+        console.warn("Google Pay OR_BIBED_11: Google Pay merchant verification is required. Directing user to Credit Card / PayPal.");
+        const msg =
+          "Google Pay is currently undergoing verification. Please select Credit/Debit Card or PayPal above to complete your order seamlessly.";
+        setErrorMessage(msg);
+        toast.error(msg, { duration: 6000 });
+        onError?.(msg);
       } else {
         console.error("Google Pay transaction error:", err);
-        const msg = err.message || "Failed to complete Google Pay checkout.";
+        const msg = err.message || "Failed to complete Google Pay checkout. Please try using Credit Card or PayPal.";
         setErrorMessage(msg);
         toast.error(msg);
         onError?.(msg);
