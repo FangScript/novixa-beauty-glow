@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
         try {
           const res = await fetch(
             `https://api.postcodes.io/postcodes?lat=${lat}&lon=${lon}&limit=1`,
-            { signal: AbortSignal.timeout(3500) }
+            { signal: AbortSignal.timeout(3500) },
           );
           if (res.ok) {
             const data = await res.json();
@@ -48,7 +48,8 @@ export async function GET(req: NextRequest) {
                 county: item.admin_county || item.region || "Greater London",
                 postcode: item.postcode,
                 country: "United Kingdom",
-                formatted: `${item.admin_district || ""}, ${item.admin_county || item.region || ""}, ${item.postcode}`.trim(),
+                formatted:
+                  `${item.admin_district || ""}, ${item.admin_county || item.region || ""}, ${item.postcode}`.trim(),
               };
               return NextResponse.json({
                 success: true,
@@ -87,7 +88,7 @@ export async function GET(req: NextRequest) {
       try {
         const res = await fetch(
           `https://api.postcodes.io/postcodes?lat=${lat}&lon=${lon}&limit=1`,
-          { signal: AbortSignal.timeout(3500) }
+          { signal: AbortSignal.timeout(3500) },
         );
         if (res.ok) {
           const data = await res.json();
@@ -99,7 +100,8 @@ export async function GET(req: NextRequest) {
               county: item.admin_county || item.region || "Greater London",
               postcode: item.postcode,
               country: "United Kingdom",
-              formatted: `${item.admin_district || ""}, ${item.admin_county || item.region || ""}, ${item.postcode}`.trim(),
+              formatted:
+                `${item.admin_district || ""}, ${item.admin_county || item.region || ""}, ${item.postcode}`.trim(),
             };
             return NextResponse.json({
               success: true,
@@ -116,18 +118,20 @@ export async function GET(req: NextRequest) {
 
     // 3. Exact Postcode Lookup (if specific postcode is requested or looks like full UK postcode)
     const cleanPostcode = activeQuery.toUpperCase().replace(/\s+/g, "");
-    const isPotentiallyFullUkPostcode = /^[A-Z]{1,2}[0-9][A-Z0-9]?[0-9][A-Z]{2}$/i.test(cleanPostcode);
+    const isPotentiallyFullUkPostcode = /^[A-Z]{1,2}[0-9][A-Z0-9]?[0-9][A-Z]{2}$/i.test(
+      cleanPostcode,
+    );
 
     if (isPotentiallyFullUkPostcode) {
       // Check local dictionary first
       const localExact = UK_ADDRESS_DICTIONARY.find(
-        (a) => a.postcode.replace(/\s+/g, "").toUpperCase() === cleanPostcode
+        (a) => a.postcode.replace(/\s+/g, "").toUpperCase() === cleanPostcode,
       );
 
       try {
         const res = await fetch(
           `https://api.postcodes.io/postcodes/${encodeURIComponent(cleanPostcode)}`,
-          { signal: AbortSignal.timeout(3500) }
+          { signal: AbortSignal.timeout(3500) },
         );
         if (res.ok) {
           const data = await res.json();
@@ -140,7 +144,8 @@ export async function GET(req: NextRequest) {
               county: r.admin_county || r.region || "Greater London",
               postcode: r.postcode || formatUkPostcode(cleanPostcode),
               country: "United Kingdom",
-              formatted: `${localExact?.line1 || r.admin_ward || r.admin_district || ""}, ${r.admin_district || ""}, ${r.admin_county || r.region || ""}, ${r.postcode}`.trim(),
+              formatted:
+                `${localExact?.line1 || r.admin_ward || r.admin_district || ""}, ${r.admin_district || ""}, ${r.admin_county || r.region || ""}, ${r.postcode}`.trim(),
             };
 
             return NextResponse.json({
@@ -174,7 +179,7 @@ export async function GET(req: NextRequest) {
       try {
         const res = await fetch(
           `https://api.postcodes.io/postcodes/${encodeURIComponent(cleanPostcode)}/autocomplete`,
-          { signal: AbortSignal.timeout(2000) }
+          { signal: AbortSignal.timeout(2000) },
         );
         if (res.ok) {
           const data = await res.json();
@@ -222,7 +227,7 @@ export async function GET(req: NextRequest) {
   } catch (err: any) {
     return NextResponse.json(
       { success: false, error: err.message || "Failed to lookup address." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

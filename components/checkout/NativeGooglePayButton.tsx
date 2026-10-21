@@ -3,6 +3,20 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { Loader2, ShieldCheck, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import type { publicPaymentConfig } from "@/lib/payments/public-config";
+import {
+  authorizeGooglePayOrder,
+  googlePayCustomerMessage,
+  googlePayErrorDetails,
+  resolveGooglePayConfig,
+  type PayPalGooglePayHelper,
+  type ResolvedGooglePayConfig,
+} from "@/lib/payments/googlepay";
+import {
+  loadWalletScript,
+  validatePayPalGooglePayScript,
+  withWalletTimeout,
+} from "@/lib/payments/wallet-script";
 
 interface NativeGooglePayButtonProps {
   amount: number;
@@ -30,6 +44,17 @@ interface NativeGooglePayButtonProps {
   disabled?: boolean;
 }
 
+interface GooglePaymentsClient {
+  isReadyToPay(request: unknown): Promise<{ result: boolean }>;
+  loadPaymentData(request: unknown): Promise<{ paymentMethodData: unknown; email?: string }>;
+  createButton(options: {
+    onClick: () => void;
+    buttonColor: string;
+    buttonType: string;
+    buttonSizeMode: string;
+  }): HTMLElement;
+}
+
 declare global {
   interface Window {
     google?: {
@@ -37,19 +62,36 @@ declare global {
         api?: {
           PaymentsClient: new (options: {
             environment: "TEST" | "PRODUCTION";
-            merchantInfo?: {
-              merchantId?: string;
-              merchantName?: string;
-              merchantOrigin?: string;
-            };
-          }) => any;
+            merchantInfo?: { merchantId?: string; merchantName?: string };
+          }) => GooglePaymentsClient;
         };
       };
     };
   }
 }
 
-const GPAY_SCRIPT_URL = "https://pay.google.com/gp/p/js/pay.js";
+function getPayPalGooglePay() {
+  const paypal = window.paypal as unknown as { Googlepay?: () => PayPalGooglePayHelper };
+  return paypal?.Googlepay?.();
+}
+
+async function paymentRequest(path: string, body: unknown) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+  try {
+    const response = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Google Pay payment request failed.");
+    return data;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 export function NativeGooglePayButton({
   amount,
@@ -65,395 +107,286 @@ export function NativeGooglePayButton({
   disabled = false,
 }: NativeGooglePayButtonProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const paymentsClientRef = useRef<any>(null);
-  const [isSdkLoaded, setIsSdkLoaded] = useState(false);
+  const runtimeRef = useRef<{
+    client: GooglePaymentsClient;
+    helper: PayPalGooglePayHelper;
+    config: ResolvedGooglePayConfig;
+  } | null>(null);
+  const processingRef = useRef(false);
+  const availabilityRef = useRef(onAvailabilityChange);
   const [isReadyToPay, setIsReadyToPay] = useState<boolean | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const clientId =
-    process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID ||
-    "BAAi8QOljyA26-sCFX-3M0WIYmJk_qm16xSH4wVblfWVIv_-NFY7GvGAIw9f6D5-A8CtcHPlUOhDpXXxGs";
-
-  // Google Pay must run in TEST environment until Google approves the merchant profile
-  // in the Google Pay & Wallet Console. Setting environment to PRODUCTION before Google approval
-  // triggers [OR_BIBED_11] ("Merchant trouble accepting payments").
-  const googlePayEnv: "TEST" | "PRODUCTION" =
-    process.env.NEXT_PUBLIC_GOOGLE_PAY_ENV === "PRODUCTION" ? "PRODUCTION" : "TEST";
-
-  // Canonical origin guard: Google Pay & Wallet Console whitelists "www.novixaretail.com".
-  // If a user navigates to the non-www domain, seamlessly redirect to www in production.
   useEffect(() => {
-    if (
-      typeof window !== "undefined" &&
-      window.location.hostname === "novixaretail.com" &&
-      window.location.protocol === "https:"
-    ) {
-      window.location.replace(
-        `https://www.novixaretail.com${window.location.pathname}${window.location.search}`,
-      );
-    }
-  }, []);
-
-  // Step 1: Dynamically load the Google Pay Web SDK script
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    if (window.google?.payments?.api?.PaymentsClient) {
-      setIsSdkLoaded(true);
-      return;
-    }
-
-    const existingScript = document.querySelector(`script[src="${GPAY_SCRIPT_URL}"]`);
-    if (existingScript) {
-      existingScript.addEventListener("load", () => setIsSdkLoaded(true));
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = GPAY_SCRIPT_URL;
-    script.async = true;
-    script.onload = () => setIsSdkLoaded(true);
-    script.onerror = () => {
-      console.warn("Failed to load Google Pay SDK.");
-      setIsReadyToPay(false);
-      onAvailabilityChange?.(false);
-    };
-    document.head.appendChild(script);
+    availabilityRef.current = onAvailabilityChange;
   }, [onAvailabilityChange]);
 
-  // Step 1b: Ensure PayPal JS SDK with googlepay component is loaded
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    if ((window as any).paypal?.Googlepay) {
-      return;
-    }
-
-    const ppScriptUrl = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=${currency}&components=buttons,googlepay,applepay`;
-    const existing = document.querySelector('script[src*="paypal.com/sdk/js"]');
-    if (!existing) {
-      const script = document.createElement("script");
-      script.src = ppScriptUrl;
-      script.async = true;
-      document.head.appendChild(script);
-    }
-  }, [clientId, currency]);
-
-  // Step 2: Initialize PaymentsClient and verify isReadyToPay
-  // Per Google Pay API v2 guidelines, tokenizationSpecification is NOT required for isReadyToPay.
-  useEffect(() => {
-    if (
-      !isSdkLoaded ||
-      typeof window === "undefined" ||
-      !window.google?.payments?.api?.PaymentsClient
-    ) {
-      return;
-    }
-
-    try {
-      const gpayMerchantId =
-        process.env.NEXT_PUBLIC_GOOGLE_PAY_MERCHANT_ID || "BCR2DN6D5L703ZKP";
-
-      const client = new window.google.payments.api.PaymentsClient({
-        environment: googlePayEnv,
-        merchantInfo:
-          googlePayEnv === "PRODUCTION"
-            ? {
-                merchantId: gpayMerchantId,
-                merchantName: "NOVIXA UK",
-                merchantOrigin: "www.novixaretail.com",
-              }
-            : {
-                merchantName: "NOVIXA UK",
-              },
-      });
-      paymentsClientRef.current = client;
-
-      // Base card payment method for isReadyToPay check (no tokenization needed for readiness check)
-      const isReadyToPayRequest = {
-        apiVersion: 2,
-        apiVersionMinor: 0,
-        allowedPaymentMethods: [
-          {
-            type: "CARD",
-            parameters: {
-              allowedAuthMethods: ["PAN_ONLY", "CRYPTOGRAM_3DS"],
-              allowedCardNetworks: ["MASTERCARD", "VISA", "AMEX", "DISCOVER"],
-            },
-          },
-        ],
-      };
-
-      client
-        .isReadyToPay(isReadyToPayRequest)
-        .then((response: { result: boolean }) => {
-          const ready = Boolean(response?.result);
-          setIsReadyToPay(ready);
-          onAvailabilityChange?.(ready);
-        })
-        .catch((err: any) => {
-          console.warn("Google Pay isReadyToPay check error:", err);
-          setIsReadyToPay(false);
-          onAvailabilityChange?.(false);
-        });
-    } catch (err: any) {
-      console.warn("Google PaymentsClient initialization error:", err);
-      setIsReadyToPay(false);
-      onAvailabilityChange?.(false);
-    }
-  }, [isSdkLoaded, googlePayEnv, clientId, onAvailabilityChange]);
-
-  // Step 3: Handle native payment sheet presentation and capture
-  const handlePayment = useCallback(async () => {
+    let cancelled = false;
+    runtimeRef.current = null;
+    setIsReadyToPay(null);
     setErrorMessage(null);
+    let publicSettings: ReturnType<typeof publicPaymentConfig> | undefined;
+    const initialize = async () => {
+      if (window.location.hostname === "novixaretail.com") {
+        window.location.replace(
+          "https://www.novixaretail.com" + window.location.pathname + window.location.search,
+        );
+        return;
+      }
+      const settingsResponse = await fetch("/api/payments/config", {
+        cache: "no-store",
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!settingsResponse.ok) throw new Error("Server payment configuration is unavailable.");
+      publicSettings = await settingsResponse.json();
+      if (cancelled) return;
+      if (!publicSettings) throw new Error("Server returned no payment configuration.");
+      const {
+        paypalClientId: clientId,
+        paypalMode,
+        googlePayEnvironment: environment,
+        googlePayMerchantId: merchantId,
+      } = publicSettings;
+      if (!clientId) throw new Error("PayPal client ID is missing.");
+      const sdkParams = new URLSearchParams({
+        "client-id": clientId,
+        currency,
+        intent: "capture",
+        components: "buttons,googlepay,applepay",
+      });
+      await Promise.all([
+        loadWalletScript({
+          src: "https://pay.google.com/gp/p/js/pay.js",
+          isReady: () => Boolean(window.google?.payments?.api?.PaymentsClient),
+        }),
+        loadWalletScript({
+          src: "https://www.paypal.com/sdk/js?" + sdkParams,
+          isReady: () => Boolean(getPayPalGooglePay()),
+          validateExisting: (src) => validatePayPalGooglePayScript(src, clientId, currency),
+        }),
+      ]);
+      if (cancelled) return;
+      const helper = getPayPalGooglePay();
+      const PaymentsClient = window.google?.payments?.api?.PaymentsClient;
+      if (!helper || !PaymentsClient) throw new Error("Google Pay SDK is unavailable.");
+      const sdkConfig = await withWalletTimeout(
+        helper.config(),
+        "PayPal Google Pay configuration timed out.",
+      );
+      if (cancelled) return;
+      const config = resolveGooglePayConfig(sdkConfig, {
+        environment,
+        merchantId,
+        paypalMode,
+        clientId,
+        origin: window.location.origin,
+      });
+      console.info("[NOVIXA Google Pay] configuration", config.diagnostics);
+      const client = new PaymentsClient({
+        environment: config.environment,
+        merchantInfo: config.merchantInfo,
+      });
+      const ready = await withWalletTimeout(
+        client.isReadyToPay({
+          apiVersion: 2,
+          apiVersionMinor: 0,
+          allowedPaymentMethods: config.allowedPaymentMethods.map(({ type, parameters }) => ({
+            type,
+            parameters,
+          })),
+        }),
+        "Google Pay readiness check timed out.",
+      );
+      if (cancelled) return;
+      runtimeRef.current = ready.result ? { client, helper, config } : null;
+      setIsReadyToPay(Boolean(ready.result));
+      availabilityRef.current?.(Boolean(ready.result));
+    };
+    initialize().catch((error: unknown) => {
+      if (cancelled) return;
+      // Whitelist public identifiers and error fields; never log wallet/customer payloads.
+      console.error("[NOVIXA Google Pay] initialization failed", {
+        origin: window.location.origin,
+        ...publicSettings,
+        ...googlePayErrorDetails(error),
+      });
+      setIsReadyToPay(false);
+      setErrorMessage(googlePayCustomerMessage(error));
+      availabilityRef.current?.(false);
+    });
+    return () => {
+      cancelled = true;
+      runtimeRef.current = null;
+    };
+  }, [currency]);
 
-    if (!validateBeforePayment()) {
+  const handlePayment = useCallback(async () => {
+    if (disabled || processingRef.current || !validateBeforePayment()) return;
+    const runtime = runtimeRef.current;
+    if (!runtime) return;
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setErrorMessage("Please review your order total before paying.");
       return;
     }
-
-    if (!paymentsClientRef.current) {
-      toast.error("Google Pay is not initialized yet. Please try again.");
-      return;
-    }
-
+    processingRef.current = true;
     setIsProcessing(true);
-
+    setErrorMessage(null);
+    let stage = "payment-sheet";
     try {
-      // 1. Prepare payment data request with official parameters
-      const paypalMerchantId =
-        process.env.NEXT_PUBLIC_PAYPAL_MERCHANT_ID || "WWHXT7BPBR6P2";
-
-      let allowedPaymentMethods: any[] = [
-        {
-          type: "CARD",
-          parameters: {
-            allowedAuthMethods: ["PAN_ONLY", "CRYPTOGRAM_3DS"],
-            allowedCardNetworks: ["MASTERCARD", "VISA", "AMEX", "DISCOVER"],
-            billingAddressRequired: true,
-            billingAddressParameters: {
-              format: "FULL",
-            },
-          },
-          tokenizationSpecification: {
-            type: "PAYMENT_GATEWAY",
-            parameters: {
-              gateway: "paypalppcp",
-              gatewayMerchantId: paypalMerchantId,
-            },
-          },
-        },
-      ];
-
-      // Retrieve dynamic configuration from PayPal Googlepay SDK if available
-      let ppConfig: any = null;
-      if (typeof window !== "undefined" && (window as any).paypal?.Googlepay) {
-        try {
-          ppConfig = await (window as any).paypal.Googlepay().config();
-          if (ppConfig?.allowedPaymentMethods && ppConfig.allowedPaymentMethods.length > 0) {
-            allowedPaymentMethods = ppConfig.allowedPaymentMethods;
-          }
-        } catch (sdkConfigErr) {
-          console.warn("paypal.Googlepay().config() notice:", sdkConfigErr);
-        }
-      }
-
-      const gpayMerchantId = process.env.NEXT_PUBLIC_GOOGLE_PAY_MERCHANT_ID || "BCR2DN6D5L703ZKP";
-
-      const merchantInfo: any = {
-        merchantName: "NOVIXA UK",
-        ...(ppConfig?.merchantInfo || {}),
-      };
-
-      if (googlePayEnv === "PRODUCTION") {
-        merchantInfo.merchantId = gpayMerchantId;
-        merchantInfo.merchantOrigin = "www.novixaretail.com";
-      }
-
-      // Official Google Pay API v2 MerchantInfo schema
-      const paymentDataRequest: any = {
+      console.info("[NOVIXA Google Pay] payment-sheet request", runtime.config.diagnostics);
+      // No network await before loadPaymentData: preserve the user's click activation.
+      const paymentData = await runtime.client.loadPaymentData({
         apiVersion: 2,
         apiVersionMinor: 0,
-        allowedPaymentMethods,
+        allowedPaymentMethods: runtime.config.allowedPaymentMethods,
+        merchantInfo: runtime.config.merchantInfo,
         transactionInfo: {
           totalPriceStatus: "FINAL",
           totalPrice: amount.toFixed(2),
           currencyCode: currency,
           countryCode: "GB",
         },
-        merchantInfo,
-      };
-
-      // 2. Start server-authoritative PayPal order creation in parallel
-      const orderPromise = fetch("/api/payments/paypal/create-order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
-          couponCode: couponCode || undefined,
-          shippingMethodId: shippingMethodId || undefined,
-          shippingAddress: shippingAddress?.addressLine1 ? shippingAddress : undefined,
-          currency,
-          paymentSource: "google_pay",
-        }),
-      }).then(async (orderRes) => {
-        const orderData = await orderRes.json();
-        if (!orderRes.ok || !orderData.id) {
-          throw new Error(orderData.error || "Failed to initialize PayPal order for Google Pay.");
-        }
-        return orderData.id as string;
       });
-
-      // 3. Immediately trigger Google Pay sheet to preserve user activation & prevent popup blockers
-      const paymentData = await paymentsClientRef.current.loadPaymentData(paymentDataRequest);
-      const paypalOrderId = await orderPromise;
-
-      // Optional: Client-side SDK confirmation if available
-      if (typeof window !== "undefined" && (window as any).paypal?.Googlepay) {
-        try {
-          await (window as any).paypal.Googlepay().confirmOrder({
-            orderId: paypalOrderId,
-            paymentMethodData: paymentData.paymentMethodData,
-          });
-        } catch (sdkConfirmErr: any) {
-          console.warn(
-            "paypal.Googlepay().confirmOrder notice:",
-            sdkConfirmErr?.message || sdkConfirmErr,
-          );
-        }
-      }
-
-      // 3. Confirm payment source and capture through PayPal
-      const confirmRes = await fetch("/api/wallets/googlepay-confirm", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          paypalOrderId,
-          paymentMethodData: paymentData.paymentMethodData,
-        }),
+      stage = "create-order";
+      // A merchant error or cancellation no longer creates an abandoned PayPal order.
+      const order = await paymentRequest("/api/payments/paypal/create-order", {
+        items: items.map(({ productId, quantity }) => ({ productId, quantity })),
+        couponCode,
+        shippingMethodId,
+        shippingAddress: shippingAddress?.addressLine1 ? shippingAddress : undefined,
+        currency,
+        paymentSource: "google_pay",
       });
-
-      const confirmResult = await confirmRes.json();
-      if (!confirmRes.ok || !confirmResult.ok) {
-        throw new Error(confirmResult.error || "Payment authorization with Google Pay failed.");
-      }
-
-      // 4. Finalize order in store
-      await onSuccess({
-        paypalOrderId,
-        captureId: confirmResult.captureId,
-        payerEmail: confirmResult.payerEmail || paymentData.email,
-      });
-    } catch (err: any) {
-      if (err?.statusCode === "CANCELED" || err?.message?.includes("CANCELED")) {
-        toast.info("Google Pay authorization was cancelled.");
-      } else if (
-        err?.message?.includes("OR_BIBED_11") ||
-        String(err).includes("OR_BIBED_11") ||
-        err?.statusMessage?.includes("OR_BIBED_11")
+      if (!order.id) throw new Error("PayPal did not return an order ID.");
+      if (
+        !Number.isFinite(Number(order.amount)) ||
+        Math.abs(Number(order.amount) - amount) > 0.005
       ) {
-        console.warn("Google Pay OR_BIBED_11: Google Pay merchant verification is required. Directing user to Credit Card / PayPal.");
-        const msg =
-          "Google Pay is currently undergoing verification. Please select Credit/Debit Card or PayPal above to complete your order seamlessly.";
-        setErrorMessage(msg);
-        toast.error(msg, { duration: 6000 });
-        onError?.(msg);
+        throw new Error("The order total changed. Review your order before retrying Google Pay.");
+      }
+      stage = "authorization";
+      await authorizeGooglePayOrder(
+        runtime.helper,
+        order.id,
+        paymentData.paymentMethodData,
+        async () => {
+          stage = "capture";
+          // PayPal's JS SDK owns token confirmation. Only an order ID goes to our server.
+          const capture = await paymentRequest("/api/wallets/googlepay-confirm", {
+            paypalOrderId: order.id,
+          });
+          if (!capture.ok) throw new Error("Google Pay capture has not completed.");
+          stage = "finalize-order";
+          await onSuccess({
+            paypalOrderId: order.id,
+            captureId: capture.captureId,
+            payerEmail: capture.payerEmail || paymentData.email,
+          });
+        },
+      );
+    } catch (error: unknown) {
+      const details = googlePayErrorDetails(error);
+      if (details.cancelled) {
+        toast.info("Google Pay was cancelled. Your shopping bag is preserved.");
       } else {
-        console.error("Google Pay transaction error:", err);
-        const msg = err.message || "Failed to complete Google Pay checkout. Please try using Credit Card or PayPal.";
-        setErrorMessage(msg);
-        toast.error(msg);
-        onError?.(msg);
+        console.error("[NOVIXA Google Pay] checkout failed", {
+          stage,
+          ...runtime.config.diagnostics,
+          ...details,
+        });
+        const message =
+          stage === "finalize-order" || stage === "capture"
+            ? "Payment confirmation needs checking. Please contact support before trying another payment."
+            : googlePayCustomerMessage(error);
+        setErrorMessage(message);
+        toast.error(message);
+        onError?.(message);
       }
     } finally {
+      processingRef.current = false;
       setIsProcessing(false);
     }
   }, [
+    disabled,
     validateBeforePayment,
+    amount,
+    currency,
     items,
     couponCode,
     shippingMethodId,
     shippingAddress,
-    currency,
-    clientId,
-    amount,
-    googlePayEnv,
     onSuccess,
     onError,
   ]);
 
-  // Step 4: Mount the official Google Pay button inside containerRef
   useEffect(() => {
     const container = containerRef.current;
-    if (!container || !isReadyToPay || !paymentsClientRef.current) return;
-
-    // Clear previous children
-    container.innerHTML = "";
-
+    const runtime = runtimeRef.current;
+    if (!container || !isReadyToPay || !runtime) return;
+    container.replaceChildren();
     try {
-      const button = paymentsClientRef.current.createButton({
-        onClick: handlePayment,
+      const button = runtime.client.createButton({
+        onClick: () => void handlePayment(),
         buttonColor: "black",
         buttonType: "buy",
         buttonSizeMode: "fill",
       });
-
       button.style.width = "100%";
       button.style.minHeight = "48px";
-
       container.appendChild(button);
-    } catch (err) {
-      console.warn("Failed to create Google Pay button:", err);
+    } catch (error) {
+      console.error("[NOVIXA Google Pay] button failed", googlePayErrorDetails(error));
+      setErrorMessage(googlePayCustomerMessage(error));
     }
-
-    return () => {
-      if (container) {
-        container.innerHTML = "";
-      }
-    };
+    return () => container.replaceChildren();
   }, [isReadyToPay, handlePayment]);
 
   return (
     <div className="w-full max-w-full space-y-3 pt-2">
       {errorMessage && (
-        <div className="flex items-center gap-2 text-xs text-rose-700 bg-rose-50 p-3 border border-rose-200">
+        <div
+          role="alert"
+          className="flex items-center gap-2 text-xs text-rose-700 bg-rose-50 p-3 border border-rose-200"
+        >
           <AlertCircle size={14} />
           <span>{errorMessage}</span>
         </div>
       )}
-
       {isProcessing && (
-        <div className="flex items-center justify-center gap-2 p-4 text-xs font-medium text-stone-700 bg-stone-50 border border-stone-200">
+        <div
+          role="status"
+          className="flex items-center justify-center gap-2 p-4 text-xs font-medium text-stone-700 bg-stone-50 border border-stone-200"
+        >
           <Loader2 size={16} className="animate-spin text-rosewood" />
-          <span>Processing your Google Pay authorization via PayPal...</span>
+          <span>Processing your Google Pay payment...</span>
         </div>
       )}
-
-      {isReadyToPay === false && (
+      {isReadyToPay === false && !errorMessage && (
         <div className="p-3 bg-amber-50 border border-amber-200 text-xs text-amber-800">
-          Google Pay is not available on this browser or no compatible card is configured. Please
-          select Credit Card or PayPal above.
+          Google Pay is not available for this checkout. Please select Card or PayPal.
         </div>
       )}
-
       {isReadyToPay === null && (
-        <div className="flex items-center justify-center py-4">
+        <div role="status" className="flex items-center justify-center py-4">
           <Loader2 size={18} className="animate-spin text-rosewood" />
           <span className="ml-2 text-xs text-muted-foreground">Initializing Google Pay...</span>
         </div>
       )}
-
-      {/* Official Native Google Pay Button Container */}
       <div
         ref={containerRef}
-        className={`w-full min-h-[48px] ${
-          isProcessing || disabled || isReadyToPay !== true ? "pointer-events-none opacity-50" : ""
-        }`}
+        aria-busy={isProcessing}
+        className={
+          "w-full min-h-[48px] " +
+          (isProcessing || disabled || isReadyToPay !== true
+            ? "pointer-events-none opacity-50"
+            : "")
+        }
       />
-
       <div className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
         <ShieldCheck size={13} className="text-emerald-700" />
-        <span>Biometrically protected with Google Pay · Processed by PayPal</span>
+        <span>Secure checkout with Google Pay · Processed by PayPal</span>
       </div>
     </div>
   );

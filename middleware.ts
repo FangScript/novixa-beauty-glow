@@ -1,63 +1,48 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { updateSession } from "@/utils/supabase/middleware";
-
+import { isAllowedMutation } from "@/lib/security/request";
 export async function middleware(request: NextRequest) {
-  const host = request.headers.get("host") || "";
-
-  // ── Canonical host redirect (non-www -> www) ──────────────────────────────
-  // Exclude /.well-known so Apple Pay and SSL domain verification bots do not encounter a 301 redirect
+  const { pathname, hostname } = request.nextUrl;
   if (
-    host.startsWith("novixaretail.com") &&
-    !request.nextUrl.pathname.startsWith("/.well-known/")
+    pathname.startsWith("/api/") &&
+    pathname !== "/api/payments/webhook" &&
+    !isAllowedMutation(request, process.env.APP_URL)
   ) {
-    const cleanUrl = new URL(
-      `https://www.novixaretail.com${request.nextUrl.pathname}${request.nextUrl.search}`,
+    return NextResponse.json(
+      { error: "Cross-origin mutations are not permitted." },
+      { status: 403 },
     );
-    return NextResponse.redirect(cleanUrl, 301);
   }
-
-  const { pathname } = request.nextUrl;
-
-  // Refresh Supabase session cookies
-  const { supabaseResponse, user } = await updateSession(request);
-
-  // Forward pathname to server components
-  supabaseResponse.headers.set("x-pathname", pathname);
-
-  // ── Admin guard ───────────────────────────────────────────────────────────
-  if (pathname.startsWith("/admin") && !pathname.startsWith("/admin/login")) {
-    const sessionCookie = request.cookies.get("novixa_admin_session")?.value;
-    const isSupabaseAdmin = user?.user_metadata?.role === "ADMIN";
-
-    // If neither a session cookie nor a verified Supabase admin token exists, redirect immediately
-    if (!sessionCookie && !isSupabaseAdmin) {
-      const loginUrl = new URL("/admin/login", request.url);
-      return NextResponse.redirect(loginUrl);
-    }
-    // Authoritative session verification against PostgreSQL is enforced in app/admin/layout.tsx
-    // and in every admin route handler via getAuthenticatedAdmin().
+  if (hostname === "novixaretail.com" && !pathname.startsWith("/.well-known/")) {
+    const target = request.nextUrl.clone();
+    target.protocol = "https:";
+    target.hostname = "www.novixaretail.com";
+    target.port = "";
+    return NextResponse.redirect(target, 308);
   }
-
-  // ── Customer guard (Account Management) ───────────────────────────────────
-  // Note: Guest checkout is permitted on /checkout; only /account requires login.
-  if (pathname.startsWith("/account")) {
-    const legacySession = request.cookies.get("novixa_customer_session")?.value;
-    if (!user && !legacySession) {
-      const loginUrl = new URL("/login", request.url);
-      loginUrl.searchParams.set("next", pathname);
-      return NextResponse.redirect(loginUrl);
-    }
+  const headers = new Headers(request.headers);
+  headers.set("x-pathname", pathname);
+  if (
+    pathname.startsWith("/admin") &&
+    pathname !== "/admin/login" &&
+    !request.cookies.get("novixa_admin_session")?.value
+  ) {
+    return NextResponse.redirect(new URL("/admin/login", request.url));
   }
-
-  return supabaseResponse;
+  if (
+    pathname.startsWith("/account") &&
+    pathname !== "/account/reset-password" &&
+    !request.cookies.get("novixa_customer_session")?.value
+  ) {
+    const target = new URL("/login", request.url);
+    target.searchParams.set("next", pathname);
+    return NextResponse.redirect(target);
+  }
+  const response = NextResponse.next({ request: { headers } });
+  if (/^\/(api\/(auth|orders|payments|wallets)|account|admin)/.test(pathname))
+    response.headers.set("Cache-Control", "no-store");
+  return response;
 }
-
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for static assets
-     */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };

@@ -1,231 +1,134 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
+import { OrderStatus, PaymentStatus, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/client";
-import { PaymentStatus, OrderStatus } from "@prisma/client";
-import { verifyWebhookSignature } from "@/lib/payments/processor";
 import { verifyPayPalWebhookSignature } from "@/lib/payments/paypal";
-
+import { paymentEventDecision, eventCaptureId } from "@/lib/commerce/payment-events";
+import { readBody, apiFailure, ApiError } from "@/lib/security/api";
 export async function POST(request: Request) {
   try {
-    const rawBody = await request.text();
-
-    let payload: any;
+    const rawEvent = (await readBody(request, 262144)).toString("utf8");
+    let input: unknown;
     try {
-      payload = JSON.parse(rawBody);
+      input = JSON.parse(rawEvent);
     } catch {
-      return NextResponse.json({ error: "Invalid JSON payload." }, { status: 400 });
+      throw new ApiError("Invalid webhook JSON.");
     }
-
-    // PayPal Transmission Headers
-    const transmissionId = request.headers.get("paypal-transmission-id");
-    const transmissionTime = request.headers.get("paypal-transmission-time");
-    const certUrl = request.headers.get("paypal-cert-url");
-    const authAlgo = request.headers.get("paypal-auth-algo");
-    const transmissionSig = request.headers.get("paypal-transmission-sig");
-    const paypalWebhookId = process.env.PAYPAL_WEBHOOK_ID;
-
-    let isVerified = false;
-
-    // Check PayPal Asymmetric Webhook Signature
+    const parsed = z
+      .object({
+        id: z.string().min(1).max(128),
+        event_type: z.string().min(1).max(128),
+        resource: z.record(z.any()),
+        resource_type: z.string().optional(),
+      })
+      .passthrough()
+      .safeParse(input);
+    if (!parsed.success) throw new ApiError("Invalid webhook event.");
+    const payload = parsed.data;
+    const get = (header: string) => request.headers.get(header) || "";
+    const webhookId = process.env.PAYPAL_WEBHOOK_ID;
+    const transmissionId = get("paypal-transmission-id"),
+      transmissionTime = get("paypal-transmission-time");
+    const certUrl = get("paypal-cert-url"),
+      authAlgo = get("paypal-auth-algo"),
+      transmissionSig = get("paypal-transmission-sig");
     if (
-      transmissionId &&
-      transmissionSig &&
-      certUrl &&
-      authAlgo &&
-      transmissionTime &&
-      paypalWebhookId
-    ) {
-      isVerified = await verifyPayPalWebhookSignature({
+      !webhookId ||
+      !transmissionId ||
+      !transmissionTime ||
+      !certUrl ||
+      !authAlgo ||
+      !transmissionSig
+    )
+      throw new ApiError("A native PayPal webhook signature is required.", 401);
+    if (
+      !(await verifyPayPalWebhookSignature({
+        webhookId,
         transmissionId,
         transmissionTime,
         certUrl,
         authAlgo,
         transmissionSig,
-        webhookId: paypalWebhookId,
-        webhookEvent: payload,
-      });
-
-      if (!isVerified) {
-        return NextResponse.json({ error: "Invalid PayPal webhook signature." }, { status: 401 });
-      }
-    } else {
-      // Custom HMAC signature verification
-      const signature = request.headers.get("x-webhook-signature") || "";
-      const webhookSecret = process.env.PAYMENT_WEBHOOK_SECRET;
-
-      if (webhookSecret && signature) {
-        isVerified = verifyWebhookSignature(rawBody, signature, webhookSecret);
-      }
-    }
-
-    if (!isVerified) {
-      return NextResponse.json(
-        { error: "Unauthorized. Webhook signature is required and must be valid." },
-        { status: 401 },
-      );
-    }
-
-    // Idempotency: Check if this webhook event was already processed
-    const webhookEventId = payload.id;
-    if (webhookEventId && process.env.DATABASE_URL) {
-      const existingEvent = await prisma.webhookEvent
-        .findUnique({
-          where: { id: webhookEventId },
-        })
-        .catch(() => null);
-
-      if (existingEvent) {
-        return NextResponse.json({ received: true, alreadyProcessed: true });
-      }
-    }
-
-    // Extract identifiers supporting both native PayPal webhook schema and custom formats
-    const eventType = (payload.event_type || payload.eventType || "").toUpperCase();
-    const resource = payload.resource || {};
-    const captureId = resource.id;
-    const paypalOrderId =
-      resource.supplementary_data?.related_ids?.order_id ||
-      (payload.resource_type === "checkout-order" ? resource.id : undefined);
-    const orderNumber = payload.orderNumber || resource.custom_id || resource.invoice_id;
-    const providerPaymentId =
-      payload.providerPaymentId || captureId || paypalOrderId || resource.id;
-    const eventStatus = (resource.status || payload.status || "").toUpperCase();
-    const orderId = payload.orderId;
-
-    if (!providerPaymentId && !orderId && !orderNumber) {
-      return NextResponse.json({ error: "Missing order or payment identifier." }, { status: 400 });
-    }
-
-    // Locate order
+        webhookEventRaw: rawEvent,
+      }))
+    )
+      throw new ApiError("Invalid PayPal webhook signature.", 401);
+    if (
+      ![
+        "PAYMENT.CAPTURE.COMPLETED",
+        "PAYMENT.CAPTURE.DENIED",
+        "PAYMENT.CAPTURE.REFUNDED",
+        "PAYMENT.CAPTURE.REVERSED",
+      ].includes(payload.event_type)
+    )
+      return NextResponse.json({ received: true, action: "ignore" });
+    const resource = payload.resource;
+    const related = resource.supplementary_data?.related_ids;
+    const providerId = eventCaptureId(payload.event_type, resource);
+    if (!providerId) throw new ApiError("A capture reference is required for reconciliation.");
     const order = await prisma.order.findFirst({
       where: {
-        OR: [
-          ...(orderId ? [{ id: orderId }] : []),
-          ...(orderNumber ? [{ orderNumber }] : []),
-          ...(providerPaymentId ? [{ payment: { providerPaymentId } }] : []),
-          ...(paypalOrderId ? [{ payment: { providerPaymentId: paypalOrderId } }] : []),
-        ],
+        payment: {
+          provider: "PAYPAL",
+          providerPaymentId: {
+            in: [providerId, related?.order_id].filter(
+              (id): id is string => typeof id === "string" && Boolean(id),
+            ),
+          },
+        },
       },
       include: { payment: true },
     });
-
-    if (!order) {
-      return NextResponse.json({ error: "Order not found." }, { status: 404 });
-    }
-
-    // Idempotency: If order is already paid, acknowledge without re-processing
-    if (
-      order.paymentStatus === PaymentStatus.PAID &&
-      (eventStatus === "PAID" || eventStatus === "COMPLETED")
-    ) {
-      return NextResponse.json({ received: true, alreadyPaid: true });
-    }
-
-    // Map status from PayPal events
-    let newPaymentStatus: PaymentStatus = PaymentStatus.PENDING;
-    let newOrderStatus: OrderStatus = order.status;
-
-    if (
-      eventType === "PAYMENT.CAPTURE.COMPLETED" ||
-      eventType === "PAYMENT.CAPTURED" ||
-      eventStatus === "COMPLETED" ||
-      eventStatus === "PAID"
-    ) {
-      newPaymentStatus = PaymentStatus.PAID;
-      // Never downgrade an order that is already PROCESSING, SHIPPED, or DELIVERED
-      if (order.status === OrderStatus.PENDING) {
-        newOrderStatus = OrderStatus.CONFIRMED;
-      }
-    } else if (
-      eventType === "PAYMENT.CAPTURE.DENIED" ||
-      eventType === "PAYMENT.FAILED" ||
-      eventStatus === "DENIED" ||
-      eventStatus === "FAILED"
-    ) {
-      if (order.paymentStatus !== PaymentStatus.PAID) {
-        newPaymentStatus = PaymentStatus.FAILED;
-      }
-    } else if (
-      eventType === "PAYMENT.CAPTURE.REFUNDED" ||
-      eventType === "PAYMENT.CAPTURE.REVERSED" ||
-      eventType === "PAYMENT.CANCELLED" ||
-      eventStatus === "CANCELLED" ||
-      eventStatus === "REFUNDED"
-    ) {
-      if (eventType === "PAYMENT.CAPTURE.REFUNDED" || eventStatus === "REFUNDED") {
-        newPaymentStatus = PaymentStatus.REFUNDED;
-        newOrderStatus = OrderStatus.REFUNDED;
-      } else {
-        newPaymentStatus = PaymentStatus.CANCELLED;
-        newOrderStatus = OrderStatus.CANCELLED;
-      }
-    }
-
-    await prisma.$transaction(async (tx) => {
-      // If order was cancelled or refunded via webhook and wasn't already in that state, restock inventory
-      const isCancellationOrRefund =
-        newOrderStatus === OrderStatus.CANCELLED || newOrderStatus === OrderStatus.REFUNDED;
-      const wasAlreadyRestocked =
-        order.status === OrderStatus.CANCELLED || order.status === OrderStatus.REFUNDED;
-
-      if (isCancellationOrRefund && !wasAlreadyRestocked) {
-        const orderWithItems = await tx.order.findUnique({
-          where: { id: order.id },
-          include: { items: true },
-        });
-        if (orderWithItems?.items) {
-          for (const item of orderWithItems.items) {
-            if (item.productId) {
-              await tx.product.update({
-                where: { id: item.productId },
-                data: { stock: { increment: Number(item.quantity) } },
-              });
-            }
-          }
-        }
-      }
-
-      await tx.order.update({
-        where: { id: order.id },
+    if (!order) throw new ApiError("Order is not ready for reconciliation.", 503);
+    const result = await prisma.$transaction(async (tx) => {
+      // Claim and processing commit together; retries cannot double-apply.
+      await tx.webhookEvent.create({
+        // The source is parsed JSON; passthrough fields retain the provider event for reconciliation.
         data: {
-          status: newOrderStatus,
-          paymentStatus: newPaymentStatus,
+          id: payload.id,
+          eventType: payload.event_type,
+          resourceId: providerId,
+          payload: payload as Prisma.InputJsonObject,
         },
       });
-
-      if (order.payment) {
-        await tx.payment.update({
-          where: { id: order.payment.id },
+      const current = await tx.order.findUniqueOrThrow({ where: { id: order.id } });
+      const decision = paymentEventDecision(payload.event_type, current, resource.amount);
+      if (decision.action === "update") {
+        const changed = await tx.order.updateMany({
+          where: { id: current.id, updatedAt: current.updatedAt },
           data: {
-            status: newPaymentStatus,
-            rawStatus: JSON.stringify({
-              lastWebhookEvent: eventType || eventStatus,
-              receivedAt: new Date().toISOString(),
-            }),
+            paymentStatus: decision.paymentStatus as PaymentStatus,
+            status: decision.status as OrderStatus,
           },
         });
+        if (changed.count !== 1)
+          throw new ApiError("Order changed concurrently. Retry reconciliation.", 409);
+        if (order.payment)
+          await tx.payment.update({
+            where: { id: order.payment.id },
+            data: { status: decision.paymentStatus as PaymentStatus },
+          });
       }
-
-      if (webhookEventId) {
-        await tx.webhookEvent
-          .create({
-            data: {
-              id: webhookEventId,
-              eventType: eventType || "UNKNOWN",
-              resourceId: providerPaymentId || order.id,
-              status: newPaymentStatus,
-              payload: payload,
-            },
-          })
-          .catch(() => null);
-      }
+      await tx.webhookEvent.update({
+        where: { id: payload.id },
+        data: {
+          status:
+            decision.action === "partial-refund"
+              ? "PARTIAL_REFUND_REVIEW_REQUIRED"
+              : decision.action,
+        },
+      });
+      // Financial refunds do not prove that physical stock was returned.
+      return decision.action;
     });
-
-    return NextResponse.json({ received: true, status: newPaymentStatus });
+    return NextResponse.json({ received: true, action: result });
   } catch (error: any) {
-    console.error("Webhook processing error:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to process webhook." },
-      { status: 500 },
+    if (error?.code === "P2002")
+      return NextResponse.json({ received: true, alreadyProcessed: true });
+    console.error(
+      "PayPal webhook reconciliation failed",
+      error instanceof Error ? error.message : "Unknown error",
     );
+    return apiFailure(error, "Unable to reconcile this payment event.");
   }
 }

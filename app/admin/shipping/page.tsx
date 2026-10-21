@@ -221,9 +221,7 @@ export default function AdminShippingPage() {
 
   const activeCount = methods.filter((m) => m.active).length;
   const defaultMethod = methods.find((m) => m.isDefault);
-  const lowestCharge = methods.length
-    ? Math.min(...methods.map((m) => Number(m.price) || 0))
-    : 0;
+  const lowestCharge = methods.length ? Math.min(...methods.map((m) => Number(m.price) || 0)) : 0;
 
   return (
     <AdminShell

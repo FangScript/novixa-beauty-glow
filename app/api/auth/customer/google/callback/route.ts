@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${appUrl}/login?error=no_code`);
   }
 
-  // 1. Validate CSRF state (Dual check: cryptographic HMAC signature OR cookie match)
+  // 1. Require both a valid HMAC signature and the matching browser state cookie.
   const cookieStore = await cookies();
   const savedCookieState = cookieStore.get("novixa_google_state")?.value;
 
@@ -33,12 +33,9 @@ export async function GET(request: Request) {
     savedCookieState && returnedState && savedCookieState === returnedState,
   );
 
-  if (!verifiedState.valid && !cookieMatches) {
-    console.error("Google OAuth state validation failed:", {
-      returnedState,
-      savedCookieState,
-      hmacValid: verifiedState.valid,
-    });
+  cookieStore.delete("novixa_google_state");
+  if (!verifiedState.valid || !cookieMatches) {
+    console.error("Google OAuth browser state validation failed.");
     return NextResponse.redirect(`${appUrl}/login?error=invalid_state`);
   }
 
@@ -94,8 +91,8 @@ export async function GET(request: Request) {
 
     const profile = await profileRes.json();
 
-    if (!profile.email || !profile.id) {
-      console.error("Google profile missing email or id:", profile);
+    if (!profile.email || !profile.id || profile.verified_email !== true) {
+      console.error("Google profile does not contain a verified email.");
       return NextResponse.redirect(`${appUrl}/login?error=no_email`);
     }
 

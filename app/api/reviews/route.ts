@@ -1,6 +1,9 @@
+import { z } from "zod";
+import { readJson, limitAttempts, apiFailure } from "@/lib/security/api";
+import { isReviewMedia } from "@/lib/security/review-media";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
-import { getAuthenticatedAdmin } from "@/lib/auth/session";
+import { getAuthenticatedAdmin, getAuthenticatedCustomer } from "@/lib/auth/session";
 
 // ─── GET /api/reviews ─────────────────────────────────────────────────────────
 export async function GET(request: Request) {
@@ -88,35 +91,31 @@ export async function GET(request: Request) {
 // ─── POST /api/reviews ────────────────────────────────────────────────────────
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const customer = await getAuthenticatedCustomer();
+    if (!customer)
+      return NextResponse.json({ error: "Sign in to submit a review." }, { status: 401 });
+    if (!process.env.DATABASE_URL)
+      return NextResponse.json({ error: "Reviews are temporarily unavailable." }, { status: 503 });
+    limitAttempts("review:" + customer.id, 5);
     const {
       productId,
-      userId,
       rating,
       title,
       body: reviewBody,
-      authorName,
-      authorEmail,
       images,
-    } = body;
-
-    if (!productId || !rating || !reviewBody) {
-      return NextResponse.json(
-        { error: "Product ID, star rating, and review text are required." },
-        { status: 400 },
-      );
-    }
-
-    const reviewImages = Array.isArray(images)
-      ? images
-          .filter((img) => typeof img === "string" && img.startsWith("/uploads/reviews/"))
-          .slice(0, 4)
-      : [];
-
-    const cleanEmail = (authorEmail || "").trim().toLowerCase();
-    const cleanName =
-      (authorName || "").trim() || (cleanEmail ? cleanEmail.split("@")[0] : "Customer");
-
+    } = await readJson(
+      request,
+      z.object({
+        productId: z.string().min(1).max(128),
+        rating: z.number().int().min(1).max(5),
+        title: z.string().trim().max(180).optional(),
+        body: z.string().trim().min(1).max(5000),
+        images: z.array(z.string().max(2048)).max(4).default([]),
+      }),
+    );
+    const reviewImages = images.filter((image) =>
+      isReviewMedia(image, process.env.NEXT_PUBLIC_SUPABASE_URL),
+    );
     if (process.env.DATABASE_URL) {
       // 1. Resolve product ID (handle slug or id)
       const targetProduct = await prisma.product.findFirst({
@@ -130,38 +129,13 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Product not found." }, { status: 404 });
       }
 
-      // 2. Resolve User ID
-      let finalUserId = userId;
-      if (finalUserId) {
-        const exists = await prisma.user.findUnique({ where: { id: finalUserId } });
-        if (!exists) finalUserId = null;
-      }
-
-      if (!finalUserId && cleanEmail) {
-        const upsertedUser = await prisma.user.upsert({
-          where: { email: cleanEmail },
-          update: { ...(cleanName && { name: cleanName }) },
-          create: {
-            email: cleanEmail,
-            name: cleanName,
-            role: "CUSTOMER",
-          },
-        });
-        finalUserId = upsertedUser.id;
-      }
-
-      if (!finalUserId) {
-        return NextResponse.json(
-          { error: "Please provide an email address or sign in to submit a review." },
-          { status: 400 },
-        );
-      }
+      const finalUserId = customer.id;
 
       // 3. Check if user purchased this product
       const hasPurchased = await prisma.order.findFirst({
         where: {
           userId: finalUserId,
-          paymentStatus: { in: ["PAID", "AUTHORIZED"] },
+          paymentStatus: "PAID",
           items: { some: { productId: targetProduct.id } },
         },
       });
@@ -201,28 +175,10 @@ export async function POST(request: Request) {
       });
     }
 
-    // Fallback simulation when no DB
-    return NextResponse.json({
-      success: true,
-      message: "Thank you! Your review has been submitted for moderation.",
-      review: {
-        id: `rev-${Date.now()}`,
-        productId,
-        customer: cleanName,
-        rating: Number(rating),
-        title: title || "",
-        review: reviewBody,
-        verified: false,
-        status: "Pending",
-        createdAt: new Date().toISOString(),
-      },
-    });
+    return NextResponse.json({ error: "Reviews are temporarily unavailable." }, { status: 503 });
   } catch (error: any) {
     console.error("POST /api/reviews error:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to submit review." },
-      { status: 500 },
-    );
+    return apiFailure(error, "Failed to submit review.");
   }
 }
 

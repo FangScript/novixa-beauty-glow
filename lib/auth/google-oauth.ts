@@ -1,9 +1,9 @@
 import { randomBytes, createHmac, timingSafeEqual } from "node:crypto";
-
-const DEFAULT_SECRET = "novixa-auth-secret-super-secure-key-32chars";
+import { authSecret } from "../security/signing";
+import { canonicalAppOrigin } from "../security/request";
 
 function getSecret(): string {
-  return process.env.AUTH_SECRET || DEFAULT_SECRET;
+  return authSecret();
 }
 
 /**
@@ -12,31 +12,16 @@ function getSecret(): string {
  * authorized redirect URIs match exactly whether accessed via www or proxy.
  */
 export function getGoogleRedirectUri(request: Request): string {
-  const url = new URL(request.url);
-
-  // In production, use APP_URL if configured
-  if (process.env.NODE_ENV === "production" && process.env.APP_URL) {
-    const appUrl = process.env.APP_URL.replace(/\/+$/, "");
-    return `${appUrl}/api/auth/customer/google/callback`;
-  }
-
-  // In development, or if APP_URL is not set, derive from request origin
-  const proto = request.headers.get("x-forwarded-proto") || url.protocol.replace(":", "");
-  const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || url.host;
-  return `${proto}://${host}/api/auth/customer/google/callback`;
+  return `${getBaseAppUrl(request)}/api/auth/customer/google/callback`;
 }
 
 /**
  * Returns the canonical base URL for post-login redirection.
  */
 export function getBaseAppUrl(request: Request): string {
-  const url = new URL(request.url);
-  if (process.env.NODE_ENV === "production" && process.env.APP_URL) {
-    return process.env.APP_URL.replace(/\/+$/, "");
-  }
-  const proto = request.headers.get("x-forwarded-proto") || url.protocol.replace(":", "");
-  const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || url.host;
-  return `${proto}://${host}`;
+  if (process.env.NODE_ENV === "production" && !process.env.APP_URL)
+    throw new Error("APP_URL is required in production.");
+  return canonicalAppOrigin(request.url, process.env.APP_URL);
 }
 
 /**
@@ -66,11 +51,11 @@ export function verifySignedState(state: string | null): { valid: boolean; next:
 
   try {
     const secret = getSecret();
-    const parts = state.split(".");
-    if (parts.length !== 2) return { valid: false, next: "/account" };
-
-    const [payload, signature] = parts;
-    if (!payload || !signature) return { valid: false, next: "/account" };
+    const separator = state.lastIndexOf(".");
+    if (separator < 0) return { valid: false, next: "/account" };
+    const payload = state.slice(0, separator),
+      signature = state.slice(separator + 1);
+    if (!payload || !/^[a-f0-9]{64}$/.test(signature)) return { valid: false, next: "/account" };
 
     const expectedSig = createHmac("sha256", secret).update(payload).digest("hex");
     const sigBuf = Buffer.from(signature, "hex");
@@ -86,8 +71,12 @@ export function verifySignedState(state: string | null): { valid: boolean; next:
     const [, timestampStr, encodedNext] = payloadParts;
     const timestamp = parseInt(timestampStr, 10);
 
-    // Expire state after 30 minutes
-    if (isNaN(timestamp) || Date.now() - timestamp > 30 * 60 * 1000) {
+    // Expire state after 15 minutes
+    if (
+      !Number.isSafeInteger(timestamp) ||
+      timestamp > Date.now() ||
+      Date.now() - timestamp > 15 * 60 * 1000
+    ) {
       return { valid: false, next: "/account" };
     }
 

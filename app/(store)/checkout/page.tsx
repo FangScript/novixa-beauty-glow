@@ -257,7 +257,9 @@ export default function CheckoutPage() {
 
     const postalCheck = validatePostalCode(formData.pinCode, formData.country || "United Kingdom");
     if (!postalCheck.isValid) {
-      toast.error(postalCheck.message || "Please enter a valid postal code for your selected country.");
+      toast.error(
+        postalCheck.message || "Please enter a valid postal code for your selected country.",
+      );
       return false;
     }
 

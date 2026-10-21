@@ -106,7 +106,7 @@ export function AddressSelector({
     if (coords) {
       if (!isWithinUkBounds(coords.lat, coords.lon)) {
         setCoordinateWarning(
-          `GPS coordinates (${coords.lat.toFixed(3)}, ${coords.lon.toFixed(3)}) are outside the UK. For UK delivery, please enter a UK postcode or address. To ship internationally, select your country below.`
+          `GPS coordinates (${coords.lat.toFixed(3)}, ${coords.lon.toFixed(3)}) are outside the UK. For UK delivery, please enter a UK postcode or address. To ship internationally, select your country below.`,
         );
         setSearchResults([]);
         setIsDropdownOpen(false);
@@ -125,9 +125,7 @@ export function AddressSelector({
     setIsLoadingResults(true);
     debounceTimerRef.current = setTimeout(async () => {
       try {
-        const res = await fetch(
-          `/api/address/postcode-lookup?q=${encodeURIComponent(trimmed)}`
-        );
+        const res = await fetch(`/api/address/postcode-lookup?q=${encodeURIComponent(trimmed)}`);
         if (res.ok) {
           const data = await res.json();
           if (data.isOutsideUk) {
@@ -166,7 +164,7 @@ export function AddressSelector({
     if (!isUk) return [];
     if (value.state) {
       const filtered = UK_MAJOR_CITIES.filter(
-        (c) => c.county.toLowerCase() === value.state.toLowerCase()
+        (c) => c.county.toLowerCase() === value.state.toLowerCase(),
       );
       if (filtered.length > 0) return filtered.map((c) => c.city);
     }
@@ -185,7 +183,7 @@ export function AddressSelector({
       if (!value.city || !value.state) {
         try {
           const res = await fetch(
-            `/api/address/postcode-lookup?postcode=${encodeURIComponent(normalized)}`
+            `/api/address/postcode-lookup?postcode=${encodeURIComponent(normalized)}`,
           );
           if (res.ok) {
             const data = await res.json();
@@ -339,7 +337,7 @@ export function AddressSelector({
               const newCity = e.target.value;
               if (isUk) {
                 const matchedCity = UK_MAJOR_CITIES.find(
-                  (c) => c.city.toLowerCase() === newCity.trim().toLowerCase()
+                  (c) => c.city.toLowerCase() === newCity.trim().toLowerCase(),
                 );
                 onChange({
                   ...value,
@@ -364,7 +362,8 @@ export function AddressSelector({
         {/* Dynamic County / State / Region */}
         <div>
           <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-            {countryConfig.label} {required && countryConfig.regions ? <span className="text-rosewood">*</span> : null}
+            {countryConfig.label}{" "}
+            {required && countryConfig.regions ? <span className="text-rosewood">*</span> : null}
           </label>
           {countryConfig.regions ? (
             <div className="relative">
@@ -423,8 +422,8 @@ export function AddressSelector({
                 value.pinCode.trim().length > 0 && !postalValidation.isValid
                   ? "border-amber-500 focus:border-rosewood focus:ring-1 focus:ring-rosewood/40"
                   : value.pinCode.trim().length > 0 && postalValidation.isValid
-                  ? "border-emerald-500/80 focus:border-rosewood focus:ring-1 focus:ring-rosewood/40"
-                  : "border-border/80 focus:border-rosewood focus:ring-1 focus:ring-rosewood/40"
+                    ? "border-emerald-500/80 focus:border-rosewood focus:ring-1 focus:ring-rosewood/40"
+                    : "border-border/80 focus:border-rosewood focus:ring-1 focus:ring-rosewood/40"
               }`}
             />
             {value.pinCode.trim().length > 0 && (

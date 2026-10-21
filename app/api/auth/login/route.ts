@@ -1,9 +1,11 @@
+import { readJson, apiFailure, limitAttempts, loginSchema } from "@/lib/security/api";
 import { NextResponse } from "next/server";
 import { loginAdmin } from "@/lib/auth/session";
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const body = await readJson(request, loginSchema);
+    limitAttempts("app/api/auth/login/route.ts" + ":" + body.email);
     const { email, password } = body;
 
     if (!email || !password) {
@@ -21,9 +23,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, admin: result.admin });
   } catch (error) {
     console.error("Login API error:", error);
-    return NextResponse.json(
-      { ok: false, error: "Authentication service error." },
-      { status: 500 },
-    );
+    return apiFailure(error, "Authentication request failed. Please try again.");
   }
 }

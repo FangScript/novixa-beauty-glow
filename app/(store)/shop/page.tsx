@@ -1,3 +1,4 @@
+import { serializeJsonLd } from "@/lib/security/html";
 export const dynamic = "force-dynamic";
 
 import type { Metadata } from "next";
@@ -63,7 +64,7 @@ export default async function ShopPage() {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionSchema) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(collectionSchema) }}
       />
       <Suspense
         fallback={<div className="page-shell py-20 text-center text-sm">Loading catalogue…</div>}

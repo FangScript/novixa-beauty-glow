@@ -1,3 +1,4 @@
+import { escapeHtml } from "@/lib/security/html";
 import { Resend } from "resend";
 import nodemailer from "nodemailer";
 
@@ -72,7 +73,13 @@ export async function sendMail(options: SendMailOptions) {
         subject: options.subject,
         html: options.html,
       });
-      return { ok: true, id: result.data?.id, provider: "resend" as const };
+      if (result.error || !result.data?.id)
+        return {
+          ok: false,
+          error: "Email provider rejected delivery.",
+          provider: "resend" as const,
+        };
+      return { ok: true, id: result.data.id, provider: "resend" as const };
     } catch (err: any) {
       console.warn("Resend email dispatch error:", err.message);
       return { ok: false, error: err.message, provider: "resend" as const };
@@ -198,10 +205,10 @@ export async function sendOrderConfirmationEmail(params: OrderConfirmationEmailP
       <tr>
         <td style="padding: 14px 0; border-bottom: 1px solid #f0eae4;">
           <div style="font-family: Georgia, serif; font-size: 15px; color: #211b18; font-weight: 500;">
-            ${item.productName}
+            ${escapeHtml(item.productName)}
           </div>
           <div style="font-size: 11px; color: #8f8279; margin-top: 3px; letter-spacing: 0.05em;">
-            SKU: ${item.sku} &times; ${item.quantity}
+            SKU: ${escapeHtml(item.sku)} &times; ${item.quantity}
           </div>
         </td>
         <td style="padding: 14px 0; border-bottom: 1px solid #f0eae4; text-align: right; font-size: 14px; font-weight: 600; color: #211b18;">
@@ -218,7 +225,7 @@ export async function sendOrderConfirmationEmail(params: OrderConfirmationEmailP
     <tr>
       <td style="padding: 32px 40px 20px;">
         <h2 style="margin: 0 0 12px; font-family: Georgia, serif; font-size: 22px; font-weight: normal; color: #211b18;">
-          Thank you for your order, ${customerName}.
+          Thank you for your order, ${escapeHtml(customerName)}.
         </h2>
         <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #665b53;">
           Your bespoke selection has been registered with our Mayfair atelier. We are carefully preparing your items for delivery.
@@ -227,7 +234,7 @@ export async function sendOrderConfirmationEmail(params: OrderConfirmationEmailP
           <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #8f5d48; font-weight: 600;">
             Order Reference:
           </span>
-          <strong style="font-size: 14px; color: #211b18; margin-left: 8px;">${orderNumber}</strong>
+          <strong style="font-size: 14px; color: #211b18; margin-left: 8px;">${escapeHtml(orderNumber)}</strong>
         </div>
       </td>
     </tr>
@@ -270,7 +277,7 @@ export async function sendOrderConfirmationEmail(params: OrderConfirmationEmailP
               : ""
           }
           <tr>
-            <td style="padding: 6px 0; color: #8f8279;">Delivery (${deliveryMethodName})</td>
+            <td style="padding: 6px 0; color: #8f8279;">Delivery (${escapeHtml(deliveryMethodName)})</td>
             <td style="padding: 6px 0; text-align: right; color: #211b18;">&pound;${shipping.toFixed(2)}</td>
           </tr>
           <tr>
@@ -283,7 +290,7 @@ export async function sendOrderConfirmationEmail(params: OrderConfirmationEmailP
           </tr>
           <tr>
             <td colspan="2" style="font-size: 11px; color: #8f8279; text-align: right; padding-top: 2px;">
-              Payment via ${paymentMethod}
+              Payment via ${escapeHtml(paymentMethod)}
             </td>
           </tr>
         </table>
@@ -297,10 +304,10 @@ export async function sendOrderConfirmationEmail(params: OrderConfirmationEmailP
           Delivery Destination
         </h3>
         <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #4a4039;">
-          ${customerName}<br />
-          ${shippingAddress.line1}${shippingAddress.line2 ? `<br />${shippingAddress.line2}` : ""}<br />
-          ${shippingAddress.city}, ${shippingAddress.state} ${shippingAddress.postalCode}<br />
-          ${shippingAddress.country || "United Kingdom"}
+          ${escapeHtml(customerName)}<br />
+          ${escapeHtml(shippingAddress.line1)}${shippingAddress.line2 ? `<br />${escapeHtml(shippingAddress.line2)}` : ""}<br />
+          ${escapeHtml(shippingAddress.city)}, ${escapeHtml(shippingAddress.state)} ${escapeHtml(shippingAddress.postalCode)}<br />
+          ${escapeHtml(shippingAddress.country || "United Kingdom")}
         </p>
       </td>
     </tr>
@@ -309,7 +316,7 @@ export async function sendOrderConfirmationEmail(params: OrderConfirmationEmailP
 
   return await sendMail({
     to: customerEmail,
-    subject: `Your NOVIXA Order Confirmation [${orderNumber}]`,
+    subject: `Your NOVIXA Order Confirmation [${escapeHtml(orderNumber)}]`,
     html: emailWrapper(innerRows),
   });
 }
@@ -347,16 +354,16 @@ export async function sendOrderStatusEmail(params: OrderStatusEmailParams) {
   let innerRows = "";
 
   if (status === "PROCESSING") {
-    subject = `NOVIXA Is Preparing Your Order ${orderNumber} 🌿`;
+    subject = `NOVIXA Is Preparing Your Order ${escapeHtml(orderNumber)} 🌿`;
     innerRows = `
       ${emailHeader("Order Processing")}
       <tr>
         <td style="padding: 36px 40px;">
           <h2 style="margin: 0 0 14px; font-family: Georgia, serif; font-size: 22px; font-weight: normal; color: #211b18;">
-            We're preparing your order, ${customerName}.
+            We're preparing your order, ${escapeHtml(customerName)}.
           </h2>
           <p style="margin: 0 0 16px; font-size: 13px; line-height: 1.8; color: #665b53;">
-            Your NOVIXA order <strong style="color:#211b18;">${orderNumber}</strong> is now being carefully curated
+            Your NOVIXA order <strong style="color:#211b18;">${escapeHtml(orderNumber)}</strong> is now being carefully curated
             by our Mayfair atelier team. Our specialists are inspecting, wrapping, and packaging your selection with the
             care it deserves.
           </p>
@@ -374,11 +381,11 @@ export async function sendOrderStatusEmail(params: OrderStatusEmailParams) {
       </tr>
       ${emailFooter()}`;
   } else if (status === "SHIPPED") {
-    subject = `Your NOVIXA Order ${orderNumber} Has Shipped ✈`;
+    subject = `Your NOVIXA Order ${escapeHtml(orderNumber)} Has Shipped ✈`;
     const trackingBlock = trackingNumber
       ? `<div style="margin: 20px 0; padding: 18px 20px; background: #f0f7ec; border: 1px solid #c5dbb8; border-radius: 2px;">
           <p style="margin: 0 0 6px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: #4b6742; font-weight: 600;">Tracking Reference</p>
-          <p style="margin: 0; font-size: 18px; font-family: Georgia, serif; color: #211b18; letter-spacing: 0.08em;">${trackingNumber}</p>
+          <p style="margin: 0; font-size: 18px; font-family: Georgia, serif; color: #211b18; letter-spacing: 0.08em;">${escapeHtml(trackingNumber)}</p>
           ${trackingUrl ? `<a href="${trackingUrl}" style="display:inline-block; margin-top: 10px; font-size: 11px; color: #4b6742; text-decoration: underline;">Track your parcel →</a>` : ""}
         </div>`
       : `<p style="font-size: 12px; color: #a1958b; margin: 12px 0;">Your tracking details will be updated within 24 hours.</p>`;
@@ -388,10 +395,10 @@ export async function sendOrderStatusEmail(params: OrderStatusEmailParams) {
       <tr>
         <td style="padding: 36px 40px;">
           <h2 style="margin: 0 0 14px; font-family: Georgia, serif; font-size: 22px; font-weight: normal; color: #211b18;">
-            Your order is on its way, ${customerName}.
+            Your order is on its way, ${escapeHtml(customerName)}.
           </h2>
           <p style="margin: 0 0 16px; font-size: 13px; line-height: 1.8; color: #665b53;">
-            Your NOVIXA parcel <strong style="color:#211b18;">${orderNumber}</strong> has been dispatched from our
+            Your NOVIXA parcel <strong style="color:#211b18;">${escapeHtml(orderNumber)}</strong> has been dispatched from our
             Mayfair atelier and is now in transit to you. Please allow 3–5 business days for standard delivery.
           </p>
           ${trackingBlock}
@@ -402,16 +409,16 @@ export async function sendOrderStatusEmail(params: OrderStatusEmailParams) {
       </tr>
       ${emailFooter()}`;
   } else if (status === "DELIVERED") {
-    subject = `Your NOVIXA Order ${orderNumber} Has Arrived 🎁`;
+    subject = `Your NOVIXA Order ${escapeHtml(orderNumber)} Has Arrived 🎁`;
     innerRows = `
       ${emailHeader("Order Delivered")}
       <tr>
         <td style="padding: 36px 40px;">
           <h2 style="margin: 0 0 14px; font-family: Georgia, serif; font-size: 22px; font-weight: normal; color: #211b18;">
-            Your order has arrived, ${customerName}.
+            Your order has arrived, ${escapeHtml(customerName)}.
           </h2>
           <p style="margin: 0 0 16px; font-size: 13px; line-height: 1.8; color: #665b53;">
-            We hope your NOVIXA selection — order <strong style="color:#211b18;">${orderNumber}</strong> — has been
+            We hope your NOVIXA selection — order <strong style="color:#211b18;">${escapeHtml(orderNumber)}</strong> — has been
             delivered to your satisfaction. We pour our passion into every fragrance and formulation we create, and we
             trust it will bring you a moment of true luxury.
           </p>
@@ -428,23 +435,23 @@ export async function sendOrderStatusEmail(params: OrderStatusEmailParams) {
       </tr>
       ${emailFooter()}`;
   } else if (status === "CANCELLED") {
-    subject = `Important: Your NOVIXA Order ${orderNumber} Has Been Cancelled`;
+    subject = `Important: Your NOVIXA Order ${escapeHtml(orderNumber)} Has Been Cancelled`;
     innerRows = `
       ${emailHeader("Order Cancelled")}
       <tr>
         <td style="padding: 36px 40px;">
           <h2 style="margin: 0 0 14px; font-family: Georgia, serif; font-size: 22px; font-weight: normal; color: #211b18;">
-            Your order has been cancelled, ${customerName}.
+            Your order has been cancelled, ${escapeHtml(customerName)}.
           </h2>
           <p style="margin: 0 0 16px; font-size: 13px; line-height: 1.8; color: #665b53;">
-            We regret to inform you that your order <strong style="color:#211b18;">${orderNumber}</strong> has been
+            We regret to inform you that your order <strong style="color:#211b18;">${escapeHtml(orderNumber)}</strong> has been
             cancelled.
           </p>
           ${
             cancellationReason
               ? `<div style="padding: 14px 18px; background: #fdf8f6; border-left: 3px solid #c9765d; margin-bottom: 20px;">
                 <p style="margin: 0; font-size: 12px; color: #8f2d18; line-height: 1.7;">
-                  <strong>Reason:</strong> ${cancellationReason}
+                  <strong>Reason:</strong> ${escapeHtml(cancellationReason)}
                 </p>
                </div>`
               : ""
@@ -497,16 +504,16 @@ export async function sendSupportInquiryEmail(params: SupportInquiryEmailParams)
   const adminHtml = `
   <div style="font-family: sans-serif; color: #211b18; line-height: 1.6; max-width: 600px;">
     <h2 style="font-family: Georgia, serif; color: #8f5d48;">New Customer Concierge Inquiry</h2>
-    <p><strong>From:</strong> ${name} (&lt;<a href="mailto:${email}">${email}</a>&gt;)</p>
-    ${phone ? `<p><strong>Phone:</strong> ${phone}</p>` : ""}
-    ${orderNumber ? `<p><strong>Order Reference:</strong> ${orderNumber}</p>` : ""}
-    <p><strong>Topic / Subject:</strong> ${subject}</p>
+    <p><strong>From:</strong> ${escapeHtml(name)} (&lt;<a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a>&gt;)</p>
+    ${phone ? `<p><strong>Phone:</strong> ${escapeHtml(phone)}</p>` : ""}
+    ${orderNumber ? `<p><strong>Order Reference:</strong> ${escapeHtml(orderNumber)}</p>` : ""}
+    <p><strong>Topic / Subject:</strong> ${escapeHtml(subject)}</p>
     <div style="margin-top: 15px; padding: 15px; background: #fbf9f7; border-left: 4px solid #8f5d48;">
       <strong>Message:</strong>
-      <p style="margin: 8px 0 0; white-space: pre-wrap;">${message}</p>
+      <p style="margin: 8px 0 0; white-space: pre-wrap;">${escapeHtml(message)}</p>
     </div>
     <p style="margin-top: 20px; font-size: 11px; color: #888;">
-      Submitted via NOVIXA Concierge Portal${inquiryId ? ` (ID: ${inquiryId})` : ""}. Reply directly to this email to reach the patron.
+      Submitted via NOVIXA Concierge Portal${inquiryId ? ` (ID: ${escapeHtml(inquiryId)})` : ""}. Reply directly to this email to reach the patron.
     </p>
   </div>`;
 
@@ -518,9 +525,9 @@ export async function sendSupportInquiryEmail(params: SupportInquiryEmailParams)
         <h2 style="margin: 0 0 14px; font-family: Georgia, serif; font-size: 22px; font-weight: normal; color: #211b18;">
           We have received your private inquiry.
         </h2>
-        <p style="margin: 0 0 12px; font-size: 13px; line-height: 1.8; color: #665b53;">Dear ${name},</p>
+        <p style="margin: 0 0 12px; font-size: 13px; line-height: 1.8; color: #665b53;">Dear ${escapeHtml(name)},</p>
         <p style="margin: 0 0 16px; font-size: 13px; line-height: 1.8; color: #665b53;">
-          Thank you for reaching out to the NOVIXA concierge desk regarding <em>"${subject}"</em>.
+          Thank you for reaching out to the NOVIXA concierge desk regarding <em>"${escapeHtml(subject)}"</em>.
         </p>
         <p style="margin: 0 0 16px; font-size: 13px; line-height: 1.8; color: #665b53;">
           Our private beauty advisors review each correspondence individually. A dedicated specialist will
@@ -528,7 +535,7 @@ export async function sendSupportInquiryEmail(params: SupportInquiryEmailParams)
         </p>
         <div style="margin: 20px 0; padding: 14px 18px; background: #faf7f4; border: 1px solid #e8dfd8; font-size: 12px; color: #665b53;">
           <strong>Your Message Summary:</strong><br />
-          ${message.slice(0, 200)}${message.length > 200 ? "..." : ""}
+          ${escapeHtml(message.slice(0, 200))}${message.length > 200 ? "..." : ""}
         </div>
         <p style="font-size: 12px; color: #8f8279; margin-top: 30px;">
           Warm regards,<br />
@@ -543,14 +550,14 @@ export async function sendSupportInquiryEmail(params: SupportInquiryEmailParams)
   const adminRes = await sendMail({
     to: ADMIN_EMAIL,
     replyTo: email,
-    subject: `[Concierge Inquiry] ${subject} - ${name}`,
+    subject: `[Concierge Inquiry] ${escapeHtml(subject)} - ${escapeHtml(name)}`,
     html: adminHtml,
   });
 
   // Send Customer Acknowledgment
   const customerRes = await sendMail({
     to: email,
-    subject: `We've received your NOVIXA inquiry: ${subject}`,
+    subject: `We've received your NOVIXA inquiry: ${escapeHtml(subject)}`,
     html: customerHtml,
   });
 
@@ -594,18 +601,18 @@ export async function sendSupportReplyEmail(params: SupportReplyEmailParams) {
           A personal response from our concierge.
         </h2>
         <p style="margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #8f8279;">
-          Re: ${originalSubject}
+          Re: ${escapeHtml(originalSubject)}
         </p>
         <hr style="border: none; border-top: 1px solid #f0eae4; margin: 16px 0;" />
-        <p style="margin: 0 0 12px; font-size: 13px; line-height: 1.8; color: #665b53;">Dear ${toName},</p>
-        <div style="font-size: 14px; line-height: 1.9; color: #211b18; white-space: pre-wrap;">${replyMessage}</div>
+        <p style="margin: 0 0 12px; font-size: 13px; line-height: 1.8; color: #665b53;">Dear ${escapeHtml(toName)},</p>
+        <div style="font-size: 14px; line-height: 1.9; color: #211b18; white-space: pre-wrap;">${escapeHtml(replyMessage)}</div>
         <hr style="border: none; border-top: 1px solid #f0eae4; margin: 24px 0;" />
         <p style="font-size: 12px; color: #8f8279; margin: 0;">
           Warm regards,<br />
-          <strong style="color:#211b18;">${agentName}</strong><br />
+          <strong style="color:#211b18;">${escapeHtml(agentName)}</strong><br />
           NOVIXA Haute Parfumerie &mdash; Mayfair, London
         </p>
-        ${inquiryId ? `<p style="font-size: 10px; color: #c4b9b0; margin-top: 12px;">Reference: ${inquiryId}</p>` : ""}
+        ${inquiryId ? `<p style="font-size: 10px; color: #c4b9b0; margin-top: 12px;">Reference: ${escapeHtml(inquiryId)}</p>` : ""}
       </td>
     </tr>
     ${emailFooter()}`;
@@ -613,7 +620,7 @@ export async function sendSupportReplyEmail(params: SupportReplyEmailParams) {
   return await sendMail({
     to: toEmail,
     replyTo: SUPPORT_DISPLAY_EMAIL,
-    subject: `Re: ${originalSubject} — NOVIXA Concierge`,
+    subject: `Re: ${escapeHtml(originalSubject)} — NOVIXA Concierge`,
     html: emailWrapper(innerRows),
   });
 }

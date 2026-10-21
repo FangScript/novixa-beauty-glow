@@ -153,9 +153,7 @@ describe("Regression Suite: Novixa Retail Production Remediation", () => {
       const approvedReviews: any[] = [];
       const reviewCount = approvedReviews.length;
       const rating =
-        reviewCount > 0
-          ? approvedReviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount
-          : 0;
+        reviewCount > 0 ? approvedReviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount : 0;
 
       assert.equal(reviewCount, 0);
       assert.equal(rating, 0);
@@ -193,8 +191,7 @@ describe("Regression Suite: Novixa Retail Production Remediation", () => {
         { rating: 4, status: "APPROVED" },
       ];
       const reviewCount = approvedReviews.length;
-      const averageRating =
-        approvedReviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount;
+      const averageRating = approvedReviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount;
 
       assert.equal(reviewCount, 2);
       assert.equal(averageRating, 4.5);

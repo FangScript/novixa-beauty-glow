@@ -19,8 +19,8 @@ jobs:
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version: "22"
+          cache: "npm"
 
       # ── 3. Install all dependencies ────────────────────────────
       - name: Install dependencies
@@ -36,7 +36,7 @@ jobs:
       - name: Build Next.js
         run: npm run build
         env:
-          NODE_OPTIONS: '--max-old-space-size=4096'
+          NODE_OPTIONS: "--max-old-space-size=4096"
           NODE_ENV: production
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
@@ -52,6 +52,9 @@ jobs:
           PAYPAL_CLIENT_SECRET: ${{ secrets.PAYPAL_CLIENT_SECRET }}
           PAYPAL_MODE: ${{ secrets.PAYPAL_MODE }}
           NEXT_PUBLIC_PAYPAL_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_PAYPAL_CLIENT_ID }}
+          NEXT_PUBLIC_PAYPAL_MODE: ${{ secrets.PAYPAL_MODE }}
+          NEXT_PUBLIC_GOOGLE_PAY_ENV: ${{ vars.NEXT_PUBLIC_GOOGLE_PAY_ENV || secrets.NEXT_PUBLIC_GOOGLE_PAY_ENV }}
+          NEXT_PUBLIC_GOOGLE_PAY_MERCHANT_ID: ${{ vars.NEXT_PUBLIC_GOOGLE_PAY_MERCHANT_ID || secrets.NEXT_PUBLIC_GOOGLE_PAY_MERCHANT_ID }}
           EMAIL_PROVIDER: ${{ secrets.EMAIL_PROVIDER }}
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
           SUPPORT_EMAIL: ${{ secrets.SUPPORT_EMAIL }}
@@ -97,8 +100,8 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ secrets.DEPLOY_PORT || 22 }}
-          source: 'deploy/*'
-          target: '/home/${{ secrets.DEPLOY_USER }}/novixa/'
+          source: "deploy/*"
+          target: "/home/${{ secrets.DEPLOY_USER }}/novixa/"
           strip_components: 1
           rm: false
 

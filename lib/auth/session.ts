@@ -1,15 +1,14 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import prisma from "@/lib/db/client";
+import { isDatabaseAdmin } from "@/lib/security/identity";
 
 export const SESSION_COOKIE = "novixa_admin_session";
 export const SESSION_TTL_SECONDS = 60 * 60 * 8; // 8 hours
 
 export const databaseConfigured = () => Boolean(process.env.DATABASE_URL);
 
-export const isSecureCookie = () =>
-  process.env.NODE_ENV === "production" &&
-  Boolean(process.env.APP_URL ? process.env.APP_URL.startsWith("https://") : false);
+export const isSecureCookie = () => process.env.NODE_ENV === "production";
 
 export function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
@@ -42,7 +41,7 @@ export async function getAuthenticatedAdmin() {
         include: { user: true },
       });
 
-      if (session && session.expiresAt > new Date() && session.user.role === "ADMIN") {
+      if (session && session.expiresAt > new Date() && isDatabaseAdmin(session.user)) {
         return {
           id: session.user.id,
           email: session.user.email,
@@ -58,31 +57,6 @@ export async function getAuthenticatedAdmin() {
       console.error("Failed to authenticate admin session:", error);
     }
   }
-
-  // Fallback: check Supabase auth
-  try {
-    const { createClient } = await import("@/utils/supabase/server");
-    const supabase = createClient(cookieStore);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (user) {
-      const isAdmin =
-        user.user_metadata?.role === "ADMIN" ||
-        (process.env.ADMIN_EMAIL &&
-          user.email?.toLowerCase() === process.env.ADMIN_EMAIL.toLowerCase());
-      if (isAdmin) {
-        return {
-          id: user.id,
-          email: user.email || "admin@novixa.com",
-          name: user.user_metadata?.name || "Administrator",
-          role: "ADMIN" as const,
-          sessionId: user.id,
-        };
-      }
-    }
-  } catch {}
 
   return null;
 }
@@ -186,29 +160,10 @@ export async function registerCustomer(name: string, email: string, password: st
     let user: { id: string; email: string; name: string };
 
     if (existingUser) {
-      if (existingUser.passwordHash) {
-        return { ok: false as const, error: "An account with this email already exists." };
-      }
-      // Upgrade newsletter subscriber to full customer account
-      user = await prisma.user.update({
-        where: { id: existingUser.id },
-        data: {
-          name: cleanName || existingUser.name,
-          passwordHash,
-          emailVerifiedAt: new Date(),
-          sessions: {
-            create: {
-              id: sessionId,
-              expiresAt,
-            },
-          },
-        },
-        select: {
-          id: true,
-          email: true,
-          name: true,
-        },
-      });
+      return {
+        ok: false as const,
+        error: "An account with this email already exists. Sign in or use account recovery.",
+      };
     } else {
       // Create fresh user
       user = await prisma.user.create({
@@ -217,7 +172,7 @@ export async function registerCustomer(name: string, email: string, password: st
           email: cleanEmail,
           passwordHash,
           role: "CUSTOMER",
-          emailVerifiedAt: new Date(),
+          emailVerifiedAt: null,
           sessions: {
             create: {
               id: sessionId,
@@ -296,13 +251,14 @@ export async function getAuthenticatedCustomer() {
   if (!databaseConfigured()) return null;
   const cookieStore = await cookies();
   const rawSession = cookieStore.get(CUSTOMER_SESSION_COOKIE)?.value;
-  if (!rawSession) return null;
 
   try {
-    const session = await prisma.session.findUnique({
-      where: { id: hashSession(rawSession) },
-      include: { user: true },
-    });
+    const session = rawSession
+      ? await prisma.session.findUnique({
+          where: { id: hashSession(rawSession) },
+          include: { user: true },
+        })
+      : null;
 
     if (!session || session.expiresAt <= new Date()) {
       if (session) {
@@ -317,43 +273,8 @@ export async function getAuthenticatedCustomer() {
       };
     }
   } catch {
-    // continue to Supabase fallback
+    // Database failures must not authorize a session through another identity source.
   }
-
-  // Fallback: check Supabase auth
-  try {
-    const { createClient } = await import("@/utils/supabase/server");
-    const supabase = createClient(cookieStore);
-    const {
-      data: { user: sbUser },
-    } = await supabase.auth.getUser();
-
-    if (sbUser?.email) {
-      const cleanEmail = sbUser.email.toLowerCase().trim();
-      const dbUser = await prisma.user.upsert({
-        where: { email: cleanEmail },
-        update: { lastLoginAt: new Date() },
-        create: {
-          id: sbUser.id,
-          email: cleanEmail,
-          name:
-            sbUser.user_metadata?.full_name ||
-            sbUser.user_metadata?.name ||
-            cleanEmail.split("@")[0] ||
-            "Customer",
-          role: "CUSTOMER",
-          lastLoginAt: new Date(),
-        },
-      });
-
-      return {
-        id: dbUser.id,
-        email: dbUser.email,
-        name: dbUser.name,
-        role: dbUser.role,
-      };
-    }
-  } catch {}
 
   return null;
 }
@@ -395,6 +316,8 @@ export async function loginWithGoogle(googleId: string, email: string, name: str
         where: { id: byEmail.id },
         data: {
           googleId,
+          // Revoke credentials set by an unverified registrant before email verification.
+          ...(!byEmail.emailVerifiedAt ? { passwordHash: null, sessions: { deleteMany: {} } } : {}),
           emailVerifiedAt: byEmail.emailVerifiedAt ?? new Date(),
           lastLoginAt: new Date(),
         },

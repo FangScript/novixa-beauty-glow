@@ -2,42 +2,6 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
 import { getAuthenticatedAdmin } from "@/lib/auth/session";
 
-const defaultCoupons = [
-  {
-    id: "c-1",
-    code: "GLOW15",
-    type: "PERCENTAGE",
-    value: 15,
-    minimumOrder: 50,
-    usageLimit: 200,
-    usageCount: 48,
-    active: true,
-    expiresAt: "2026-12-31T23:59:59.000Z",
-  },
-  {
-    id: "c-2",
-    code: "LUXE20",
-    type: "FIXED",
-    value: 20,
-    minimumOrder: 100,
-    usageLimit: 100,
-    usageCount: 22,
-    active: true,
-    expiresAt: "2026-11-30T23:59:59.000Z",
-  },
-  {
-    id: "c-3",
-    code: "WELCOME10",
-    type: "PERCENTAGE",
-    value: 10,
-    minimumOrder: 40,
-    usageLimit: null,
-    usageCount: 115,
-    active: true,
-    expiresAt: null,
-  },
-];
-
 // ─── GET /api/coupons ─────────────────────────────────────────────────────────
 export async function GET() {
   try {
@@ -51,38 +15,14 @@ export async function GET() {
         orderBy: { createdAt: "desc" },
       });
 
-      if (coupons.length > 0) {
-        return NextResponse.json({ coupons, source: "database" });
-      }
-
-      // If database has 0 coupons, seed defaults
-      for (const def of defaultCoupons) {
-        await prisma.coupon
-          .upsert({
-            where: { code: def.code },
-            update: {},
-            create: {
-              code: def.code,
-              type: def.type as any,
-              value: def.value,
-              minimumOrder: def.minimumOrder,
-              usageLimit: def.usageLimit,
-              usageCount: def.usageCount,
-              active: def.active,
-              expiresAt: def.expiresAt ? new Date(def.expiresAt) : null,
-            },
-          })
-          .catch(() => null);
-      }
-
-      const seeded = await prisma.coupon.findMany({ orderBy: { createdAt: "desc" } });
-      return NextResponse.json({ coupons: seeded, source: "database" });
+      return NextResponse.json({ coupons, source: "database" });
     }
   } catch (error) {
-    console.warn("GET /api/coupons DB query error, using defaults:", error);
+    console.warn("GET /api/coupons database query failed:", error);
+    return NextResponse.json({ error: "Coupons are temporarily unavailable." }, { status: 503 });
   }
 
-  return NextResponse.json({ coupons: defaultCoupons, source: "default" });
+  return NextResponse.json({ coupons: [], error: "Database is not configured." }, { status: 503 });
 }
 
 // ─── POST /api/coupons ────────────────────────────────────────────────────────

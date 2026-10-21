@@ -1,4 +1,14 @@
+import { z } from "zod";
+import { orderInput } from "@/lib/commerce/order-input";
+import { readJson, apiFailure, ApiError } from "@/lib/security/api";
+import { shouldRestock } from "@/lib/commerce/payment-events";
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
+import { getCheckoutQuote } from "@/lib/commerce/quote";
+import { CommerceError } from "@/lib/commerce/pricing";
+import { requireCheckoutIntent } from "@/lib/payments/checkout-session";
+import { assertIntentQuote } from "@/lib/payments/checkout-intent";
+import { customerOrderScope } from "@/lib/security/identity";
 import { prisma } from "@/lib/db/client";
 import { OrderStatus, PaymentStatus } from "@prisma/client";
 import { verifyPaymentServerSide, type PaymentMethod } from "@/lib/payments/processor";
@@ -7,6 +17,7 @@ import {
   capturePayPalOrder,
   refundPayPalCapture,
 } from "@/lib/payments/paypal";
+import { settleProviderOrder } from "@/lib/payments/capture-provider";
 import { getAuthenticatedAdmin, getAuthenticatedCustomer } from "@/lib/auth/session";
 import { sendOrderConfirmationEmail, sendOrderStatusEmail } from "@/lib/email/service";
 
@@ -55,19 +66,7 @@ export async function GET(request: Request) {
           };
         }
       } else if (customer) {
-        // Customer strictly restricted to viewing only their own orders
-        whereClause = {
-          OR: [
-            { userId: customer.id },
-            { user: { email: customer.email } },
-            {
-              shippingAddressSnapshot: {
-                path: ["email"],
-                string_contains: customer.email,
-              },
-            },
-          ],
-        };
+        whereClause = customerOrderScope(customer.id);
       }
 
       const orders = await prisma.order.findMany({
@@ -109,8 +108,12 @@ export async function POST(request: Request) {
     // Guest checkout is fully supported. If an account is authenticated, link its ID.
     const resolvedPrismaUserId: string | null = authenticatedUser ? authenticatedUser.id : null;
 
-    const body = await request.json();
-    const { items, customer, address, shippingMethodId } = body;
+    const body = await readJson(request, orderInput);
+    const { customer, address } = body;
+    if (!process.env.DATABASE_URL)
+      return NextResponse.json({ error: "Checkout is temporarily unavailable." }, { status: 503 });
+    const quote = await getCheckoutQuote({ ...body, couponCode: body.couponCode || undefined });
+    const items = quote.items;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: "Your shopping bag is empty." }, { status: 400 });
@@ -144,14 +147,14 @@ export async function POST(request: Request) {
       address?.line1 ||
       paymentDetails.shippingAddress?.line1 ||
       paymentDetails.shippingAddress?.addressLines?.[0] ||
-      "Address on file"
+      ""
     ).trim();
 
     const effectiveCity = (
       address?.city ||
       paymentDetails.shippingAddress?.city ||
       paymentDetails.shippingAddress?.locality ||
-      "London"
+      ""
     ).trim();
 
     const effectiveState = (
@@ -165,173 +168,38 @@ export async function POST(request: Request) {
     const effectivePostalCode = (
       address?.postalCode ||
       paymentDetails.shippingAddress?.postalCode ||
-      "SW1A 1AA"
+      ""
     ).trim();
 
-    if (!effectiveEmail) {
+    if (
+      !effectiveEmail ||
+      !effectiveName ||
+      !effectiveLine1 ||
+      !effectiveCity ||
+      !effectivePostalCode
+    ) {
       return NextResponse.json(
-        { error: "Customer email is required to finalize order." },
+        { error: "A customer email, name, and complete delivery address are required." },
         { status: 400 },
       );
     }
 
-    if (!process.env.DATABASE_URL) {
-      const fallbackOrderNumber = `NVX-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-      return NextResponse.json({
-        ok: true,
-        order: {
-          id: `ord-${Date.now()}`,
-          orderNumber: fallbackOrderNumber,
-          status: "PENDING",
-          paymentStatus: "UNPAID",
-          subtotal: 5000,
-          shipping: 0,
-          total: 5000,
-          createdAt: new Date().toISOString(),
-          shippingAddressSnapshot: { ...address, ...customer },
-          items: items.map((i: any, idx: number) => ({
-            id: `item-${idx}`,
-            productName: `Item ${idx + 1}`,
-            sku: `SKU-${idx}`,
-            unitPrice: 2500,
-            quantity: i.quantity,
-          })),
-        },
-      });
-    }
-
-    // Resolve products from PostgreSQL (strictly active products)
-    const productIds = items.map((i: any) => i.productId);
-    const dbProducts = await prisma.product.findMany({
-      where: { id: { in: productIds }, status: "ACTIVE" },
-      include: { images: { orderBy: { sortOrder: "asc" }, take: 1 } },
-    });
-
-    const productMap = new Map(dbProducts.map((p) => [p.id, p]));
-
-    // Validate stock and calculate authoritative prices
-    let subtotal = 0;
-    const lineItemsToCreate: {
-      productId: string;
-      productName: string;
-      sku: string;
-      unitPrice: number;
-      quantity: number;
-      imageUrl: string;
-    }[] = [];
-
-    for (const item of items) {
-      const itemQty = Math.round(Number(item.quantity) * 100) / 100;
-      if (isNaN(itemQty) || itemQty <= 0) {
-        return NextResponse.json(
-          { error: `Invalid item quantity specified for item ${item.productId}` },
-          { status: 400 },
-        );
-      }
-
-      const product = productMap.get(item.productId);
-      if (!product || product.status !== "ACTIVE") {
-        return NextResponse.json(
-          {
-            error: `Product "${product?.name || item.productId}" is not available or has been deactivated.`,
-          },
-          { status: 400 },
-        );
-      }
-
-      if (product.stock < itemQty) {
-        return NextResponse.json(
-          {
-            error: `Insufficient stock for "${product.name}". Only ${product.stock} left in stock.`,
-          },
-          { status: 400 },
-        );
-      }
-
-      const unitPrice = Number(product.salePrice ?? product.price);
-      subtotal += unitPrice * itemQty;
-
-      lineItemsToCreate.push({
-        productId: product.id,
-        productName: product.name,
-        sku: product.sku,
-        unitPrice,
-        quantity: itemQty,
-        imageUrl: product.images[0]?.url ?? "/images/product-perfume.jpg",
-      });
-    }
-
-    let discount = 0;
-    let validCouponId: string | null = null;
-    const requestedCouponCode = (body.couponCode || "").trim().toUpperCase();
-
-    if (requestedCouponCode) {
-      const foundCoupon = await prisma.coupon
-        .findUnique({
-          where: { code: requestedCouponCode },
-        })
-        .catch(() => null);
-
-      if (
-        foundCoupon &&
-        foundCoupon.active &&
-        (!foundCoupon.expiresAt || new Date(foundCoupon.expiresAt).getTime() > Date.now()) &&
-        (!foundCoupon.usageLimit || foundCoupon.usageCount < foundCoupon.usageLimit) &&
-        subtotal >= Number(foundCoupon.minimumOrder)
-      ) {
-        validCouponId = foundCoupon.id;
-        const couponVal = Number(foundCoupon.value);
-        if (foundCoupon.type === "PERCENTAGE") {
-          discount = Math.round(((subtotal * couponVal) / 100) * 100) / 100;
-        } else {
-          discount = Math.min(subtotal, Math.round(couponVal * 100) / 100);
-        }
-      }
-    }
-
-    // Authoritative Shipping Method Calculation
-    let shipping = 4.95;
-    let resolvedShippingMethodId: string | null = null;
-    let resolvedShippingMethodName: string | null = "Normal Delivery";
-
-    if (shippingMethodId) {
-      const dbMethod = await prisma.shippingMethod
-        .findUnique({ where: { id: shippingMethodId } })
-        .catch(() => null);
-      if (dbMethod && dbMethod.active) {
-        shipping = Number(dbMethod.price);
-        resolvedShippingMethodId = dbMethod.id;
-        resolvedShippingMethodName = dbMethod.name;
-      }
-    }
-
-    if (!resolvedShippingMethodId) {
-      const defaultMethod = await prisma.shippingMethod
-        .findFirst({ where: { active: true, isDefault: true } })
-        .catch(() => null);
-      if (defaultMethod) {
-        shipping = Number(defaultMethod.price);
-        resolvedShippingMethodId = defaultMethod.id;
-        resolvedShippingMethodName = defaultMethod.name;
-      }
-    }
-
-    // Complimentary UK Delivery policy: Orders over £70 qualify for free standard shipping
-    const isStandardOrNormal =
-      !resolvedShippingMethodName ||
-      resolvedShippingMethodName.toLowerCase().includes("normal") ||
-      resolvedShippingMethodName.toLowerCase().includes("standard");
-
-    if (subtotal >= 70 && isStandardOrNormal) {
-      shipping = 0;
-    }
-
-    const tax = 0;
-    let total = Math.max(
-      0,
-      Math.round((Math.max(0, subtotal - discount) + shipping + tax) * 100) / 100,
-    );
-    const orderNumber = `NVX-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+    const {
+      subtotal,
+      discount,
+      shipping,
+      tax,
+      lineItems: lineItemsToCreate,
+      couponId: validCouponId,
+      shippingMethodId: resolvedShippingMethodId,
+      shippingMethodName: resolvedShippingMethodName,
+    } = quote;
+    const total = quote.total;
+    const orderNumber =
+      "NVX-" +
+      new Date().getUTCFullYear() +
+      "-" +
+      randomUUID().replace(/-/g, "").slice(0, 16).toUpperCase();
 
     const fullShippingSnapshot = {
       fullName: effectiveName,
@@ -345,18 +213,23 @@ export async function POST(request: Request) {
       country: address?.country || paymentDetails.shippingAddress?.countryCode || "GB",
     };
 
-    const paymentMethod = (body.paymentMethod || "COD").toUpperCase() as PaymentMethod;
+    const paymentMethod = (
+      typeof body.paymentMethod === "string" ? body.paymentMethod : ""
+    ).toUpperCase() as PaymentMethod;
+    if (!["PAYPAL", "CARD", "GOOGLE_PAY", "APPLE_PAY"].includes(paymentMethod)) {
+      return NextResponse.json({ error: "This payment method is not enabled." }, { status: 400 });
+    }
+    if (
+      !(process.env.PAYPAL_CLIENT_ID || process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID) ||
+      !process.env.PAYPAL_CLIENT_SECRET
+    ) {
+      return NextResponse.json(
+        { error: "Payment processing is temporarily unavailable." },
+        { status: 503 },
+      );
+    }
 
-    // Normalize card details if submitted with alternate field names
-    const normalizedPaymentDetails = {
-      ...paymentDetails,
-      nameOnCard: paymentDetails.nameOnCard || paymentDetails.cardholderName || customer.name,
-      expiry:
-        paymentDetails.expiry ||
-        (paymentDetails.expMonth && paymentDetails.expYear
-          ? `${paymentDetails.expMonth.padStart(2, "0")}/${paymentDetails.expYear.slice(-2)}`
-          : ""),
-    };
+    const normalizedPaymentDetails = paymentDetails;
 
     // Verify payment server-side using provider-agnostic engine
     const verification = verifyPaymentServerSide(
@@ -376,101 +249,35 @@ export async function POST(request: Request) {
       );
     }
 
-    // For PayPal, Card, and digital wallet methods, verify the order details directly with PayPal API
-    if (
-      ["PAYPAL", "CARD", "GOOGLE_PAY", "APPLE_PAY"].includes(paymentMethod) &&
-      process.env.PAYPAL_CLIENT_ID &&
-      process.env.PAYPAL_CLIENT_SECRET
-    ) {
-      const paypalOrderId =
-        normalizedPaymentDetails.paypalOrderId ||
-        normalizedPaymentDetails.orderId ||
-        verification.metadata?.paypalOrderId;
-
-      if (!paypalOrderId) {
-        return NextResponse.json(
-          { error: "Payment authorization reference is missing." },
-          { status: 400 },
-        );
-      }
-
-      try {
-        let orderDetails = await getPayPalOrderDetails(paypalOrderId);
-        let paypalStatus = orderDetails.status;
-        let purchaseUnit = orderDetails.purchase_units?.[0];
-        let capturedAmount = parseFloat(purchaseUnit?.amount?.value || "0");
-        let capturedCurrency = purchaseUnit?.amount?.currency_code || "";
-        let captures = purchaseUnit?.payments?.captures || [];
-        let latestCapture = captures[0];
-        let isActuallyCaptured =
-          paypalStatus === "COMPLETED" || latestCapture?.status === "COMPLETED";
-
-        // If order is approved but not yet captured, perform atomic capture on server
-        if (paypalStatus === "APPROVED" && !isActuallyCaptured) {
-          try {
-            const captureData = await capturePayPalOrder(paypalOrderId);
-            orderDetails = captureData;
-            paypalStatus = captureData.status;
-            purchaseUnit = captureData.purchase_units?.[0];
-            capturedAmount = parseFloat(purchaseUnit?.amount?.value || "0");
-            capturedCurrency = purchaseUnit?.amount?.currency_code || "";
-            captures = purchaseUnit?.payments?.captures || [];
-            latestCapture = captures[0];
-            isActuallyCaptured =
-              paypalStatus === "COMPLETED" || latestCapture?.status === "COMPLETED";
-          } catch (capErr: any) {
-            console.error("Atomic PayPal capture failed:", capErr);
-            return NextResponse.json(
-              { error: "Failed to capture payment with PayPal. Your card was not charged." },
-              { status: 400 },
-            );
-          }
-        }
-
-        // Verify status is COMPLETED or captured
-        if (!isActuallyCaptured && paypalStatus !== "COMPLETED") {
-          return NextResponse.json(
-            { error: `Payment authorization could not be completed (status: ${paypalStatus}).` },
-            { status: 400 },
-          );
-        }
-
-        // Verify currency
-        if (capturedCurrency && capturedCurrency !== "GBP") {
-          return NextResponse.json(
-            { error: `Payment currency mismatch: expected GBP, received ${capturedCurrency}.` },
-            { status: 400 },
-          );
-        }
-
-        // Strictly verify captured amount against authoritative total (reject tampering)
-        if (capturedAmount <= 0 || Math.abs(capturedAmount - total) > 0.05) {
-          console.error(
-            `Payment amount mismatch rejected: captured=£${capturedAmount.toFixed(2)}, expected=£${total.toFixed(2)}.`,
-          );
-          return NextResponse.json(
-            {
-              error: `Payment amount discrepancy detected: provider captured £${capturedAmount.toFixed(2)}, but order total is £${total.toFixed(2)}. Transaction declined for security.`,
-            },
-            { status: 400 },
-          );
-        }
-
-        // Small penny rounding adjustment (within £0.05)
-        total = capturedAmount;
-
-        verification.status = PaymentStatus.PAID;
-        verification.providerPaymentId = latestCapture?.id || paypalOrderId;
-      } catch (paypalErr: any) {
-        console.error("Server-side PayPal verification failed:", paypalErr);
-        return NextResponse.json(
-          { error: "Could not verify payment with PayPal. Please try again." },
-          { status: 400 },
-        );
-      }
+    const paypalOrderId =
+      normalizedPaymentDetails.paypalOrderId ||
+      normalizedPaymentDetails.orderId ||
+      verification.metadata?.paypalOrderId;
+    try {
+      const intent = await requireCheckoutIntent(paypalOrderId);
+      assertIntentQuote(intent, items, total);
+      const { capture } = await settleProviderOrder(paypalOrderId, intent.totalPence, {
+        getOrder: getPayPalOrderDetails,
+        captureOrder: capturePayPalOrder,
+        pause: () => new Promise((resolve) => setTimeout(resolve, 600)),
+      });
+      verification.status = PaymentStatus.PAID;
+      verification.providerPaymentId = capture.id;
+    } catch (error) {
+      console.error(
+        "Payment verification rejected",
+        error instanceof Error ? error.message : "Unknown failure",
+      );
+      return NextResponse.json(
+        {
+          error:
+            "Payment could not be verified for this checkout. If charged, contact support before retrying.",
+        },
+        { status: 409 },
+      );
     }
 
-    // ─── Idempotency Check: prevent duplicate orders on retry or double-click ─
+    // A unique provider capture ID makes finalization retries idempotent.
     if (verification.providerPaymentId) {
       const existingPayment = await prisma.payment.findUnique({
         where: { providerPaymentId: verification.providerPaymentId },
@@ -525,12 +332,18 @@ export async function POST(request: Request) {
 
       // 2. Increment coupon usage if applied
       if (validCouponId) {
-        await tx.coupon
-          .update({
-            where: { id: validCouponId },
-            data: { usageCount: { increment: 1 } },
-          })
-          .catch(() => null);
+        const used = await tx.coupon.updateMany({
+          where: {
+            id: validCouponId,
+            active: true,
+            usageLimit: quote.couponUsageLimit,
+            ...(quote.couponUsageLimit !== null
+              ? { usageCount: { lt: quote.couponUsageLimit } }
+              : {}),
+          },
+          data: { usageCount: { increment: 1 } },
+        });
+        if (used.count !== 1) throw new CommerceError("The coupon usage limit has been reached.");
       }
 
       // 3. Create Order
@@ -631,8 +444,16 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error("Order placement error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to place order. Please try again." },
-      { status: 500 },
+      {
+        error:
+          error instanceof CommerceError || error instanceof ApiError
+            ? error.message
+            : "Failed to place order. If charged, contact support before retrying.",
+      },
+      {
+        status:
+          error instanceof ApiError ? error.status : error instanceof CommerceError ? 400 : 500,
+      },
     );
   }
 }
@@ -647,7 +468,16 @@ export async function PUT(request: Request) {
       );
     }
 
-    const body = await request.json();
+    const body = await readJson(
+      request,
+      z.object({
+        id: z.string().min(1).max(128),
+        status: z.nativeEnum(OrderStatus).optional(),
+        paymentStatus: z.nativeEnum(PaymentStatus).optional(),
+        trackingNumber: z.string().max(180).optional(),
+        cancellationReason: z.string().max(1000).optional(),
+      }),
+    );
     const { id, status, trackingNumber, paymentStatus } = body;
 
     if (!id) {
@@ -655,7 +485,10 @@ export async function PUT(request: Request) {
     }
 
     if (!process.env.DATABASE_URL) {
-      return NextResponse.json({ ok: true, order: body });
+      return NextResponse.json(
+        { error: "Order management is temporarily unavailable." },
+        { status: 503 },
+      );
     }
 
     const existingOrder = await prisma.order.findUnique({
@@ -723,82 +556,88 @@ export async function PUT(request: Request) {
 
     // Process provider refund if transitioning to REFUNDED
     const isRefunding = status === OrderStatus.REFUNDED || paymentStatus === PaymentStatus.REFUNDED;
+    if (
+      isRefunding &&
+      ![PaymentStatus.PAID, PaymentStatus.REFUNDED].includes(
+        existingOrder.paymentStatus as "PAID" | "REFUNDED",
+      )
+    )
+      throw new ApiError("Only a paid payment can be refunded.");
     if (isRefunding && existingOrder.paymentStatus === PaymentStatus.PAID) {
+      if (!existingOrder.payment?.providerPaymentId || existingOrder.payment.provider !== "PAYPAL")
+        throw new ApiError("This payment requires manual provider reconciliation.", 409);
+      if (
+        existingOrder.payment?.provider === "PAYPAL" &&
+        (!(process.env.PAYPAL_CLIENT_ID || process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID) ||
+          !process.env.PAYPAL_CLIENT_SECRET)
+      )
+        return NextResponse.json(
+          { error: "Payment provider is not configured for refunds." },
+          { status: 503 },
+        );
       if (
         existingOrder.payment?.providerPaymentId &&
         existingOrder.payment?.provider === "PAYPAL" &&
-        process.env.PAYPAL_CLIENT_ID &&
+        (process.env.PAYPAL_CLIENT_ID || process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID) &&
         process.env.PAYPAL_CLIENT_SECRET
       ) {
         try {
-          await refundPayPalCapture(
+          const refund = await refundPayPalCapture(
             existingOrder.payment.providerPaymentId,
             Number(existingOrder.total),
           );
+          if (refund.status !== "COMPLETED")
+            return NextResponse.json(
+              {
+                error: "Refund is pending at the provider. Reconcile it before changing the order.",
+              },
+              { status: 409 },
+            );
         } catch (refundErr: any) {
           console.error("PayPal capture refund failed:", refundErr);
           return NextResponse.json(
-            { error: `PayPal refund failed: ${refundErr.message || "Provider error"}` },
+            {
+              error:
+                "PayPal could not complete this refund. Check the provider record before retrying.",
+            },
             { status: 400 },
           );
         }
       }
     }
 
-    let updated;
-    const shouldRestock =
-      (status === OrderStatus.CANCELLED && existingOrder.status !== OrderStatus.CANCELLED) ||
-      (status === OrderStatus.REFUNDED && existingOrder.status !== OrderStatus.REFUNDED);
-
-    if (shouldRestock) {
-      updated = await prisma.$transaction(async (tx) => {
+    const effectiveStatus = status || existingOrder.status;
+    const effectivePaymentStatus = isRefunding ? PaymentStatus.REFUNDED : paymentStatus;
+    const restoreStock = shouldRestock(existingOrder.status, effectiveStatus);
+    const updated = await prisma.$transaction(async (tx) => {
+      const changed = await tx.order.updateMany({
+        where: { id, updatedAt: existingOrder.updatedAt },
+        data: {
+          status: effectiveStatus,
+          ...(trackingNumber !== undefined ? { trackingNumber } : {}),
+          ...(effectivePaymentStatus ? { paymentStatus: effectivePaymentStatus } : {}),
+        },
+      });
+      if (changed.count !== 1)
+        throw new ApiError("Order changed concurrently. Refresh before retrying.", 409);
+      if (restoreStock)
         for (const item of existingOrder.items) {
-          if (item.productId) {
+          if (item.productId)
             await tx.product.update({
               where: { id: item.productId },
               data: { stock: { increment: Number(item.quantity) } },
             });
-          }
         }
-
-        const effectivePaymentStatus = isRefunding
-          ? PaymentStatus.REFUNDED
-          : (paymentStatus as PaymentStatus | undefined);
-
-        if (isRefunding && existingOrder.payment) {
-          await tx.payment.update({
-            where: { id: existingOrder.payment.id },
-            data: { status: PaymentStatus.REFUNDED },
-          });
-        }
-
-        return await tx.order.update({
-          where: { id },
-          data: {
-            ...(status ? { status: status as OrderStatus } : {}),
-            ...(trackingNumber !== undefined ? { trackingNumber } : {}),
-            ...(effectivePaymentStatus ? { paymentStatus: effectivePaymentStatus } : {}),
-          },
-          include: {
-            items: true,
-            user: { select: { name: true, email: true } },
-          },
+      if (effectivePaymentStatus && existingOrder.payment)
+        await tx.payment.update({
+          where: { id: existingOrder.payment.id },
+          data: { status: effectivePaymentStatus },
         });
-      });
-    } else {
-      updated = await prisma.order.update({
+      return tx.order.findUniqueOrThrow({
         where: { id },
-        data: {
-          ...(status ? { status: status as OrderStatus } : {}),
-          ...(trackingNumber !== undefined ? { trackingNumber } : {}),
-          ...(paymentStatus ? { paymentStatus: paymentStatus as PaymentStatus } : {}),
-        },
-        include: {
-          items: true,
-          user: { select: { name: true, email: true } },
-        },
+        include: { items: true, user: { select: { name: true, email: true } } },
       });
-    }
+    });
 
     // Trigger customer status email for key status transitions
     const emailableStatuses: OrderStatus[] = [
@@ -828,9 +667,9 @@ export async function PUT(request: Request) {
     return NextResponse.json({ ok: true, order: updated });
   } catch (error: any) {
     console.error("Update order error:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to update order." },
-      { status: 500 },
+    return apiFailure(
+      error,
+      "Failed to update order. Refresh and reconcile the provider record before retrying.",
     );
   }
 }

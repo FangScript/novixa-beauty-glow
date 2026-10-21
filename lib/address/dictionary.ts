@@ -817,7 +817,7 @@ export function isWithinUkBounds(lat: number, lon: number): boolean {
 
 export function validatePostalCode(
   postalCode: string,
-  countryNameOrCode?: string
+  countryNameOrCode?: string,
 ): PostalValidationResult {
   const code = (postalCode || "").trim();
   const c = (countryNameOrCode || "United Kingdom").toLowerCase().trim();
@@ -894,4 +894,3 @@ export function validatePostalCode(
 
   return { isValid: true, normalized: code };
 }
-

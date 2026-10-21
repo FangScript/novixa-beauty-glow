@@ -1,10 +1,23 @@
+import { z } from "zod";
+import { readJson, limitAttempts, apiFailure } from "@/lib/security/api";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
 import { sendSupportInquiryEmail } from "@/lib/email/service";
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const body = await readJson(
+      request,
+      z.object({
+        name: z.string().trim().min(1).max(120),
+        email: z.string().trim().email().max(254),
+        phone: z.string().max(40).optional(),
+        subject: z.string().max(180).optional(),
+        orderNumber: z.string().max(80).optional(),
+        message: z.string().trim().min(1).max(5000),
+      }),
+    );
+    limitAttempts("contact:" + body.email.toLowerCase(), 5);
     const { name, email, phone, subject, orderNumber, message } = body;
 
     if (!name || !email || !message) {
@@ -30,9 +43,7 @@ export async function POST(request: Request) {
       const customer = await prisma.user
         .upsert({
           where: { email: cleanEmail },
-          update: {
-            ...(phone ? { phone: phone.trim() } : {}),
-          },
+          update: {},
           create: {
             email: cleanEmail,
             name: name.trim(),
@@ -90,9 +101,6 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error("POST /api/contact error:", error);
-    return NextResponse.json(
-      { success: false, error: "Failed to transmit message. Please try again." },
-      { status: 500 },
-    );
+    return apiFailure(error, "Failed to transmit message. Please try again.");
   }
 }

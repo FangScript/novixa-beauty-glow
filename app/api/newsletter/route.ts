@@ -1,9 +1,12 @@
+import { z } from "zod";
+import { readJson, limitAttempts, apiFailure } from "@/lib/security/api";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const body = await readJson(request, z.object({ email: z.string().trim().email().max(254) }));
+    limitAttempts("newsletter:" + body.email.toLowerCase(), 5);
     const { email } = body;
 
     if (!email || typeof email !== "string" || !email.includes("@")) {
@@ -40,7 +43,7 @@ export async function POST(request: Request) {
       const welcomeCoupon = await prisma.coupon
         .upsert({
           where: { code: "WELCOME10" },
-          update: { active: true, minimumOrder: 40 },
+          update: {},
           create: {
             code: "WELCOME10",
             type: "PERCENTAGE",
@@ -69,9 +72,6 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error("POST /api/newsletter error:", error);
-    return NextResponse.json(
-      { success: false, error: "Unable to process subscription. Please try again." },
-      { status: 500 },
-    );
+    return apiFailure(error, "Unable to process subscription. Please try again.");
   }
 }

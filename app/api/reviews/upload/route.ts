@@ -1,3 +1,5 @@
+import { getAuthenticatedCustomer } from "@/lib/auth/session";
+import { limitAttempts, apiFailure, readBody, ApiError } from "@/lib/security/api";
 import { NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
@@ -33,7 +35,19 @@ function getSupabaseClient() {
 
 export async function POST(request: Request) {
   try {
-    const formData = await request.formData();
+    const customer = await getAuthenticatedCustomer();
+    if (!customer)
+      return NextResponse.json({ error: "Sign in to upload review photos." }, { status: 401 });
+    limitAttempts("review-upload:" + customer.id, 5);
+    const contentType = request.headers.get("content-type") || "";
+    if (!contentType.startsWith("multipart/form-data;"))
+      throw new ApiError("Multipart image uploads are required.");
+    const bytes = await readBody(request, MAX_FILES * MAX_FILE_SIZE + 65536);
+    const formData = await new Request(request.url, {
+      method: "POST",
+      headers: { "content-type": contentType },
+      body: bytes,
+    }).formData();
     const files = formData.getAll("file") as File[];
 
     if (!files || files.length === 0) {
@@ -52,6 +66,7 @@ export async function POST(request: Request) {
     const uploadedUrls: string[] = [];
 
     for (const file of files) {
+      if (!(file instanceof File)) throw new ApiError("Each photo must be an image file.");
       const mimeType = (file.type || "").toLowerCase().trim();
       const rawExt = path
         .extname(file.name || "")
@@ -147,10 +162,9 @@ export async function POST(request: Request) {
         }
       }
 
-      // ── Strategy 3: Base64 Data URL Fallback (Never Fails) ─────────────────
+      // Do not report success without durable storage.
       if (!fileSaved) {
-        const base64 = buffer.toString("base64");
-        uploadedUrls.push(`data:${mimeType || "image/jpeg"};base64,${base64}`);
+        throw new ApiError("Photo storage is temporarily unavailable. Please retry later.", 503);
       }
     }
 
@@ -161,9 +175,6 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error("Review image upload error:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to process photo upload." },
-      { status: 500 },
-    );
+    return apiFailure(error, "Failed to process photo upload.");
   }
 }

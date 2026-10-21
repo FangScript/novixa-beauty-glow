@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Loader2, CheckCircle2, AlertCircle, Lock, Eye, EyeOff } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/utils/supabase/client";
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -16,20 +15,20 @@ function ResetPasswordForm() {
   const [isSaving, setIsSaving] = useState(false);
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
+  const [recoveryToken, setRecoveryToken] = useState("");
 
   useEffect(() => {
-    // Supabase sends the token via URL hash — calling getSession() picks it up automatically
-    const supabase = createClient();
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setSessionReady(true);
-      } else {
-        setStatus({
-          type: "error",
-          message: "This reset link has expired or is invalid. Please request a new one.",
-        });
-      }
-    });
+    const token = new URLSearchParams(window.location.hash.slice(1)).get("token") || "";
+    if (/^[a-f0-9]{64}$/.test(token)) {
+      setRecoveryToken(token);
+      setSessionReady(true);
+      window.history.replaceState(null, "", window.location.pathname);
+    } else {
+      setStatus({
+        type: "error",
+        message: "This reset link is invalid. Please request a new one.",
+      });
+    }
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -47,10 +46,14 @@ function ResetPasswordForm() {
 
     setIsSaving(true);
     try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) {
-        setStatus({ type: "error", message: error.message });
+      const response = await fetch("/api/auth/customer/reset-password/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: recoveryToken, password }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) {
+        setStatus({ type: "error", message: result.error || "Unable to reset your password." });
       } else {
         setStatus({
           type: "success",

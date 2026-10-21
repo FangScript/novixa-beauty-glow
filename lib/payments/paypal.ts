@@ -1,7 +1,14 @@
+import { validateAppleSessionTarget } from "./apple-validation";
+import { createHash } from "node:crypto";
+import { webhookVerificationBody } from "./webhook-payload";
 /**
  * PayPal REST API Integration
  * Supports both Sandbox and Live environments configured via environment variables.
  */
+
+function paypalFetch(url: string, options: RequestInit = {}) {
+  return fetch(url, { ...options, signal: AbortSignal.timeout(15000) });
+}
 
 interface PayPalTokenResponse {
   scope: string;
@@ -15,12 +22,12 @@ interface PayPalTokenResponse {
 let cachedAccessToken: { token: string; expiresAt: number } | null = null;
 
 export function getPayPalBaseUrl(): string {
-  const mode = process.env.PAYPAL_MODE?.toLowerCase();
+  const mode = process.env.PAYPAL_MODE?.trim().toLowerCase();
   return mode === "live" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com";
 }
 
 export function getPayPalClientId(): string {
-  return process.env.PAYPAL_CLIENT_ID || process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "";
+  return (process.env.PAYPAL_CLIENT_ID || process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "").trim();
 }
 
 export function getPayPalClientSecret(): string {
@@ -47,7 +54,7 @@ export async function getPayPalAccessToken(): Promise<string> {
   const baseUrl = getPayPalBaseUrl();
   const authHeader = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
 
-  const response = await fetch(`${baseUrl}/v1/oauth2/token`, {
+  const response = await paypalFetch(`${baseUrl}/v1/oauth2/token`, {
     method: "POST",
     headers: {
       Authorization: `Basic ${authHeader}`,
@@ -201,7 +208,7 @@ export async function createPayPalOrder(params: CreateOrderParams) {
     payload.application_context = experienceContext;
   }
 
-  const response = await fetch(`${baseUrl}/v2/checkout/orders`, {
+  const response = await paypalFetch(`${baseUrl}/v2/checkout/orders`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -232,11 +239,15 @@ export async function capturePayPalOrder(paypalOrderId: string) {
   const accessToken = await getPayPalAccessToken();
   const baseUrl = getPayPalBaseUrl();
 
-  const response = await fetch(`${baseUrl}/v2/checkout/orders/${paypalOrderId}/capture`, {
+  const response = await paypalFetch(`${baseUrl}/v2/checkout/orders/${paypalOrderId}/capture`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
+      "PayPal-Request-Id": createHash("sha256")
+        .update("capture:" + paypalOrderId)
+        .digest("hex")
+        .slice(0, 38),
       Prefer: "return=representation",
     },
   });
@@ -273,7 +284,7 @@ export async function getPayPalOrderDetails(paypalOrderId: string) {
   const accessToken = await getPayPalAccessToken();
   const baseUrl = getPayPalBaseUrl();
 
-  const response = await fetch(`${baseUrl}/v2/checkout/orders/${paypalOrderId}`, {
+  const response = await paypalFetch(`${baseUrl}/v2/checkout/orders/${paypalOrderId}`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -346,15 +357,18 @@ export async function confirmPayPalOrderPaymentSource(
     );
   }
 
-  const response = await fetch(`${baseUrl}/v2/checkout/orders/${orderId}/confirm-payment-source`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-      Prefer: "return=representation",
+  const response = await paypalFetch(
+    `${baseUrl}/v2/checkout/orders/${orderId}/confirm-payment-source`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({ payment_source: normalizedPaymentSource }),
     },
-    body: JSON.stringify({ payment_source: normalizedPaymentSource }),
-  });
+  );
 
   const data = await response.json();
   const debugId = response.headers.get("Paypal-Debug-Id") || data?.debug_id;
@@ -393,68 +407,58 @@ export async function confirmPayPalOrderPaymentSource(
  */
 export async function validateApplePayMerchantSession(validationUrl: string, domainName?: string) {
   // Validate that the validation URL belongs to Apple
-  try {
-    const parsed = new URL(validationUrl);
-    if (!parsed.hostname.endsWith(".apple.com")) {
-      throw new Error("Invalid Apple Pay validation URL domain.");
-    }
-  } catch (err: any) {
-    throw new Error(err.message || "Invalid validation URL.");
-  }
-
-  const cert = process.env.APPLE_PAY_CERTIFICATE;
-  const key = process.env.APPLE_PAY_PRIVATE_KEY;
-  const merchantIdentifier =
-    process.env.APPLE_PAY_MERCHANT_IDENTIFIER || "merchant.com.novixaretail";
-  const displayName = "NOVIXA UK";
-  const domain = domainName || process.env.NEXT_PUBLIC_APP_DOMAIN || "www.novixaretail.com";
-
-  if (cert && key) {
-    const https = await import("node:https");
-    const agent = new https.Agent({ cert, key });
-
-    const response = await fetch(validationUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+  const url = validateAppleSessionTarget(validationUrl);
+  const cert = process.env.APPLE_PAY_CERTIFICATE,
+    key = process.env.APPLE_PAY_PRIVATE_KEY;
+  const merchantIdentifier = process.env.APPLE_PAY_MERCHANT_IDENTIFIER;
+  if (!cert || !key || !merchantIdentifier)
+    throw new Error(
+      "Direct Apple Pay merchant validation is not configured. Use the PayPal Apple Pay SDK.",
+    );
+  const domain = new URL(process.env.APP_URL || "https://www.novixaretail.com").hostname;
+  if (domainName && domainName !== domain)
+    throw new Error("Apple Pay domain does not match this store.");
+  const https = await import("node:https");
+  // Node fetch ignores https.Agent. Use the HTTPS API for mutual TLS.
+  return await new Promise<unknown>((resolve, reject) => {
+    const req = https.request(
+      url,
+      { method: "POST", cert, key, headers: { "Content-Type": "application/json" } },
+      (response) => {
+        const chunks: Buffer[] = [];
+        let length = 0;
+        response.on("data", (chunk: Buffer) => {
+          length += chunk.length;
+          if (length > 262144) {
+            response.destroy();
+            reject(new Error("Apple merchant response exceeded the size limit."));
+          } else chunks.push(chunk);
+        });
+        response.on("error", reject);
+        response.on("end", () => {
+          if (response.statusCode !== 200) {
+            reject(new Error("Apple merchant validation was rejected."));
+            return;
+          }
+          try {
+            resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+          } catch {
+            reject(new Error("Invalid Apple merchant response."));
+          }
+        });
+      },
+    );
+    req.setTimeout(10000, () => req.destroy(new Error("Apple merchant validation timed out.")));
+    req.on("error", reject);
+    req.end(
+      JSON.stringify({
         merchantIdentifier,
-        displayName,
+        displayName: "NOVIXA UK",
         initiative: "web",
         initiativeContext: domain,
       }),
-      // @ts-expect-error agent is node:https Agent
-      agent,
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Apple Pay validation failed: ${response.status} ${errText}`);
-    }
-
-    return await response.json();
-  }
-
-  // If running in development/sandbox without an Apple cert installed,
-  // return a mock session object only in development/sandbox mode
-  const isProduction =
-    process.env.NODE_ENV === "production" || process.env.PAYPAL_MODE?.toLowerCase() === "live";
-
-  if (isProduction) {
-    throw new Error(
-      "Apple Pay production merchant certificates (APPLE_PAY_CERTIFICATE, APPLE_PAY_PRIVATE_KEY) are not configured.",
     );
-  }
-
-  return {
-    epochTimestamp: Date.now(),
-    expiresAt: Date.now() + 3600000,
-    merchantSessionIdentifier: `SSH_${Date.now()}`,
-    nonce: `NONCE_${Date.now()}`,
-    merchantIdentifier,
-    domainName: domain,
-    displayName,
-    signature: "NOVIXA_SANDBOX_MOCK_SIGNATURE",
-  };
+  });
 }
 
 /**
@@ -467,27 +471,29 @@ export async function verifyPayPalWebhookSignature(params: {
   authAlgo: string;
   transmissionSig: string;
   webhookId: string;
-  webhookEvent: any;
+  webhookEventRaw: string;
 }): Promise<boolean> {
   try {
     const accessToken = await getPayPalAccessToken();
     const baseUrl = getPayPalBaseUrl();
 
-    const response = await fetch(`${baseUrl}/v1/notifications/verify-webhook-signature`, {
+    const response = await paypalFetch(`${baseUrl}/v1/notifications/verify-webhook-signature`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        transmission_id: params.transmissionId,
-        transmission_time: params.transmissionTime,
-        cert_url: params.certUrl,
-        auth_algo: params.authAlgo,
-        transmission_sig: params.transmissionSig,
-        webhook_id: params.webhookId,
-        webhook_event: params.webhookEvent,
-      }),
+      body: webhookVerificationBody(
+        {
+          transmission_id: params.transmissionId,
+          transmission_time: params.transmissionTime,
+          cert_url: params.certUrl,
+          auth_algo: params.authAlgo,
+          transmission_sig: params.transmissionSig,
+          webhook_id: params.webhookId,
+        },
+        params.webhookEventRaw,
+      ),
     });
 
     if (!response.ok) return false;
@@ -518,11 +524,15 @@ export async function refundPayPalCapture(
     };
   }
 
-  const response = await fetch(`${baseUrl}/v2/payments/captures/${captureId}/refund`, {
+  const response = await paypalFetch(`${baseUrl}/v2/payments/captures/${captureId}/refund`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
+      "PayPal-Request-Id": createHash("sha256")
+        .update("refund:" + captureId + ":" + (amount?.toFixed(2) || "full") + ":" + currency)
+        .digest("hex")
+        .slice(0, 38),
       Prefer: "return=representation",
     },
     body: JSON.stringify(payload),

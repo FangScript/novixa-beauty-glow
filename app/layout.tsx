@@ -1,3 +1,4 @@
+import { serializeJsonLd } from "@/lib/security/html";
 import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Plus_Jakarta_Sans } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
@@ -204,7 +205,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData) }}
         />
       </head>
       <body className="antialiased bg-background text-foreground min-h-screen">

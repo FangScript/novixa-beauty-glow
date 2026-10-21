@@ -1,3 +1,4 @@
+import { serializeJsonLd } from "@/lib/security/html";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
@@ -213,7 +214,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
       <ProductDetailClient product={product} relatedProducts={related} />
     </>

@@ -105,7 +105,8 @@ export default function AccountAddressesPage() {
     if (!postalCheck.isValid) {
       setStatus({
         type: "error",
-        message: postalCheck.message || "Please enter a valid postal code for your selected country.",
+        message:
+          postalCheck.message || "Please enter a valid postal code for your selected country.",
       });
       return;
     }
