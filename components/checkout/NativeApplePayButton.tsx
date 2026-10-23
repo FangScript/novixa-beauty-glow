@@ -1,8 +1,14 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Loader2, ShieldCheck, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { resolveApplePayConfig } from "@/lib/payments/applepay";
+import {
+  loadWalletScript,
+  validatePayPalGooglePayScript,
+  withWalletTimeout,
+} from "@/lib/payments/wallet-script";
 
 interface NativeApplePayButtonProps {
   amount: number;
@@ -48,20 +54,6 @@ export function checkApplePaySupport(): boolean {
   }
 }
 
-async function getApplePayHelper(): Promise<any | null> {
-  if (typeof window === "undefined") return null;
-  if ((window as any).paypal?.Applepay) {
-    return (window as any).paypal.Applepay();
-  }
-  for (let i = 0; i < 25; i++) {
-    await new Promise((r) => setTimeout(r, 100));
-    if ((window as any).paypal?.Applepay) {
-      return (window as any).paypal.Applepay();
-    }
-  }
-  return null;
-}
-
 export function NativeApplePayButton({
   amount,
   currency = "GBP",
@@ -77,23 +69,55 @@ export function NativeApplePayButton({
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const runtime = useRef<{ helper: any; config: ReturnType<typeof resolveApplePayConfig> } | null>(
+    null,
+  );
+  const [ready, setReady] = useState(false);
   useEffect(() => {
-    // Proactively preload PayPal SDK with applepay component if not already present
-    if (typeof window !== "undefined" && !(window as any).paypal?.Applepay) {
-      const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
-      if (
-        clientId &&
-        !document.querySelector('script[src*="paypal.com/sdk/js"][src*="applepay"]')
-      ) {
-        const script = document.createElement("script");
-        script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=${currency}&components=applepay,buttons`;
-        script.async = true;
-        document.head.appendChild(script);
+    let cancelled = false;
+    runtime.current = null;
+    setReady(false);
+    async function initialize() {
+      const response = await fetch("/api/payments/config", {
+        cache: "no-store",
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!response.ok) throw new Error("Server payment configuration is unavailable.");
+      const { paypalClientId } = await response.json();
+      if (!paypalClientId) throw new Error("PayPal client ID is missing.");
+      const params = new URLSearchParams({
+        "client-id": paypalClientId,
+        currency,
+        intent: "capture",
+        components: "buttons,googlepay,applepay",
+      });
+      await loadWalletScript({
+        src: "https://www.paypal.com/sdk/js?" + params,
+        isReady: () => Boolean((window as any).paypal?.Applepay),
+        validateExisting: (src) =>
+          validatePayPalGooglePayScript(src, paypalClientId, currency, "applepay"),
+      });
+      const helper = (window as any).paypal.Applepay();
+      const config = resolveApplePayConfig(
+        await withWalletTimeout(helper.config(), "Apple Pay configuration timed out."),
+      );
+      if (!cancelled) {
+        runtime.current = { helper, config };
+        setReady(true);
       }
     }
+    initialize().catch((error) => {
+      if (!cancelled) setErrorMessage(error.message || "Unable to initialize Apple Pay.");
+    });
+    return () => {
+      cancelled = true;
+      runtime.current = null;
+    };
   }, [currency]);
 
   const handleApplePayClick = () => {
+    if (!runtime.current || !ready || disabled || isProcessing) return;
+    const { helper: applepayHelper, config } = runtime.current;
     setErrorMessage(null);
 
     if (!validateBeforePayment()) {
@@ -123,19 +147,17 @@ export function NativeApplePayButton({
         addressLines: [shippingAddress?.addressLine1, shippingAddress?.addressLine2].filter(
           Boolean,
         ) as string[],
-        locality: shippingAddress?.city || "London",
+        locality: shippingAddress?.city || "",
         administrativeArea: shippingAddress?.state || "",
-        postalCode: shippingAddress?.postalCode || "SW1A 1AA",
+        postalCode: shippingAddress?.postalCode || "",
         country: "United Kingdom",
         countryCode: shippingAddress?.countryCode || "GB",
       };
 
       // 1. Build Apple Pay Payment Request synchronously
       const paymentRequest = {
-        countryCode: "GB",
+        ...config,
         currencyCode: currency,
-        merchantCapabilities: ["supports3DS", "supportsCredit", "supportsDebit"],
-        supportedNetworks: ["visa", "masterCard", "amex", "discover"],
         requiredBillingContactFields: ["postalAddress", "name", "phone", "email"],
         requiredShippingContactFields: ["postalAddress", "name", "phone", "email"],
         total: {
@@ -154,6 +176,7 @@ export function NativeApplePayButton({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+          expectedTotal: amount,
           couponCode: couponCode || undefined,
           shippingMethodId: shippingMethodId || undefined,
           shippingAddress: shippingAddress?.addressLine1 ? shippingAddress : undefined,
@@ -168,41 +191,22 @@ export function NativeApplePayButton({
         return data.id as string;
       });
 
+      // Handle rejection even if the buyer cancels before authorization.
+      void orderPromise.catch(() => {});
+
       // 3. Handle Merchant Validation
       session.onvalidatemerchant = async (event: any) => {
         try {
-          // If PayPal SDK exposes window.paypal.Applepay, use it; otherwise proxy to server
-          const applepayHelper = await getApplePayHelper();
-          if (applepayHelper) {
-            try {
-              const res = await applepayHelper.validateMerchant({
-                validationUrl: event.validationURL,
-                displayName: "Novixa Beauty & Glow",
-              });
-              const merchantSession = res?.merchantSession || res;
-              session.completeMerchantValidation(merchantSession);
-              return;
-            } catch (sdkErr) {
-              console.warn(
-                "PayPal SDK client validateMerchant notice, falling back to server:",
-                sdkErr,
-              );
-            }
-          }
-
-          // Server-side merchant validation proxy
-          const validateRes = await fetch("/api/wallets/applepay-validate", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ validationUrl: event.validationURL }),
-          });
-
-          const validateData = await validateRes.json();
-          if (!validateRes.ok || !validateData.merchantSession) {
-            throw new Error(validateData.error || "Merchant validation failed with Apple.");
-          }
-
-          session.completeMerchantValidation(validateData.merchantSession);
+          const result = (await withWalletTimeout(
+            applepayHelper.validateMerchant({
+              validationUrl: event.validationURL,
+              displayName: "NOVIXA UK",
+            }),
+            "Apple Pay merchant validation timed out.",
+          )) as any;
+          if (!result?.merchantSession)
+            throw new Error("PayPal returned no Apple Pay merchant session.");
+          session.completeMerchantValidation(result.merchantSession);
         } catch (err: any) {
           console.error("Apple Pay validation error:", err);
           session.abort();
@@ -223,13 +227,6 @@ export function NativeApplePayButton({
           const paypalOrderId = await orderPromise;
 
           // In PayPal PPCP mode, PayPal's client-side SDK manages token decryption
-          const applepayHelper = await getApplePayHelper();
-          if (!applepayHelper) {
-            throw new Error(
-              "PayPal Apple Pay SDK failed to load. Please refresh the page and try again.",
-            );
-          }
-
           // Merge Apple Pay contacts with customer form fallback for 100% compliant AVS validation
           const billingContact =
             payment.billingContact &&
@@ -248,12 +245,15 @@ export function NativeApplePayButton({
               : fallbackBillingContact;
 
           try {
-            const confirmResult = await applepayHelper.confirmOrder({
-              orderId: paypalOrderId,
-              token: payment.token,
-              billingContact,
-              shippingContact,
-            });
+            const confirmResult = (await withWalletTimeout(
+              applepayHelper.confirmOrder({
+                orderId: paypalOrderId,
+                token: payment.token,
+                billingContact,
+                shippingContact,
+              }),
+              "Apple Pay authorization timed out.",
+            )) as any;
 
             if (confirmResult?.status === "FAILED" || confirmResult?.error) {
               const errDetail =
@@ -420,11 +420,11 @@ export function NativeApplePayButton({
       {/* Official Native Apple Pay Button */}
       <button
         type="button"
-        disabled={disabled || isProcessing}
+        disabled={disabled || isProcessing || !ready}
         onClick={handleApplePayClick}
         aria-label="Buy with Apple Pay"
         className={`w-full h-12 bg-black text-white rounded-lg cursor-pointer transition-all flex items-center justify-center text-sm font-medium hover:bg-neutral-900 active:scale-[0.99] shadow-xs apple-pay-native-button ${
-          disabled || isProcessing ? "opacity-50 pointer-events-none" : ""
+          disabled || isProcessing || !ready ? "opacity-50 pointer-events-none" : ""
         }`}
       >
         {/* Rendered only when -apple-pay-button WebKit styling is not applied */}

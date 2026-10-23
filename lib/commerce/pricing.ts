@@ -71,6 +71,7 @@ export function priceCart(
   coupon: PricedCoupon | null,
   method: PricedShipping,
   now = Date.now(),
+  bundleAdjustmentPence = 0,
 ) {
   const productMap = new Map(products.map((product) => [product.id, product]));
   let subtotalPence = 0;
@@ -93,6 +94,10 @@ export function priceCart(
       imageUrl: product.images?.[0]?.url || null,
     };
   });
+  if (!Number.isSafeInteger(bundleAdjustmentPence))
+    throw new CommerceError("Invalid bundle pricing.");
+  const merchandisePence = subtotalPence - bundleAdjustmentPence;
+  if (merchandisePence < 0) throw new CommerceError("Invalid bundle total.");
   let discountPence = 0;
   if (coupon) {
     if (
@@ -100,30 +105,33 @@ export function priceCart(
       (coupon.startsAt && coupon.startsAt.getTime() > now) ||
       (coupon.expiresAt && coupon.expiresAt.getTime() <= now) ||
       (coupon.usageLimit !== null && coupon.usageCount >= coupon.usageLimit) ||
-      subtotalPence < moneyInPence(coupon.minimumOrder)
+      merchandisePence < moneyInPence(coupon.minimumOrder)
     )
       throw new CommerceError("This coupon is not currently available for this order.");
     const value = Number(coupon.value);
     if (!Number.isFinite(value) || value < 0 || (coupon.type === "PERCENTAGE" && value > 100))
       throw new CommerceError("Invalid coupon configuration.");
     discountPence = Math.min(
-      subtotalPence,
+      merchandisePence,
       coupon.type === "PERCENTAGE"
-        ? Math.round((subtotalPence * value) / 100)
+        ? Math.round((merchandisePence * value) / 100)
         : moneyInPence(value),
     );
   }
   if (!method.active) throw new CommerceError("The delivery method is no longer available.");
-  const freeStandard = subtotalPence >= 7000 && /normal|standard/i.test(method.name);
+  const freeStandard = merchandisePence >= 7000 && /normal|standard/i.test(method.name);
   const shippingPence = freeStandard ? 0 : moneyInPence(method.price);
-  const totalPence = subtotalPence - discountPence + shippingPence;
+  const totalPence = merchandisePence - discountPence + shippingPence;
   if (!Number.isSafeInteger(totalPence) || totalPence < 1)
     throw new CommerceError("The checkout total must be at least one penny.");
   return {
     items,
     lineItems,
     subtotal: subtotalPence / 100,
-    discount: discountPence / 100,
+    discount: (discountPence + bundleAdjustmentPence) / 100,
+    bundleAdjustment: bundleAdjustmentPence / 100,
+    merchandiseSubtotal: merchandisePence / 100,
+    couponDiscount: discountPence / 100,
     shipping: shippingPence / 100,
     tax: 0,
     total: totalPence / 100,

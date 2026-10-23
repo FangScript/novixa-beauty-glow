@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 import { Loader2, ShieldCheck, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -47,9 +47,23 @@ export function PayPalCheckoutButton({
   const [isProcessing, setIsProcessing] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
 
-  const clientId =
-    process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID ||
-    "BAAi8QOljyA26-sCFX-3M0WIYmJk_qm16xSH4wVblfWVIv_-NFY7GvGAIw9f6D5-A8CtcHPlUOhDpXXxGs";
+  const [clientId, setClientId] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/payments/config", { cache: "no-store", signal: AbortSignal.timeout(15000) })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Server payment configuration is unavailable.");
+        const data = await response.json();
+        if (!data.paypalClientId) throw new Error("PayPal client ID is missing.");
+        if (!cancelled) setClientId(data.paypalClientId);
+      })
+      .catch((error) => {
+        if (!cancelled) setInitError(error.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleCreateOrder = async (): Promise<string> => {
     setInitError(null);
@@ -63,6 +77,7 @@ export function PayPalCheckoutButton({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+          expectedTotal: amount,
           couponCode: couponCode || undefined,
           shippingMethodId: shippingMethodId || undefined,
           shippingAddress: shippingAddress?.addressLine1 ? shippingAddress : undefined,
@@ -138,48 +153,50 @@ export function PayPalCheckoutButton({
       <div
         className={`w-full max-w-full overflow-hidden ${isProcessing || disabled ? "pointer-events-none opacity-50" : ""}`}
       >
-        <PayPalScriptProvider
-          options={{
-            clientId,
-            currency,
-            intent: "capture",
-            components: "buttons,googlepay,applepay",
-            enableFunding: fundingSource === "card" ? "card" : undefined,
-            disableFunding: fundingSource === "paypal" ? "card,credit,paylater,venmo" : undefined,
-          }}
-        >
-          <PayPalButtons
-            key={fundingSource || "paypal-default"}
-            fundingSource={fundingSource || "paypal"}
-            style={{
-              layout: "vertical",
-              color: fundingSource === "card" ? "black" : "gold",
-              shape: "rect",
-              label: fundingSource === "card" ? undefined : "paypal",
-              height: 48,
-              tagline: false,
+        {clientId && (
+          <PayPalScriptProvider
+            options={{
+              clientId,
+              currency,
+              intent: "capture",
+              components: "buttons,googlepay,applepay",
+              enableFunding: fundingSource === "card" ? "card" : undefined,
+              disableFunding: fundingSource === "paypal" ? "card,credit,paylater,venmo" : undefined,
             }}
-            disabled={disabled || isProcessing}
-            createOrder={handleCreateOrder}
-            onApprove={handleApprove}
-            onError={(err: any) => {
-              console.error("PayPal SDK Button Error:", err);
-              if (
-                err?.message?.includes("ADDRESS_VALIDATION_FAILED") ||
-                err?.message?.includes("Validation failed")
-              ) {
-                return;
-              }
-              const errMsg = "Payment authorization encountered an issue. Please try again.";
-              setInitError(errMsg);
-              toast.error(errMsg);
-              onError?.(errMsg);
-            }}
-            onCancel={() => {
-              toast.info("Payment was cancelled. Your shopping bag is preserved.");
-            }}
-          />
-        </PayPalScriptProvider>
+          >
+            <PayPalButtons
+              key={fundingSource || "paypal-default"}
+              fundingSource={fundingSource || "paypal"}
+              style={{
+                layout: "vertical",
+                color: fundingSource === "card" ? "black" : "gold",
+                shape: "rect",
+                label: fundingSource === "card" ? undefined : "paypal",
+                height: 48,
+                tagline: false,
+              }}
+              disabled={disabled || isProcessing}
+              createOrder={handleCreateOrder}
+              onApprove={handleApprove}
+              onError={(err: any) => {
+                console.error("PayPal SDK Button Error:", err);
+                if (
+                  err?.message?.includes("ADDRESS_VALIDATION_FAILED") ||
+                  err?.message?.includes("Validation failed")
+                ) {
+                  return;
+                }
+                const errMsg = "Payment authorization encountered an issue. Please try again.";
+                setInitError(errMsg);
+                toast.error(errMsg);
+                onError?.(errMsg);
+              }}
+              onCancel={() => {
+                toast.info("Payment was cancelled. Your shopping bag is preserved.");
+              }}
+            />
+          </PayPalScriptProvider>
+        )}
       </div>
 
       <div className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">

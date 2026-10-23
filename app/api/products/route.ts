@@ -74,7 +74,7 @@ export async function GET(request: Request) {
         );
       });
 
-      if (published.length > 0) {
+      {
         const mapped = published.map((p) => {
           const approvedReviews = (p as any).reviews || [];
           const count = approvedReviews.length;
@@ -123,26 +123,7 @@ export async function GET(request: Request) {
     console.warn("Falling back to in-memory catalogue query:", error);
   }
 
-  // Fallback to static catalogue
-  let list = q ? searchProducts(q) : fallbackProducts;
-
-  if (idList.length > 0) {
-    list = list.filter((p) => idList.includes(p.id) || idList.includes(p.slug));
-  }
-
-  if (category && category !== "all") {
-    list = list.filter((p) => p.category === category);
-  }
-
-  if (gender && gender !== "all") {
-    list = list.filter((p) => p.gender === gender);
-  }
-
-  return NextResponse.json({
-    total: list.length,
-    products: list,
-    source: "catalogue",
-  });
+  return NextResponse.json({ total: 0, products: [], source: "unavailable" }, { status: 503 });
 }
 
 export async function POST(request: Request) {

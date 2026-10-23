@@ -1,9 +1,5 @@
 import { prisma } from "@/lib/db/client";
-import {
-  products as fallbackProducts,
-  registerLiveProducts,
-  type Product,
-} from "@/lib/products/catalogue";
+import { registerLiveProducts, type Product } from "@/lib/products/catalogue";
 
 function isInternalTestProduct(p: any): boolean {
   const name = (p.name || "").toLowerCase();
@@ -89,7 +85,7 @@ export async function getLiveProducts(): Promise<Product[]> {
     console.warn("Failed to fetch live products from database, falling back to catalogue:", error);
   }
 
-  return fallbackProducts.filter((p) => !isInternalTestProduct(p));
+  return [];
 }
 
 export async function getLiveProductBySlug(slug: string): Promise<Product | null> {
@@ -131,14 +127,7 @@ export async function getLiveProductBySlug(slug: string): Promise<Product | null
     console.warn("Failed to fetch live product by slug from database:", error);
   }
 
-  const fallback = fallbackProducts.find(
-    (p) =>
-      !isInternalTestProduct(p) &&
-      (p.slug.toLowerCase() === lower ||
-        p.id.toLowerCase() === lower ||
-        p.sku.toLowerCase() === lower),
-  );
-  return fallback ?? null;
+  return null;
 }
 
 export async function getLiveProductById(id: string): Promise<Product | null> {

@@ -1,5 +1,6 @@
 "use client";
 
+import { useCheckoutQuote } from "@/lib/commerce/use-checkout-quote";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { PageShell } from "@/components/layout/PageShell";
@@ -21,7 +22,7 @@ const DEFAULT_SHIPPING_OPTIONS: ShippingOption[] = [
   {
     id: "normal",
     name: "Normal Delivery",
-    price: 0.2,
+    price: 4.95,
     timeframe: "3-5 days",
     description: "Standard tracked courier delivery within 3-5 business days.",
     isDefault: true,
@@ -29,7 +30,7 @@ const DEFAULT_SHIPPING_OPTIONS: ShippingOption[] = [
   {
     id: "express",
     name: "Express Delivery",
-    price: 0.3,
+    price: 7.95,
     timeframe: "1-3 days",
     description: "Priority expedited courier dispatch with 1-3 business days delivery.",
     isDefault: false,
@@ -37,8 +38,7 @@ const DEFAULT_SHIPPING_OPTIONS: ShippingOption[] = [
 ];
 
 export default function CartPage() {
-  const { cart, updateQuantity, removeFromCart, subtotal } = useCommerce();
-  const items = cartProducts(cart);
+  const { cart, updateQuantity, removeFromCart, subtotal: cartSubtotal } = useCommerce();
 
   const [shippingMethods, setShippingMethods] =
     useState<ShippingOption[]>(DEFAULT_SHIPPING_OPTIONS);
@@ -68,7 +68,13 @@ export default function CartPage() {
     shippingMethods[0] ||
     DEFAULT_SHIPPING_OPTIONS[0];
 
-  const shipping = items.length > 0 ? selectedShipping.price : 0;
+  const { quote, quoteError, quoteReady } = useCheckoutQuote(
+    cart,
+    ["normal", "express"].includes(selectedShipping.id) ? undefined : selectedShipping.id,
+  );
+  const items = cartProducts(quote?.items ?? cart);
+  const subtotal = quote?.subtotal ?? cartSubtotal;
+  const shipping = quote?.shipping ?? 0;
 
   const handleSelectShipping = (method: ShippingOption) => {
     setSelectedMethodId(method.id);
@@ -94,7 +100,12 @@ export default function CartPage() {
           <div className="divide-y divide-border border-y border-border">
             {items.map(({ item, product }) => (
               <div key={product.id} className="flex gap-5 py-6">
-                <Link href={`/products/${product.slug}`} className="shrink-0">
+                <Link
+                  href={
+                    item.productId.startsWith("bundle:") ? "/bundles" : `/products/${product.slug}`
+                  }
+                  className="shrink-0"
+                >
                   <img
                     src={product.images[0]}
                     alt={product.name}
@@ -105,7 +116,11 @@ export default function CartPage() {
                   <div className="flex justify-between gap-3">
                     <div>
                       <Link
-                        href={`/products/${product.slug}`}
+                        href={
+                          item.productId.startsWith("bundle:")
+                            ? "/bundles"
+                            : `/products/${product.slug}`
+                        }
                         className="font-display text-lg tracking-tight hover:text-rosewood transition-colors"
                       >
                         {product.name}
@@ -172,16 +187,18 @@ export default function CartPage() {
 
             <div className="space-y-3 text-sm border-t border-border/60 pt-4">
               <div className="flex justify-between text-muted-foreground">
-                <span>Subtotal</span>
+                <span>Subtotal {quoteError && <span role="alert">� {quoteError}</span>}</span>
                 <span className="text-foreground font-medium">{formatPrice(subtotal)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
                 <span>Delivery ({selectedShipping.name})</span>
-                <span className="text-foreground font-medium">{formatPrice(shipping)}</span>
+                <span className="text-foreground font-medium">
+                  {quoteReady ? formatPrice(shipping) : "Calculating..."}
+                </span>
               </div>
               <div className="flex justify-between border-t border-border pt-4 font-semibold text-base text-foreground">
                 <span>Estimated Total</span>
-                <span>{formatPrice(subtotal + shipping)}</span>
+                <span>{quoteReady ? formatPrice(subtotal + shipping) : "Calculating..."}</span>
               </div>
             </div>
 

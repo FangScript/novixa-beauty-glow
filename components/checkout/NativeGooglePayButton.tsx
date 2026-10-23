@@ -253,6 +253,7 @@ export function NativeGooglePayButton({
       // A merchant error or cancellation no longer creates an abandoned PayPal order.
       const order = await paymentRequest("/api/payments/paypal/create-order", {
         items: items.map(({ productId, quantity }) => ({ productId, quantity })),
+        expectedTotal: amount,
         couponCode,
         shippingMethodId,
         shippingAddress: shippingAddress?.addressLine1 ? shippingAddress : undefined,

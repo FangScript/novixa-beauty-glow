@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { createPayPalOrder } from "@/lib/payments/paypal";
 import { getCheckoutQuote } from "@/lib/commerce/quote";
-import { CommerceError } from "@/lib/commerce/pricing";
+import { CommerceError, moneyInPence } from "@/lib/commerce/pricing";
 import { readJson, apiFailure, ApiError } from "@/lib/security/api";
 import { authSecret } from "@/lib/security/signing";
 import {
@@ -15,6 +15,7 @@ import {
 const text = z.string().trim().max(180).optional();
 const schema = z.object({
   items: z.unknown(),
+  expectedTotal: z.number().finite().positive(),
   couponCode: z.string().max(64).optional(),
   shippingMethodId: z.string().max(128).optional(),
   shippingAddress: z
@@ -36,6 +37,10 @@ export async function POST(request: Request) {
     authSecret();
     const body = await readJson(request, schema);
     const quote = await getCheckoutQuote(body);
+    if (moneyInPence(body.expectedTotal) !== quote.totalPence)
+      throw new CommerceError(
+        "Prices or delivery charges changed. Refresh checkout before paying.",
+      );
     const order = await createPayPalOrder({
       amount: quote.total,
       currency: "GBP",

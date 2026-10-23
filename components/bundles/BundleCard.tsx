@@ -26,7 +26,7 @@ export type DynamicBundle = {
 };
 
 export function BundleCard({ bundle }: { bundle: DynamicBundle }) {
-  const { addToCart } = useCommerce();
+  const { addBundle } = useCommerce();
 
   const savingsPct = useMemo(() => {
     if (bundle.savings !== undefined) return bundle.savings;
@@ -42,13 +42,7 @@ export function BundleCard({ bundle }: { bundle: DynamicBundle }) {
       return;
     }
 
-    bundle.items.forEach((item) => {
-      addToCart(item.productId, item.quantity || 1);
-    });
-
-    toast.success(
-      `"${bundle.name}" set (${bundle.items.length} items) added to your shopping bag.`,
-    );
+    void addBundle(bundle.id);
   };
 
   return (

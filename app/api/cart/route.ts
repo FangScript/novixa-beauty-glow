@@ -189,7 +189,7 @@ export async function POST(request: Request) {
     if (!productId || typeof productId !== "string") {
       return NextResponse.json({ ok: false, error: "productId is required." }, { status: 400 });
     }
-    if (isNaN(rawQuantity) || rawQuantity <= 0) {
+    if (!Number.isFinite(rawQuantity) || rawQuantity <= 0 || rawQuantity > 99) {
       return NextResponse.json(
         { ok: false, error: "quantity must be greater than zero." },
         { status: 400 },
@@ -202,7 +202,7 @@ export async function POST(request: Request) {
       where: { id: productId },
       select: { id: true, stock: true, name: true, status: true },
     });
-    if (!product || product.status === "ARCHIVED") {
+    if (!product || product.status !== "ACTIVE") {
       return NextResponse.json(
         { ok: false, error: "Product not found or unavailable." },
         { status: 404 },
@@ -289,7 +289,7 @@ export async function PUT(request: Request) {
     }
 
     const rawQuantity = Number(quantity);
-    if (isNaN(rawQuantity) || rawQuantity < 0) {
+    if (!Number.isFinite(rawQuantity) || rawQuantity < 0 || rawQuantity > 99) {
       return NextResponse.json(
         { ok: false, error: "quantity must be a non-negative number." },
         { status: 400 },
@@ -353,6 +353,12 @@ export async function PUT(request: Request) {
       });
     }
 
+    if (!itemId && productId) {
+      await prisma.cartItem.updateMany({
+        where: { cartId: cart.id, productId },
+        data: { quantity: cleanQuantity },
+      });
+    }
     return NextResponse.json({ ok: true });
   } catch (error: any) {
     console.error("PUT /api/cart error:", error);

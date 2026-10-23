@@ -75,12 +75,17 @@ export function withWalletTimeout<T>(operation: Promise<T>, message: string, tim
   ]).finally(() => clearTimeout(timer));
 }
 
-export function validatePayPalGooglePayScript(src: string, clientId: string, currency: string) {
+export function validatePayPalGooglePayScript(
+  src: string,
+  clientId: string,
+  currency: string,
+  component = "googlepay",
+) {
   const params = new URL(src).searchParams;
   if (params.get("client-id") !== clientId || (params.get("currency") || "USD") !== currency) {
     throw new Error("The loaded PayPal SDK client ID or currency does not match checkout.");
   }
-  if (!(params.get("components") || "buttons").split(",").includes("googlepay")) {
-    throw new Error("The loaded PayPal SDK does not include the googlepay component.");
+  if (!(params.get("components") || "buttons").split(",").includes(component)) {
+    throw new Error(`The loaded PayPal SDK does not include the ${component} component.`);
   }
 }

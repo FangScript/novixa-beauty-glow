@@ -1,5 +1,6 @@
 "use client";
 
+import { useCheckoutQuote } from "@/lib/commerce/use-checkout-quote";
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -65,7 +66,7 @@ const DEFAULT_SHIPPING_OPTIONS: ShippingOption[] = [
     id: "sm-normal",
     name: "Normal Delivery",
     timeframe: "3-5 days",
-    price: 0.2,
+    price: 4.95,
     description: "Standard tracked courier delivery within 3-5 business days.",
     isDefault: true,
   },
@@ -73,7 +74,7 @@ const DEFAULT_SHIPPING_OPTIONS: ShippingOption[] = [
     id: "sm-express",
     name: "Express Delivery",
     timeframe: "1-3 days",
-    price: 0.3,
+    price: 7.95,
     description: "Priority expedited courier dispatch with 1-3 business days delivery.",
     isDefault: false,
   },
@@ -91,7 +92,7 @@ type PaymentMethodType =
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { cart, subtotal, clearCart, isCartLoading } = useCommerce();
+  const { cart, subtotal: cartSubtotal, clearCart, isCartLoading, cartError } = useCommerce();
   const { user } = useCustomerAuth();
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -224,12 +225,17 @@ export default function CheckoutPage() {
       .finally(() => setIsLoadingShipping(false));
   }, []);
 
-  const discount = appliedCoupon?.discount ?? 0;
-  const shippingCharge = selectedShippingMethod ? selectedShippingMethod.price : 0.2;
-  const orderTotal = Math.max(
-    0,
-    Math.round((Math.max(0, subtotal - discount) + shippingCharge) * 100) / 100,
+  const { quote, quoteError, quoteReady } = useCheckoutQuote(
+    cart,
+    selectedShippingMethod?.id || undefined,
+    appliedCoupon?.code,
+    isCartLoading || isLoadingShipping || submitted,
   );
+  const subtotal = quote?.subtotal ?? cartSubtotal;
+  const discount = quote?.discount ?? 0;
+  const shippingCharge = quote?.shipping ?? 0;
+  const orderTotal = quote?.total ?? 0;
+  const paymentBlocked = isSubmitting || isCartLoading || !quoteReady || Boolean(cartError);
 
   const currentShippingAddress = useMemo(
     () => ({
@@ -238,7 +244,9 @@ export default function CheckoutPage() {
       city: formData.city.trim() || undefined,
       state: formData.state.trim() || undefined,
       postalCode: formData.pinCode.trim() || undefined,
-      countryCode: formData.country.trim() || "GB",
+      countryCode: /^(United Kingdom|UK|GB)$/i.test(formData.country.trim())
+        ? "GB"
+        : formData.country.trim(),
     }),
     [formData],
   );
@@ -246,6 +254,10 @@ export default function CheckoutPage() {
   // Format card number with spaces (4 4 4 4)
 
   const validateAddressForm = (): boolean => {
+    if (paymentBlocked) {
+      toast.error(cartError || quoteError || "Please wait while prices are verified.");
+      return false;
+    }
     if (!formData.name.trim() || !formData.email.trim()) {
       toast.error("Please enter your name and email address.");
       return false;
@@ -626,12 +638,12 @@ export default function CheckoutPage() {
 
       <form className="mt-8 grid gap-10 lg:grid-cols-[1fr_390px]" onSubmit={handleSubmit}>
         <div className="space-y-8 min-w-0 max-w-full">
-          {errorMessage && (
+          {(errorMessage || cartError || quoteError) && (
             <div className="border border-[#b86d5a] bg-[#fbf2ef] p-4 text-xs text-[#8f2d18] flex items-start gap-2.5">
               <Info size={16} className="shrink-0 mt-0.5 text-[#b86d5a]" />
               <div>
                 <p className="font-semibold">Checkout Notice</p>
-                <p className="mt-0.5">{errorMessage}</p>
+                <p className="mt-0.5">{errorMessage || cartError || quoteError}</p>
               </div>
             </div>
           )}
@@ -840,7 +852,7 @@ export default function CheckoutPage() {
                       shippingMethodId={selectedShippingMethod?.id}
                       shippingAddress={currentShippingAddress}
                       validateBeforePayment={validateAddressForm}
-                      disabled={isSubmitting}
+                      disabled={paymentBlocked}
                       onSuccess={async (res) => {
                         await submitOrderWithDetails("CARD", {
                           paypalOrderId: res.paypalOrderId,
@@ -910,7 +922,7 @@ export default function CheckoutPage() {
                       shippingMethodId={selectedShippingMethod?.id}
                       shippingAddress={currentShippingAddress}
                       validateBeforePayment={validateAddressForm}
-                      disabled={isSubmitting}
+                      disabled={paymentBlocked}
                       onSuccess={async (res) => {
                         await submitOrderWithDetails("PAYPAL", {
                           paypalOrderId: res.paypalOrderId,
@@ -976,7 +988,7 @@ export default function CheckoutPage() {
                       shippingMethodId={selectedShippingMethod?.id}
                       shippingAddress={currentShippingAddress}
                       validateBeforePayment={validateAddressForm}
-                      disabled={isSubmitting}
+                      disabled={paymentBlocked}
                       onSuccess={async (res) => {
                         await submitOrderWithDetails("GOOGLE_PAY", {
                           paypalOrderId: res.paypalOrderId,
@@ -1071,7 +1083,7 @@ export default function CheckoutPage() {
                         shippingMethodId={selectedShippingMethod?.id}
                         shippingAddress={currentShippingAddress}
                         validateBeforePayment={validateAddressForm}
-                        disabled={isSubmitting}
+                        disabled={paymentBlocked}
                         onSuccess={async (res) => {
                           await submitOrderWithDetails("APPLE_PAY", {
                             paypalOrderId: res.paypalOrderId,
@@ -1098,7 +1110,7 @@ export default function CheckoutPage() {
         <aside className="h-fit border border-border bg-white/40 p-6 backdrop-blur-xs">
           <h2 className="font-display text-2xl">Order Summary</h2>
           <div className="mt-5 space-y-3 text-sm">
-            {cartProducts(cart).map(({ item, product }) => (
+            {cartProducts(quote?.items ?? cart).map(({ item, product }) => (
               <div key={product.id} className="flex justify-between gap-3 text-xs">
                 <span className="text-muted-foreground">
                   {product.name} × {item.quantity}
@@ -1177,7 +1189,7 @@ export default function CheckoutPage() {
             {/* Order Total */}
             <div className="flex justify-between border-t border-border pt-4 font-semibold text-base text-foreground">
               <span>Total</span>
-              <span>{formatPrice(orderTotal)}</span>
+              <span>{quoteReady ? formatPrice(orderTotal) : "Verifying total..."}</span>
             </div>
             <p className="text-[10px] text-muted-foreground pt-1 text-right">
               Includes 20% UK VAT. Complimentary delivery over £70.
@@ -1197,13 +1209,13 @@ export default function CheckoutPage() {
                 );
               }
             }}
-            disabled={isSubmitting}
+            disabled={paymentBlocked}
             className="mt-8 w-full rounded-none bg-ink text-white hover:bg-black py-6 text-[10px] font-semibold tracking-[0.14em]"
           >
             {isSubmitting ? (
               <Loader2 size={16} className="animate-spin" />
             ) : (
-              `PROCEED TO ${methodDisplayNames[paymentMethod].toUpperCase()} — ${formatPrice(orderTotal)}`
+              `PROCEED TO ${methodDisplayNames[paymentMethod].toUpperCase()} — ${quoteReady ? formatPrice(orderTotal) : "Verifying total..."}`
             )}
           </Button>
           <div className="mt-3 flex items-center justify-center gap-2 text-[10px] text-muted-foreground">
