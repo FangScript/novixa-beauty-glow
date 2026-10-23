@@ -11,6 +11,7 @@ import {
 } from "@/lib/payments/wallet-script";
 
 interface NativeApplePayButtonProps {
+  customer: { name: string; email: string; phone?: string };
   amount: number;
   currency?: string;
   items: Array<{ productId: string; quantity: number; price?: number }>;
@@ -55,6 +56,7 @@ export function checkApplePaySupport(): boolean {
 }
 
 export function NativeApplePayButton({
+  customer,
   amount,
   currency = "GBP",
   items,
@@ -177,6 +179,7 @@ export function NativeApplePayButton({
         body: JSON.stringify({
           items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
           expectedTotal: amount,
+          customer,
           couponCode: couponCode || undefined,
           shippingMethodId: shippingMethodId || undefined,
           shippingAddress: shippingAddress?.addressLine1 ? shippingAddress : undefined,
@@ -351,7 +354,7 @@ export function NativeApplePayButton({
             console.error("Store order placement error after successful payment:", orderStoreErr);
             toast.error(
               orderStoreErr?.message ||
-                "Order registered but confirmation delayed. Please refresh or check orders.",
+                `Payment received; confirmation could not load. Do not pay again. Contact support with reference ${paypalOrderId}.`,
             );
           }
         } catch (authErr: any) {

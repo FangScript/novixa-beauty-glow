@@ -1,3 +1,4 @@
+import { reconcilePreparedOrder } from "@/lib/payments/prepared-order";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { OrderStatus, PaymentStatus, type Prisma } from "@prisma/client";
@@ -80,6 +81,18 @@ export async function POST(request: Request) {
       include: { payment: true },
     });
     if (!order) throw new ApiError("Order is not ready for reconciliation.", 503);
+    if (
+      payload.event_type === "PAYMENT.CAPTURE.COMPLETED" &&
+      order.orderNumber.startsWith("NVX-PAYPAL-")
+    ) {
+      if (["REFUNDED", "CANCELLED"].includes(order.paymentStatus)) {
+        return NextResponse.json({ ok: true, ignored: "Terminal payment state" });
+      }
+      const result = await reconcilePreparedOrder(order.orderNumber.slice("NVX-PAYPAL-".length));
+      if (!result.recovered)
+        throw new ApiError("Provider capture is not ready for reconciliation.", 503);
+      return NextResponse.json({ received: true, action: "reconciled" });
+    }
     const result = await prisma.$transaction(async (tx) => {
       // Claim and processing commit together; retries cannot double-apply.
       await tx.webhookEvent.create({
@@ -94,6 +107,25 @@ export async function POST(request: Request) {
       const current = await tx.order.findUniqueOrThrow({ where: { id: order.id } });
       const decision = paymentEventDecision(payload.event_type, current, resource.amount);
       if (decision.action === "update") {
+        if (
+          payload.event_type === "PAYMENT.CAPTURE.DENIED" &&
+          current.orderNumber.startsWith("NVX-PAYPAL-") &&
+          current.paymentStatus === "PROCESSING"
+        ) {
+          const items = await tx.orderItem.findMany({ where: { orderId: current.id } });
+          for (const item of items)
+            if (item.productId)
+              await tx.product.update({
+                where: { id: item.productId },
+                data: { stock: { increment: item.quantity } },
+              });
+          if (current.couponId)
+            await tx.coupon.updateMany({
+              where: { id: current.couponId, usageCount: { gt: 0 } },
+              data: { usageCount: { decrement: 1 } },
+            });
+          decision.status = "CANCELLED";
+        }
         const changed = await tx.order.updateMany({
           where: { id: current.id, updatedAt: current.updatedAt },
           data: {

@@ -4,6 +4,7 @@ export interface CaptureProvider {
   getOrder(id: string): Promise<any>;
   captureOrder(id: string): Promise<any>;
   pause(): Promise<void>;
+  beforeCapture?(): Promise<void>;
 }
 export async function settleProviderOrder(
   id: string,
@@ -22,6 +23,7 @@ export async function settleProviderOrder(
   if (order.status !== "COMPLETED") {
     if (order.status !== "APPROVED") throw new Error("Payment approval is incomplete.");
     assertProviderAmount(order, totalPence);
+    await provider.beforeCapture?.();
     try {
       order = await provider.captureOrder(id);
     } catch {

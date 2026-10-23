@@ -53,11 +53,17 @@ export function NewsletterForm() {
     }
   };
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     if (!welcomeOffer) return;
-    navigator.clipboard.writeText(welcomeOffer.code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
+    try {
+      await navigator.clipboard.writeText(welcomeOffer.code);
+      setCopied(true);
+      setErrorMessage(null);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      setCopied(false);
+      setErrorMessage("Could not copy automatically. Select and copy the voucher code above.");
+    }
   };
 
   return (

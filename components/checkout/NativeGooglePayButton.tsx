@@ -19,6 +19,7 @@ import {
 } from "@/lib/payments/wallet-script";
 
 interface NativeGooglePayButtonProps {
+  customer: { name: string; email: string; phone?: string };
   amount: number;
   currency?: string;
   items: Array<{ productId: string; quantity: number; price?: number }>;
@@ -94,6 +95,7 @@ async function paymentRequest(path: string, body: unknown) {
 }
 
 export function NativeGooglePayButton({
+  customer,
   amount,
   currency = "GBP",
   items,
@@ -254,6 +256,7 @@ export function NativeGooglePayButton({
       const order = await paymentRequest("/api/payments/paypal/create-order", {
         items: items.map(({ productId, quantity }) => ({ productId, quantity })),
         expectedTotal: amount,
+        customer,
         couponCode,
         shippingMethodId,
         shippingAddress: shippingAddress?.addressLine1 ? shippingAddress : undefined,
@@ -310,6 +313,7 @@ export function NativeGooglePayButton({
       setIsProcessing(false);
     }
   }, [
+    customer,
     disabled,
     validateBeforePayment,
     amount,

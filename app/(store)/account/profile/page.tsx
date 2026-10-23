@@ -6,10 +6,9 @@ import { ArrowLeft, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
 import { Button } from "@/components/ui/button";
 import { useCustomerAuth } from "@/lib/auth/customer-context";
-import { createClient } from "@/utils/supabase/client";
 
 export default function AccountProfilePage() {
-  const { user, isLoading: authLoading } = useCustomerAuth();
+  const { user, isLoading: authLoading, updateProfile } = useCustomerAuth();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -35,16 +34,8 @@ export default function AccountProfilePage() {
     setIsSaving(true);
 
     try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.updateUser({
-        data: { full_name: fullName.trim() },
-      });
-
-      if (error) {
-        setStatus({ type: "error", message: error.message });
-      } else {
-        setStatus({ type: "success", message: "Profile updated successfully." });
-      }
+      await updateProfile(fullName.trim());
+      setStatus({ type: "success", message: "Profile updated successfully." });
     } catch {
       setStatus({ type: "error", message: "An unexpected error occurred. Please try again." });
     } finally {

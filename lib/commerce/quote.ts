@@ -1,3 +1,4 @@
+import { requireUKDestination } from "./shipping";
 import { BUNDLE_PREFIX, expandBundles } from "./bundles";
 import { prisma } from "@/lib/db/client";
 import { CommerceError, normalizeCart, priceCart } from "./pricing";
@@ -5,9 +6,15 @@ import { CommerceError, normalizeCart, priceCart } from "./pricing";
 /** All payment creation and order finalization use this one authoritative quote. */
 export async function getCheckoutQuote(input: {
   items?: unknown;
+  countryCode?: unknown;
   couponCode?: unknown;
   shippingMethodId?: unknown;
 }) {
+  try {
+    requireUKDestination(input.countryCode);
+  } catch {
+    throw new CommerceError("Delivery is currently available to United Kingdom addresses only.");
+  }
   const requestedItems = normalizeCart(input.items);
   const bundleIds = requestedItems
     .filter((i) => i.productId.startsWith(BUNDLE_PREFIX))
@@ -82,6 +89,7 @@ export async function getCheckoutQuote(input: {
         price: Number(p.price),
         salePrice: p.salePrice === null ? null : Number(p.salePrice),
         stock: p.stock,
+        isMeasured: p.isMeasured,
         sku: p.sku,
         image: p.images[0]?.url || "/images/product-perfume.jpg",
       },

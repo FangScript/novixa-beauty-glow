@@ -189,8 +189,10 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
           <div className="mt-8 flex items-center gap-3">
             <QuantityControl
               quantity={quantity}
-              min={1}
-              onChange={(n) => setQuantity(Math.max(1, Math.min(product.stock, Math.round(n))))}
+              max={Math.min(product.stock, 99)}
+              min={product.isMeasured ? 0.01 : 1}
+              step={product.isMeasured ? 0.01 : 1}
+              onChange={setQuantity}
             />
             <Button
               className="h-11 flex-1 rounded-none bg-ink text-white hover:bg-black text-[10px] font-semibold tracking-[0.14em] uppercase"

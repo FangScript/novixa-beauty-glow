@@ -19,7 +19,10 @@ export async function generateMetadata({
   if (!product) return {};
 
   const productUrl = `${baseUrl}/products/${product.slug || slug}`;
-  const priceFormatted = product.price ? `£${Number(product.price).toFixed(2)}` : "";
+  const priceFormatted =
+    (product.salePrice ?? product.price)
+      ? `£${Number(product.salePrice ?? product.price).toFixed(2)}`
+      : "";
   const title = `${product.name} ${priceFormatted ? `(${priceFormatted})` : ""} | Luxury British Beauty | NOVIXA UK`;
   const description =
     product.description?.slice(0, 155) ||
@@ -62,7 +65,7 @@ export async function generateMetadata({
       creator: "@novixaretail",
     },
     other: {
-      "product:price:amount": String(product.price || 0),
+      "product:price:amount": String(product.salePrice ?? product.price ?? 0),
       "product:price:currency": "GBP",
       "product:availability": (product.stock ?? 1) > 0 ? "in stock" : "out of stock",
       "product:brand": "NOVIXA",
@@ -124,7 +127,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           "@type": "Offer",
           url: productUrl,
           priceCurrency: "GBP",
-          price: Number(product.price || 0).toFixed(2),
+          price: Number(product.salePrice ?? product.price ?? 0).toFixed(2),
           priceValidUntil: "2027-12-31",
           itemCondition: "https://schema.org/NewCondition",
           availability:
@@ -135,33 +138,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             "@type": "Organization",
             name: "NOVIXA UK",
           },
-          shippingDetails: {
-            "@type": "OfferShippingDetails",
-            shippingRate: {
-              "@type": "MonetaryAmount",
-              value: Number(product.price || 0) >= 70 ? "0.00" : "4.95",
-              currency: "GBP",
-            },
-            shippingDestination: {
-              "@type": "DefinedRegion",
-              addressCountry: "GB",
-            },
-            deliveryTime: {
-              "@type": "ShippingDeliveryTime",
-              handlingTime: {
-                "@type": "QuantitativeValue",
-                minValue: 0,
-                maxValue: 1,
-                unitCode: "DAY",
-              },
-              transitTime: {
-                "@type": "QuantitativeValue",
-                minValue: 1,
-                maxValue: 2,
-                unitCode: "DAY",
-              },
-            },
-          },
+
           hasMerchantReturnPolicy: {
             "@type": "MerchantReturnPolicy",
             applicableCountry: "GB",

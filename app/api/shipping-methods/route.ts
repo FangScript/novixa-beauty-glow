@@ -41,17 +41,11 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const isAdmin = searchParams.get("admin") === "true";
 
-    if (!process.env.DATABASE_URL) {
-      return NextResponse.json({
-        success: true,
-        methods: DEFAULT_SHIPPING_METHODS.map((m, idx) => ({
-          id: `sm-default-${idx + 1}`,
-          ...m,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        })),
-      });
-    }
+    if (!process.env.DATABASE_URL)
+      return NextResponse.json(
+        { success: false, error: "Delivery options are temporarily unavailable." },
+        { status: 503 },
+      );
 
     await ensureDefaultShippingMethods();
 

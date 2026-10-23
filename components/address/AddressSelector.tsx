@@ -26,6 +26,7 @@ interface AddressSelectorProps {
   value: AddressFormData;
   onChange: (val: AddressFormData) => void;
   required?: boolean;
+  ukOnly?: boolean;
   className?: string;
 }
 
@@ -33,6 +34,7 @@ export function AddressSelector({
   value,
   onChange,
   required = true,
+  ukOnly = false,
   className = "",
 }: AddressSelectorProps) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -292,7 +294,7 @@ export function AddressSelector({
             onChange={(e) => handleCountryChange(e.target.value)}
             className="h-11 w-full appearance-none border border-border/80 bg-white/70 px-3 pr-8 text-xs font-normal outline-none focus:border-rosewood focus:ring-1 focus:ring-rosewood/40 transition-all rounded-none cursor-pointer"
           >
-            {COUNTRIES.map((c) => (
+            {COUNTRIES.filter((c) => !ukOnly || c.code === "GB").map((c) => (
               <option key={c.code} value={c.name}>
                 {c.name}
               </option>

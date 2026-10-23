@@ -133,6 +133,7 @@ function formatCartItem(item: any) {
       price: Number(p.price),
       salePrice: p.salePrice !== null && p.salePrice !== undefined ? Number(p.salePrice) : null,
       stock: Number(p.stock),
+      isMeasured: Boolean(p.isMeasured),
       sku: p.sku,
       image: p.images?.[0]?.url ?? "/images/product-perfume.jpg",
     },

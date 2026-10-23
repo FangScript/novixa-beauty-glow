@@ -1,3 +1,8 @@
+import { prisma } from "@/lib/db/client";
+import { getAuthenticatedCustomer } from "@/lib/auth/session";
+import { preparedOrderNumber } from "@/lib/payments/prepared-order";
+import { cartHash } from "@/lib/payments/checkout-intent";
+import { requireUKDestination } from "@/lib/commerce/shipping";
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -14,21 +19,24 @@ import {
 
 const text = z.string().trim().max(180).optional();
 const schema = z.object({
+  customer: z.object({
+    name: z.string().trim().min(1).max(180),
+    email: z.string().trim().email().max(254),
+    phone: z.string().trim().max(80).optional(),
+  }),
   items: z.unknown(),
   expectedTotal: z.number().finite().positive(),
   couponCode: z.string().max(64).optional(),
   shippingMethodId: z.string().max(128).optional(),
-  shippingAddress: z
-    .object({
-      name: text,
-      addressLine1: text,
-      addressLine2: text,
-      city: text,
-      state: text,
-      postalCode: text,
-      countryCode: text,
-    })
-    .optional(),
+  shippingAddress: z.object({
+    name: text,
+    addressLine1: z.string().trim().min(1).max(180),
+    addressLine2: text,
+    city: z.string().trim().min(1).max(180),
+    state: text,
+    postalCode: z.string().trim().min(1).max(32),
+    countryCode: text,
+  }),
   paymentSource: z.enum(["card", "paypal", "apple_pay", "google_pay"]).default("paypal"),
 });
 export async function POST(request: Request) {
@@ -36,7 +44,13 @@ export async function POST(request: Request) {
     if (!process.env.DATABASE_URL) throw new ApiError("Checkout is temporarily unavailable.", 503);
     authSecret();
     const body = await readJson(request, schema);
-    const quote = await getCheckoutQuote(body);
+    let countryCode: string;
+    try {
+      countryCode = requireUKDestination(body.shippingAddress.countryCode);
+    } catch {
+      throw new CommerceError("Delivery is currently available to United Kingdom addresses only.");
+    }
+    const quote = await getCheckoutQuote({ ...body, countryCode });
     if (moneyInPence(body.expectedTotal) !== quote.totalPence)
       throw new CommerceError(
         "Prices or delivery charges changed. Refresh checkout before paying.",
@@ -50,6 +64,47 @@ export async function POST(request: Request) {
       shippingAddress: body.shippingAddress,
     });
     if (!order.id) throw new Error("Provider returned no order ID.");
+    const customer = await getAuthenticatedCustomer();
+    const address = body.shippingAddress;
+    await prisma.order.create({
+      data: {
+        orderNumber: preparedOrderNumber(order.id),
+        status: "PENDING",
+        paymentStatus: "UNPAID",
+        userId: customer?.id || null,
+        subtotal: quote.subtotal,
+        discount: quote.discount,
+        shipping: quote.shipping,
+        tax: quote.tax,
+        total: quote.total,
+        couponId: quote.couponId,
+        shippingMethodId: quote.shippingMethodId,
+        shippingMethodName: quote.shippingMethodName,
+        shippingAddressSnapshot: {
+          fullName: body.customer.name,
+          email: body.customer.email,
+          phone: body.customer.phone || "",
+          line1: address.addressLine1,
+          line2: address.addressLine2 || "",
+          city: address.city,
+          state: address.state || "",
+          postalCode: address.postalCode,
+          country: countryCode,
+        },
+        items: { create: quote.lineItems },
+        payment: {
+          create: {
+            provider: "PAYPAL",
+            method: body.paymentSource.toUpperCase(),
+            status: "UNPAID",
+            providerPaymentId: order.id,
+            amount: quote.total,
+            currency: "GBP",
+            rawStatus: JSON.stringify({ paypalOrderId: order.id, cartHash: cartHash(quote.items) }),
+          },
+        },
+      },
+    });
     const response = NextResponse.json({
       ok: true,
       id: order.id,

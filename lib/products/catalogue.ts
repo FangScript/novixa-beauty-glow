@@ -41,6 +41,7 @@ export const productSchema = z
     hairType: z.string().optional(),
     ingredients: z.array(z.string()).optional(),
     stock: z.number().nonnegative(),
+    isMeasured: z.boolean().optional(),
     rating: z.number().min(0).max(5),
     reviewCount: z.number().int().nonnegative(),
     badge: z.string().optional(),

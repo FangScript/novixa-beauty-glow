@@ -1,5 +1,7 @@
 "use client";
 
+import { useShipping } from "@/lib/commerce/use-shipping";
+import { effectiveShippingPrice } from "@/lib/commerce/shipping";
 import { useCheckoutQuote } from "@/lib/commerce/use-checkout-quote";
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -9,84 +11,45 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { cartProducts, formatPrice, useCommerce } from "@/lib/commerce/context";
 import { Button } from "@/components/ui/button";
 
-interface ShippingOption {
-  id: string;
-  name: string;
-  price: number;
-  timeframe: string;
-  description?: string;
-  isDefault?: boolean;
-}
-
-const DEFAULT_SHIPPING_OPTIONS: ShippingOption[] = [
-  {
-    id: "normal",
-    name: "Normal Delivery",
-    price: 4.95,
-    timeframe: "3-5 days",
-    description: "Standard tracked courier delivery within 3-5 business days.",
-    isDefault: true,
-  },
-  {
-    id: "express",
-    name: "Express Delivery",
-    price: 7.95,
-    timeframe: "1-3 days",
-    description: "Priority expedited courier dispatch with 1-3 business days delivery.",
-    isDefault: false,
-  },
-];
-
 export default function CartPage() {
-  const { cart, updateQuantity, removeFromCart, subtotal: cartSubtotal } = useCommerce();
+  const {
+    cart,
+    updateQuantity,
+    removeFromCart,
+    subtotal: cartSubtotal,
+    isCartLoading,
+    cartError,
+    retryCart,
+  } = useCommerce();
 
-  const [shippingMethods, setShippingMethods] =
-    useState<ShippingOption[]>(DEFAULT_SHIPPING_OPTIONS);
-  const [selectedMethodId, setSelectedMethodId] = useState<string>("normal");
-
-  useEffect(() => {
-    const saved =
-      typeof window !== "undefined" ? localStorage.getItem("novixa_shipping_method_id") : null;
-    fetch("/api/shipping-methods")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && Array.isArray(data.methods) && data.methods.length > 0) {
-          setShippingMethods(data.methods);
-          if (saved && data.methods.some((m: any) => m.id === saved)) {
-            setSelectedMethodId(saved);
-          } else {
-            const def = data.methods.find((m: any) => m.isDefault) || data.methods[0];
-            setSelectedMethodId(def.id);
-          }
-        }
-      })
-      .catch((err) => console.warn("Failed to load shipping methods:", err));
-  }, []);
-
-  const selectedShipping =
-    shippingMethods.find((m) => m.id === selectedMethodId) ||
-    shippingMethods[0] ||
-    DEFAULT_SHIPPING_OPTIONS[0];
-
+  const {
+    shippingMethods,
+    selectedShippingMethod: selectedShipping,
+    setSelectedShippingMethod: handleSelectShipping,
+    isLoadingShipping,
+    shippingError,
+    retryShipping,
+  } = useShipping();
   const { quote, quoteError, quoteReady } = useCheckoutQuote(
     cart,
-    ["normal", "express"].includes(selectedShipping.id) ? undefined : selectedShipping.id,
+    selectedShipping?.id,
+    undefined,
+    isLoadingShipping || Boolean(shippingError),
   );
   const items = cartProducts(quote?.items ?? cart);
   const subtotal = quote?.subtotal ?? cartSubtotal;
   const shipping = quote?.shipping ?? 0;
 
-  const handleSelectShipping = (method: ShippingOption) => {
-    setSelectedMethodId(method.id);
-    try {
-      localStorage.setItem("novixa_shipping_method_id", method.id);
-      localStorage.setItem("novixa_shipping_method_name", method.name);
-    } catch {}
-  };
-
   return (
     <PageShell eyebrow="Your Edit" title="Shopping Bag">
-      {!items.length ? (
+      {cartError && (
+        <p role="alert">
+          {cartError} <button onClick={retryCart}>Retry</button>
+        </p>
+      )}
+      {isCartLoading ? (
+        <p role="status">Updating your shopping bag...</p>
+      ) : !items.length ? (
         <div className="mt-8">
           <EmptyState
             title="Your bag is waiting"
@@ -157,8 +120,16 @@ export default function CartPage() {
                 <span className="text-[10px] text-muted-foreground">Tracked UK Courier</span>
               </div>
               <div className="grid grid-cols-1 gap-2">
+                {shippingError && (
+                  <p role="alert">
+                    {shippingError}{" "}
+                    <button type="button" onClick={retryShipping}>
+                      Retry
+                    </button>
+                  </p>
+                )}
                 {shippingMethods.map((method) => {
-                  const isSelected = method.id === selectedShipping.id;
+                  const isSelected = method.id === selectedShipping?.id;
                   return (
                     <button
                       key={method.id}
@@ -177,7 +148,9 @@ export default function CartPage() {
                         </span>
                       </div>
                       <span className="font-bold text-rosewood text-sm">
-                        {formatPrice(method.price)}
+                        {effectiveShippingPrice(method, subtotal) === 0
+                          ? "Free"
+                          : formatPrice(effectiveShippingPrice(method, subtotal))}
                       </span>
                     </button>
                   );
@@ -191,7 +164,7 @@ export default function CartPage() {
                 <span className="text-foreground font-medium">{formatPrice(subtotal)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
-                <span>Delivery ({selectedShipping.name})</span>
+                <span>Delivery ({selectedShipping?.name || "Delivery"})</span>
                 <span className="text-foreground font-medium">
                   {quoteReady ? formatPrice(shipping) : "Calculating..."}
                 </span>

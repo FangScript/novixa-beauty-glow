@@ -6,6 +6,7 @@ import { Loader2, ShieldCheck, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
 interface PayPalCheckoutButtonProps {
+  customer: { name: string; email: string; phone?: string };
   amount: number;
   currency?: string;
   items: Array<{ productId: string; quantity: number; price?: number }>;
@@ -32,6 +33,7 @@ interface PayPalCheckoutButtonProps {
 }
 
 export function PayPalCheckoutButton({
+  customer,
   amount,
   currency = "GBP",
   items,
@@ -78,6 +80,7 @@ export function PayPalCheckoutButton({
         body: JSON.stringify({
           items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
           expectedTotal: amount,
+          customer,
           couponCode: couponCode || undefined,
           shippingMethodId: shippingMethodId || undefined,
           shippingAddress: shippingAddress?.addressLine1 ? shippingAddress : undefined,

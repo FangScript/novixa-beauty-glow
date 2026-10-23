@@ -21,6 +21,7 @@ export type CustomerAuthContextType = {
   signInWithGoogle: (next?: string) => Promise<{ ok: boolean; error?: string }>;
   resetPassword: (email: string) => Promise<{ ok: boolean; error?: string }>;
   logout: () => Promise<void>;
+  updateProfile: (name: string) => Promise<void>;
 };
 
 const CustomerAuthContext = createContext<CustomerAuthContextType | null>(null);
@@ -124,11 +125,22 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const updateProfile = useCallback(async (name: string) => {
+    const response = await fetch("/api/auth/customer/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || "Unable to update your profile.");
+    setUser(data.user);
+  }, []);
   const logout = useCallback(async () => {
     const response = await fetch("/api/auth/customer/logout", { method: "POST" });
     if (!response.ok) throw new Error("Unable to sign out. Please try again.");
     setUser(null);
     localStorage.removeItem("novixa_customer_email");
+    localStorage.removeItem("novixa_recent_orders");
   }, []);
 
   return (
@@ -141,6 +153,7 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
         signInWithGoogle,
         resetPassword,
         logout,
+        updateProfile,
       }}
     >
       {children}

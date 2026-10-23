@@ -1,4 +1,5 @@
 "use client";
+import { normalizeQuantity } from "@/lib/commerce/quantity";
 
 import { Minus, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,23 +18,21 @@ export function QuantityControl({
   max?: number;
   step?: number;
 }) {
-  const currentInt = Math.max(min, Math.round(quantity || 1));
+  const currentInt = normalizeQuantity(quantity, min, max, step);
   const [val, setVal] = useState<string>(String(currentInt));
 
   useEffect(() => {
-    setVal(String(Math.max(min, Math.round(quantity || 1))));
-  }, [quantity, min]);
+    setVal(String(normalizeQuantity(quantity, min, max, step)));
+  }, [quantity, min, max, step]);
 
   const commitChange = (num: number) => {
-    let next = Math.round(num);
-    if (min !== undefined && next < min) next = min;
-    if (max !== undefined && next > max) next = max;
+    const next = normalizeQuantity(num, min, max, step);
     setVal(String(next));
     onChange(next);
   };
 
   const handleBlur = () => {
-    const parsed = parseInt(val, 10);
+    const parsed = Number(val);
     if (isNaN(parsed) || (min !== undefined && parsed < min)) {
       commitChange(min !== undefined ? min : 1);
     } else {
@@ -62,7 +61,7 @@ export function QuantityControl({
       </Button>
       <input
         type="number"
-        step="1"
+        step={step}
         min={min}
         max={max}
         value={val}

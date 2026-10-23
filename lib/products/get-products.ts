@@ -38,6 +38,7 @@ function mapDbProduct(p: any): Product {
     brand: p.brand || "NOVIXA",
     sku: p.sku,
     stock: p.stock ?? 0,
+    isMeasured: Boolean(p.isMeasured),
     rating,
     reviewCount,
     tags: p.tags ?? [],
@@ -62,6 +63,7 @@ function mapDbProduct(p: any): Product {
 }
 
 export async function getLiveProducts(): Promise<Product[]> {
+  if (!process.env.DATABASE_URL) throw new Error("Catalogue is unavailable.");
   try {
     if (process.env.DATABASE_URL) {
       const dbProducts = await prisma.product.findMany({
@@ -82,13 +84,16 @@ export async function getLiveProducts(): Promise<Product[]> {
       }
     }
   } catch (error) {
-    console.warn("Failed to fetch live products from database, falling back to catalogue:", error);
+    console.warn("Failed to fetch live products from database:", error);
+    throw new Error("The catalogue is temporarily unavailable. Please retry.");
   }
 
   return [];
 }
 
 export async function getLiveProductBySlug(slug: string): Promise<Product | null> {
+  if (!process.env.DATABASE_URL)
+    throw new Error("Product information is temporarily unavailable. Please retry.");
   if (!slug) return null;
   const decoded = decodeURIComponent(slug).trim();
   const lower = decoded.toLowerCase();
@@ -125,6 +130,7 @@ export async function getLiveProductBySlug(slug: string): Promise<Product | null
     }
   } catch (error) {
     console.warn("Failed to fetch live product by slug from database:", error);
+    throw new Error("Product information is temporarily unavailable. Please retry.");
   }
 
   return null;

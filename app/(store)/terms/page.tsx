@@ -1,3 +1,4 @@
+import { ShippingRates } from "@/components/storefront/ShippingRates";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Scale, ShoppingBag, Truck, RotateCcw, AlertCircle, ShieldAlert } from "lucide-react";
@@ -82,19 +83,7 @@ export default function TermsPage() {
             We deliver to addresses across England, Wales, Scotland, and Northern Ireland using
             Royal Mail Tracked and DPD services:
           </p>
-          <ul className="mt-2 list-disc pl-5 space-y-1 text-sm text-foreground/80">
-            <li>
-              <strong>Complimentary Delivery:</strong> Applicable on all UK orders of £70 or
-              greater.
-            </li>
-            <li>
-              <strong>Standard Logistics Fee:</strong> £4.95 for orders under £70.
-            </li>
-            <li>
-              <strong>Dispatch Cutoff:</strong> Orders placed before 2:00 PM GMT on business days
-              are dispatched same-day.
-            </li>
-          </ul>
+          <ShippingRates />
           <p className="mt-2 text-xs">
             Risk and ownership of the goods transfer to you upon physical delivery to your specified
             address.

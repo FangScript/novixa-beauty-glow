@@ -1,3 +1,4 @@
+import { ShippingRates } from "@/components/storefront/ShippingRates";
 import Link from "next/link";
 import { Truck, ShieldCheck, Clock, Gift, ArrowRight } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
@@ -30,14 +31,13 @@ export default function ShippingPage() {
     {
       icon: Truck,
       title: "Complimentary UK Delivery",
-      description:
-        "Enjoy complimentary Royal Mail Tracked delivery on all UK orders exceeding £70. For orders under £70, a flat standard logistics fee of £4.95 applies.",
+      description: <ShippingRates />,
     },
     {
       icon: Clock,
-      title: "Next-Day & 48-Hour Timelines",
+      title: "Delivery Estimates",
       description:
-        "Orders placed before 2:00 PM GMT are packaged and dispatched same-day. Royal Mail Tracked 24 delivers next working day; Tracked 48 delivers within 2–3 working days.",
+        "Choose a delivery service using the current estimated timeframe shown above and at checkout. Dispatch and transit times may vary by destination and bank holidays.",
     },
     {
       icon: Gift,
@@ -54,16 +54,7 @@ export default function ShippingPage() {
   ];
 
   const timelines = [
-    {
-      region: "Mainland England & Wales (London, Manchester, Birmingham, Leeds, Bristol)",
-      time: "1 – 2 Working Days (Tracked 24)",
-    },
-    { region: "Scotland (Edinburgh, Glasgow & Central Belt)", time: "1 – 2 Working Days" },
-    { region: "Northern Ireland (Belfast & Regional Districts)", time: "2 – 3 Working Days" },
-    {
-      region: "Scottish Highlands & Islands, Channel Islands, Isle of Man",
-      time: "2 – 4 Working Days",
-    },
+    { region: "United Kingdom", time: "See the current delivery service estimates above." },
   ];
 
   return (
@@ -85,9 +76,9 @@ export default function ShippingPage() {
                 <Icon size={20} />
               </div>
               <h3 className="mt-4 font-display text-xl text-foreground">{item.title}</h3>
-              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+              <div className="mt-2 text-xs leading-relaxed text-muted-foreground">
                 {item.description}
-              </p>
+              </div>
             </div>
           );
         })}

@@ -7,8 +7,10 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { getProduct, useCommerce, type Product } from "@/lib/commerce/context";
 
 export default function WishlistPage() {
-  const { wishlist } = useCommerce();
+  const { wishlist, toggleWishlist } = useCommerce();
   const [products, setProducts] = useState<Product[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,32 +24,23 @@ export default function WishlistPage() {
         return;
       }
 
-      // First resolve statically available products for instantaneous rendering
-      const staticMap = new Map<string, Product>();
-      wishlist.forEach((id) => {
-        const p = getProduct(id);
-        if (p) staticMap.set(p.id, p);
-      });
-
-      // Fetch dynamic products from the API to guarantee all DB products and live prices load
+      setLoading(true);
+      setError(null);
       try {
-        const res = await fetch(`/api/products?ids=${encodeURIComponent(wishlist.join(","))}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data.products)) {
-            data.products.forEach((p: Product) => staticMap.set(p.id, p));
-          }
+        const res = await fetch(`/api/products?ids=${encodeURIComponent(wishlist.join(","))}`, {
+          cache: "no-store",
+        });
+        const data = await res.json();
+        if (!res.ok || !Array.isArray(data.products))
+          throw new Error("Unable to load current wishlist products.");
+        if (isMounted) setProducts(data.products);
+      } catch (error) {
+        if (isMounted) {
+          setProducts([]);
+          setError(error instanceof Error ? error.message : "Unable to load wishlist.");
         }
-      } catch (err) {
-        console.warn("Failed to fetch live wishlist products:", err);
-      }
-
-      if (isMounted) {
-        const resolvedList = wishlist
-          .map((id) => staticMap.get(id))
-          .filter((p): p is Product => Boolean(p));
-        setProducts(resolvedList);
-        setLoading(false);
+      } finally {
+        if (isMounted) setLoading(false);
       }
     }
 
@@ -55,11 +48,27 @@ export default function WishlistPage() {
     return () => {
       isMounted = false;
     };
-  }, [wishlist]);
+  }, [wishlist, revision]);
 
   return (
     <PageShell eyebrow="Saved For Later" title="Your Wishlist">
-      {loading ? (
+      {!loading &&
+        !error &&
+        wishlist
+          .filter((id) => !products.some((p) => p.id === id))
+          .map((id) => (
+            <p key={id} className="mt-4">
+              A saved item is no longer available.{" "}
+              <button onClick={() => toggleWishlist(id)} className="underline">
+                Remove saved item
+              </button>
+            </p>
+          ))}
+      {error ? (
+        <div role="alert">
+          {error} <button onClick={() => setRevision((n) => n + 1)}>Retry</button>
+        </div>
+      ) : loading ? (
         <div className="mt-12 flex justify-center py-16">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-stone-800 border-t-transparent" />
         </div>

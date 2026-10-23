@@ -10,92 +10,46 @@ import { useCustomerAuth } from "@/lib/auth/customer-context";
 import { OrderTracker } from "@/components/account/OrderTracker";
 
 export default function AccountOrdersPage() {
-  const { user } = useCustomerAuth();
-  const [orders, setOrders] = useState<any[]>([]);
-  const [email, setEmail] = useState("");
-  const [searchEmail, setSearchEmail] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-
-  const fetchOrders = async (targetEmail: string, targetUserId?: string) => {
-    setIsLoading(true);
-    try {
-      // Prefer userId lookup (more reliable) then fall back to email
-      const param = targetUserId
-        ? `userId=${encodeURIComponent(targetUserId)}`
-        : targetEmail
-          ? `email=${encodeURIComponent(targetEmail)}`
-          : null;
-
-      if (param) {
-        const res = await fetch(`/api/orders?${param}`);
-        const data = await res.json();
-        if (data.orders && Array.isArray(data.orders) && data.orders.length > 0) {
-          setOrders(data.orders);
-          setIsLoading(false);
-          return;
-        }
-      }
-
-      // Fallback to local session orders if API returns empty
-      if (typeof window !== "undefined") {
-        const local = JSON.parse(localStorage.getItem("novixa_recent_orders") || "[]");
-        setOrders(local);
-      }
-    } catch (err) {
-      console.warn("Failed to fetch customer orders:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  const { user, isLoading: authLoading } = useCustomerAuth();
+  const [result, setResult] = useState<{ userId: string; orders: any[]; error?: string }>();
+  const [revision, setRevision] = useState(0);
+  const userId = user?.id;
+  const email = user?.email || "";
+  const orders = result?.userId === user?.id ? result?.orders || [] : [];
+  const error = result?.userId === user?.id ? result?.error : undefined;
+  const isLoading = authLoading || Boolean(user && result?.userId !== user.id);
   useEffect(() => {
-    // Prefer the authenticated customer email, fall back to localStorage
-    const resolvedEmail =
-      user?.email ||
-      (typeof window !== "undefined" ? localStorage.getItem("novixa_customer_email") || "" : "");
-    setEmail(resolvedEmail);
-    setSearchEmail(resolvedEmail);
-    fetchOrders(resolvedEmail, user?.id);
-  }, [user]);
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchEmail.trim()) {
-      if (typeof window !== "undefined") {
-        localStorage.setItem("novixa_customer_email", searchEmail.trim());
-      }
-      setEmail(searchEmail.trim());
-      fetchOrders(searchEmail.trim());
-    }
-  };
+    if (!userId) return;
+    const controller = new AbortController();
+    setResult(undefined);
+    fetch("/api/orders", { cache: "no-store", signal: controller.signal })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok || !Array.isArray(data.orders))
+          throw new Error(data.error || "Unable to load your orders.");
+        if (!controller.signal.aborted) setResult({ userId, orders: data.orders });
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) setResult({ userId, orders: [], error: error.message });
+      });
+    return () => controller.abort();
+  }, [userId, revision]);
 
   return (
     <PageShell eyebrow="Your Account" title="Order History">
-      {/* Email lookup — hidden when logged in since email is auto-resolved */}
-      {!user && (
-        <form onSubmit={handleSearch} className="mt-8 flex max-w-md gap-2">
-          <input
-            type="email"
-            placeholder="Lookup orders by your email..."
-            value={searchEmail}
-            onChange={(e) => setSearchEmail(e.target.value)}
-            className="h-10 flex-1 border border-border bg-white/50 px-3 text-xs outline-none focus:border-rosewood"
-          />
-          <Button
-            type="submit"
-            className="h-10 rounded-none bg-ink text-white hover:bg-black text-[10px] uppercase tracking-wider"
-          >
-            <Search size={13} className="mr-1.5" /> Find
-          </Button>
-        </form>
-      )}
       {user && email && (
         <p className="mt-8 text-xs text-muted-foreground">
           Showing orders for <span className="font-medium text-foreground">{email}</span>
         </p>
       )}
 
-      {isLoading ? (
+      {error ? (
+        <div role="alert">
+          {error} <button onClick={() => setRevision((n) => n + 1)}>Retry</button>
+        </div>
+      ) : !authLoading && !user ? (
+        <Link href="/login?next=/account/orders">Sign in to view your orders</Link>
+      ) : isLoading ? (
         <div className="py-20 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
           <Loader2 size={16} className="animate-spin text-rosewood" /> Retrieving your orders...
         </div>
@@ -111,7 +65,7 @@ export default function AccountOrdersPage() {
             title="No orders yet"
             copy={
               email
-                ? `No orders found associated with ${email}. Try another email or explore the collection.`
+                ? `No orders found associated with ${email}. Explore the collection to place your first order.`
                 : "Your completed NOVIXA orders will appear here along with live tracking and receipts."
             }
             action="/shop"

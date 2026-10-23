@@ -1,5 +1,7 @@
 "use client";
 
+import { useShipping } from "@/lib/commerce/use-shipping";
+import { effectiveShippingPrice } from "@/lib/commerce/shipping";
 import { useCheckoutQuote } from "@/lib/commerce/use-checkout-quote";
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
@@ -52,34 +54,6 @@ import {
   MaestroLogo,
 } from "@/components/checkout/CardBrandBadges";
 
-export type ShippingOption = {
-  id: string;
-  name: string;
-  timeframe: string;
-  price: number;
-  description?: string | null;
-  isDefault: boolean;
-};
-
-const DEFAULT_SHIPPING_OPTIONS: ShippingOption[] = [
-  {
-    id: "sm-normal",
-    name: "Normal Delivery",
-    timeframe: "3-5 days",
-    price: 4.95,
-    description: "Standard tracked courier delivery within 3-5 business days.",
-    isDefault: true,
-  },
-  {
-    id: "sm-express",
-    name: "Express Delivery",
-    timeframe: "1-3 days",
-    price: 7.95,
-    description: "Priority expedited courier dispatch with 1-3 business days delivery.",
-    isDefault: false,
-  },
-];
-
 type AppliedCoupon = {
   id?: string;
   code: string;
@@ -92,7 +66,14 @@ type PaymentMethodType =
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { cart, subtotal: cartSubtotal, clearCart, isCartLoading, cartError } = useCommerce();
+  const {
+    cart,
+    subtotal: cartSubtotal,
+    clearCart,
+    isCartLoading,
+    cartError,
+    retryCart,
+  } = useCommerce();
   const { user } = useCustomerAuth();
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -197,39 +178,19 @@ export default function CheckoutPage() {
     toast.info("Promotional code removed");
   };
 
-  // Shipping Methods Selection
-  const [shippingMethods, setShippingMethods] =
-    useState<ShippingOption[]>(DEFAULT_SHIPPING_OPTIONS);
-  const [selectedShippingMethod, setSelectedShippingMethod] = useState<ShippingOption>(
-    DEFAULT_SHIPPING_OPTIONS[0],
-  );
-  const [isLoadingShipping, setIsLoadingShipping] = useState(true);
-
-  useEffect(() => {
-    const savedMethodId =
-      typeof window !== "undefined" ? localStorage.getItem("novixa_shipping_method_id") : null;
-    fetch("/api/shipping-methods")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && Array.isArray(data.methods) && data.methods.length > 0) {
-          setShippingMethods(data.methods);
-          const matched = savedMethodId
-            ? data.methods.find((m: any) => m.id === savedMethodId)
-            : null;
-          const defaultOpt =
-            matched || data.methods.find((m: any) => m.isDefault) || data.methods[0];
-          setSelectedShippingMethod(defaultOpt);
-        }
-      })
-      .catch((err) => console.warn("Failed to load shipping methods:", err))
-      .finally(() => setIsLoadingShipping(false));
-  }, []);
-
+  const {
+    shippingMethods,
+    selectedShippingMethod,
+    setSelectedShippingMethod,
+    isLoadingShipping,
+    shippingError,
+    retryShipping,
+  } = useShipping();
   const { quote, quoteError, quoteReady } = useCheckoutQuote(
     cart,
     selectedShippingMethod?.id || undefined,
     appliedCoupon?.code,
-    isCartLoading || isLoadingShipping || submitted,
+    isCartLoading || isLoadingShipping || Boolean(shippingError) || submitted,
   );
   const subtotal = quote?.subtotal ?? cartSubtotal;
   const discount = quote?.discount ?? 0;
@@ -256,6 +217,10 @@ export default function CheckoutPage() {
   const validateAddressForm = (): boolean => {
     if (paymentBlocked) {
       toast.error(cartError || quoteError || "Please wait while prices are verified.");
+      return false;
+    }
+    if (formData.country !== "United Kingdom" && formData.country !== "GB") {
+      toast.error("Delivery is currently available within the United Kingdom only.");
       return false;
     }
     if (!formData.name.trim() || !formData.email.trim()) {
@@ -368,19 +333,8 @@ export default function CheckoutPage() {
       }
 
       // Save customer email and placed order for local history sync
-      if (typeof window !== "undefined") {
-        try {
-          localStorage.setItem("novixa_customer_email", formData.email.trim());
-          const existing = JSON.parse(localStorage.getItem("novixa_recent_orders") || "[]");
-          localStorage.setItem(
-            "novixa_recent_orders",
-            JSON.stringify([data.order, ...existing].slice(0, 20)),
-          );
-        } catch {}
-      }
-
       setConfirmedOrder(data.order);
-      clearCart();
+      void clearCart();
       setSubmitted(true);
       toast.success(`Order ${data.order.orderNumber} placed successfully!`);
     } catch (err: any) {
@@ -431,7 +385,10 @@ export default function CheckoutPage() {
     return (
       <PageShell title="Checkout">
         <div className="mt-8">
-          <p className="text-sm text-muted-foreground">Your shopping bag is currently empty.</p>
+          <p className="text-sm text-muted-foreground">
+            {cartError || "Your shopping bag is currently empty."}
+          </p>
+          {cartError && <Button onClick={retryCart}>Retry shopping bag</Button>}
           <Button asChild className="mt-6 rounded-none bg-ink text-white hover:bg-black">
             <Link href="/shop" className="text-xs uppercase tracking-wider">
               Return to shop
@@ -687,6 +644,7 @@ export default function CheckoutPage() {
             <h2 className="font-display text-2xl">Shipping Address</h2>
             <div className="mt-4">
               <AddressSelector
+                ukOnly
                 value={{
                   address: formData.address,
                   city: formData.city,
@@ -719,6 +677,14 @@ export default function CheckoutPage() {
             </div>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {shippingError && (
+                <p role="alert">
+                  {shippingError}{" "}
+                  <button type="button" onClick={retryShipping}>
+                    Retry
+                  </button>
+                </p>
+              )}
               {shippingMethods.map((method) => {
                 const isSelected = selectedShippingMethod?.id === method.id;
                 return (
@@ -771,7 +737,9 @@ export default function CheckoutPage() {
                       </div>
                       <div className="text-right">
                         <span className="font-display text-base text-foreground block">
-                          {formatPrice(method.price)}
+                          {effectiveShippingPrice(method, subtotal) === 0
+                            ? "Free"
+                            : formatPrice(effectiveShippingPrice(method, subtotal))}
                         </span>
                         {method.isDefault && (
                           <span className="mt-0.5 inline-block text-[9px] font-semibold uppercase tracking-wider text-rosewood">
@@ -842,6 +810,11 @@ export default function CheckoutPage() {
                     </p>
                     <PayPalCheckoutButton
                       fundingSource="card"
+                      customer={{
+                        name: formData.name.trim(),
+                        email: formData.email.trim(),
+                        phone: formData.phone.trim(),
+                      }}
                       amount={orderTotal}
                       currency="GBP"
                       items={cart.map((c) => ({
@@ -912,6 +885,11 @@ export default function CheckoutPage() {
                     </p>
                     <PayPalCheckoutButton
                       fundingSource="paypal"
+                      customer={{
+                        name: formData.name.trim(),
+                        email: formData.email.trim(),
+                        phone: formData.phone.trim(),
+                      }}
                       amount={orderTotal}
                       currency="GBP"
                       items={cart.map((c) => ({
@@ -978,6 +956,11 @@ export default function CheckoutPage() {
                     </p>
                     <NativeGooglePayButton
                       key="native-google-pay"
+                      customer={{
+                        name: formData.name.trim(),
+                        email: formData.email.trim(),
+                        phone: formData.phone.trim(),
+                      }}
                       amount={orderTotal}
                       currency="GBP"
                       items={cart.map((c) => ({
@@ -1073,6 +1056,11 @@ export default function CheckoutPage() {
                     ) : (
                       <NativeApplePayButton
                         key="native-apple-pay"
+                        customer={{
+                          name: formData.name.trim(),
+                          email: formData.email.trim(),
+                          phone: formData.phone.trim(),
+                        }}
                         amount={orderTotal}
                         currency="GBP"
                         items={cart.map((c) => ({

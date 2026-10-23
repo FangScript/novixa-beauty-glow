@@ -1,3 +1,4 @@
+import { effectiveShippingPrice } from "./shipping";
 export class CommerceError extends Error {
   readonly status = 400;
 }
@@ -119,8 +120,7 @@ export function priceCart(
     );
   }
   if (!method.active) throw new CommerceError("The delivery method is no longer available.");
-  const freeStandard = merchandisePence >= 7000 && /normal|standard/i.test(method.name);
-  const shippingPence = freeStandard ? 0 : moneyInPence(method.price);
+  const shippingPence = moneyInPence(effectiveShippingPrice(method, merchandisePence / 100));
   const totalPence = merchandisePence - discountPence + shippingPence;
   if (!Number.isSafeInteger(totalPence) || totalPence < 1)
     throw new CommerceError("The checkout total must be at least one penny.");

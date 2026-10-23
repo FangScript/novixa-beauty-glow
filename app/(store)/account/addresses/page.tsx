@@ -55,14 +55,18 @@ export default function AccountAddressesPage() {
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
   const fetchAddresses = async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const res = await fetch("/api/addresses");
       const data = await res.json();
-      if (data.addresses) setAddresses(data.addresses);
+      if (!res.ok || !Array.isArray(data.addresses))
+        throw new Error("Unable to load saved addresses.");
+      setAddresses(data.addresses);
     } catch (err) {
-      console.warn("Failed to fetch addresses:", err);
+      setLoadError("Unable to load saved addresses. Please retry.");
     } finally {
       setIsLoading(false);
     }
@@ -178,6 +182,11 @@ export default function AccountAddressesPage() {
 
   return (
     <PageShell eyebrow="Account" title="Delivery Addresses">
+      {loadError && (
+        <p role="alert">
+          {loadError} <button onClick={fetchAddresses}>Retry</button>
+        </p>
+      )}
       <div className="mt-8 flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
           {addresses.length > 0
@@ -302,7 +311,7 @@ export default function AccountAddressesPage() {
           <Loader2 size={14} className="animate-spin text-rosewood" />
           Loading addresses…
         </div>
-      ) : addresses.length === 0 && !showForm ? (
+      ) : !loadError && addresses.length === 0 && !showForm ? (
         <div className="mt-8 border border-border bg-white/30 p-10 text-center">
           <MapPin size={28} className="mx-auto text-rosewood/40" />
           <p className="mt-3 font-display text-xl text-foreground">No saved addresses</p>

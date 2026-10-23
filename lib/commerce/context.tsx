@@ -34,6 +34,7 @@ export type CartItem = {
     price: number;
     salePrice: number | null;
     stock: number;
+    isMeasured?: boolean;
     sku: string;
     image: string;
   };
@@ -45,6 +46,7 @@ type CommerceContextType = {
   addToCart: (id: string, quantity?: number) => Promise<void>;
   addBundle: (id: string) => Promise<void>;
   cartError: string | null;
+  retryCart: () => void;
   updateQuantity: (id: string, quantity: number) => void;
   removeFromCart: (id: string) => void;
   toggleWishlist: (id: string) => void;
@@ -93,6 +95,9 @@ export function CommerceProvider({
   children: ReactNode;
   userId?: string | null;
 }) {
+  const storageKey = "novixa-cart:" + (userId || "guest");
+  const [revision, setRevision] = useState(0);
+  const retryCart = useCallback(() => setRevision((n) => n + 1), []);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [isCartLoading, setIsCartLoading] = useState(true);
@@ -100,11 +105,14 @@ export function CommerceProvider({
   const cartRef = useRef<CartItem[]>([]);
   const queue = useRef<Promise<void>>(Promise.resolve());
   const pending = useRef(0);
-  const commit = useCallback((items: CartItem[]) => {
-    cartRef.current = items;
-    setCart(items);
-    writeLS("novixa-cart", items);
-  }, []);
+  const commit = useCallback(
+    (items: CartItem[]) => {
+      cartRef.current = items;
+      setCart(items);
+      writeLS(storageKey, items);
+    },
+    [storageKey],
+  );
   const verify = useCallback(
     async (items: CartItem[]) => {
       if (!items.length) {
@@ -143,19 +151,10 @@ export function CommerceProvider({
 
   useEffect(() => {
     void enqueue(async () => {
-      const local = readLS<CartItem[]>("novixa-cart", []);
+      const local = readLS<CartItem[]>(storageKey, []);
       const data = await cartRequest("/api/cart");
-      let server: CartItem[] = data.items;
-      // Import legacy guest items once, then use server quantities as authoritative.
-      if (!server.length) {
-        for (const item of local.filter((i) => !isBundle(i))) {
-          const synced = await cartRequest("/api/cart", "POST", {
-            productId: item.productId,
-            quantity: item.quantity,
-          });
-          server = synced.items;
-        }
-      }
+      const server: CartItem[] = data.items;
+      // Server regular items are authoritative, including an empty cart.
       commit([...server, ...local.filter(isBundle)]);
       await verify([...server, ...local.filter(isBundle)]);
     });
@@ -185,7 +184,7 @@ export function CommerceProvider({
     };
     window.addEventListener("focus", refresh);
     return () => window.removeEventListener("focus", refresh);
-  }, [userId, enqueue, verify, commit]);
+  }, [userId, enqueue, verify, commit, storageKey, revision]);
 
   const addToCart = useCallback(
     (productId: string, quantity = 1) =>
@@ -292,6 +291,7 @@ export function CommerceProvider({
         clearCart,
         isCartLoading,
         cartError,
+        retryCart,
       }}
     >
       {children}

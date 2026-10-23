@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { PageShell } from "@/components/layout/PageShell";
 import { ProductCard } from "@/components/products/ProductCard";
@@ -15,11 +15,15 @@ export function ShopClient({ initialProducts }: ShopClientProps) {
   const initialQuery = searchParams.get("q") ?? "";
   const initialCategory = (searchParams.get("category") as ProductCategory) ?? "all";
 
-  const [allProducts] = useState<Product[]>(initialProducts);
+  const allProducts = initialProducts;
   const [query, setQuery] = useState(initialQuery);
   const [category, setCategory] = useState<"all" | ProductCategory>(initialCategory);
   const [sort, setSort] = useState("featured");
 
+  useEffect(() => {
+    setQuery(initialQuery);
+    setCategory(initialCategory);
+  }, [initialQuery, initialCategory]);
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
     const list = allProducts.filter((p) => {
@@ -33,7 +37,9 @@ export function ShopClient({ initialProducts }: ShopClientProps) {
         ? (a.salePrice ?? a.price) - (b.salePrice ?? b.price)
         : sort === "price-high"
           ? (b.salePrice ?? b.price) - (a.salePrice ?? a.price)
-          : b.rating - a.rating,
+          : sort === "rating"
+            ? b.rating - a.rating
+            : 0,
     );
   }, [allProducts, query, category, sort]);
 
